@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { Todo, todoSchema } from '@/models/todo.model';
+import { ROUTES } from '@/features/todos/const';
 
 interface Props {
   todo: Todo;
@@ -25,7 +26,7 @@ const TodoEditComponent = ({ todo }: Props) => {
   const onUpdate = (data: Todo) => {
     todoUpdate(data, {
       onSuccess: () => {
-        router.push('/todos');
+        router.push(ROUTES.TODOS);
       }
     });
   };

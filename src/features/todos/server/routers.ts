@@ -1,8 +1,14 @@
-import { ORPCError } from '@orpc/server';
+/**
+ * Todo Router
+ *
+ * ORPC procedure definitions for todo operations.
+ * Validates input/output only - delegates business logic to services.
+ */
+
 import { z } from 'zod';
-import TodoCollection from '@/collections/todo.collection';
 import { appProcedure } from '@/lib/orpc';
 import { todoSchema } from '@/models/todo.model';
+import * as todoService from '@/features/todos/services/todo.service';
 
 const API_TODO_PREFIX = '/todos';
 const tags = ['Todo'];
@@ -17,8 +23,9 @@ export const todoRouter = appProcedure.router({
     })
     .output(todoSchema.array())
     .handler(async () => {
-      return (await TodoCollection.find()).reverse();
+      return todoService.getAllTodos();
     }),
+
   getById: appProcedure
     .route({
       method: 'GET',
@@ -29,19 +36,9 @@ export const todoRouter = appProcedure.router({
     .input(z.object({ id: z.string() }))
     .output(todoSchema)
     .handler(async ({ input }) => {
-      const { id } = input;
-
-      try {
-        return await TodoCollection.findById(id).orFail();
-      } catch {
-        throw new ORPCError('BAD_REQUEST', {
-          message: 'Todo Not Found',
-          data: {
-            id
-          }
-        });
-      }
+      return todoService.getTodoById(input.id);
     }),
+
   create: appProcedure
     .route({
       method: 'POST',
@@ -52,13 +49,9 @@ export const todoRouter = appProcedure.router({
     .input(z.object({ text: z.string() }))
     .output(todoSchema)
     .handler(async ({ input }) => {
-      const { text } = input;
-
-      return new TodoCollection({
-        text,
-        completed: false
-      }).save();
+      return todoService.createTodo(input.text);
     }),
+
   update: appProcedure
     .route({
       method: 'PUT',
@@ -70,16 +63,9 @@ export const todoRouter = appProcedure.router({
     .output(todoSchema)
     .handler(async ({ input }) => {
       const { id, ...updates } = input;
-
-      try {
-        return await TodoCollection.findByIdAndUpdate(id, updates, { new: true }).orFail();
-      } catch {
-        throw new ORPCError('BAD_REQUEST', {
-          message: 'Todo Not Found',
-          data: { id }
-        });
-      }
+      return todoService.updateTodo(id, updates);
     }),
+
   delete: appProcedure
     .route({
       method: 'DELETE',
@@ -90,15 +76,6 @@ export const todoRouter = appProcedure.router({
     .input(z.object({ id: z.string() }))
     .output(z.void())
     .handler(async ({ input }) => {
-      const { id } = input;
-
-      try {
-        await TodoCollection.findByIdAndDelete(id).orFail();
-      } catch {
-        throw new ORPCError('BAD_REQUEST', {
-          message: 'Todo Not Found',
-          data: { id }
-        });
-      }
+      return todoService.deleteTodo(input.id);
     })
 });

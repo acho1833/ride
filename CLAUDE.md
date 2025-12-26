@@ -127,6 +127,8 @@ Views are client components that use hooks and compose feature components:
 
 ```typescript
 // src/features/todos/views/todos-view.component.tsx
+'use client';
+
 import TodoListComponent from '@/features/todos/components/todo-list.component';
 import TodoCreateComponent from '@/features/todos/components/todo-create.component';
 
@@ -194,10 +196,24 @@ MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin
 
 ### No Magic Values
 - **Never use hardcoded values** - Extract to constants in `src/const.ts` or feature-specific `const.ts`
+- **Route paths**: Define in feature-specific `const.ts` (see example below)
 - **API paths**: Define as constants (e.g., `const API_TODO_PREFIX = '/todos'`)
 - **Timeouts/intervals**: Use named constants (e.g., `const DEBOUNCE_MS = 300`)
 - **Repeated strings**: Extract to constants or enums
 - **Configuration values**: Use environment variables or config files
+
+```typescript
+// Feature route constants - src/features/todos/const.ts
+export const ROUTES = {
+  TODOS: '/todos',
+  TODO: (id: string) => `/todos/${id}`
+} as const;
+
+// Usage in components
+import { ROUTES } from '@/features/todos/const';
+router.push(ROUTES.TODOS);
+<Link href={ROUTES.TODO(todo.id)}>
+```
 
 ```typescript
 // BAD

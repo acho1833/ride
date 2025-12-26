@@ -1,0 +1,10 @@
+{
+  "upstream": "https://github.com/acho1833/ride.git",
+  "exclude": [
+    ".git/",
+    ".claude/",
+    "CLAUDE.md",
+    "tasks/",
+    ".next/"
+  ]
+}

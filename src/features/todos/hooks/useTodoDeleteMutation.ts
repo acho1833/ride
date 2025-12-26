@@ -30,7 +30,7 @@ export const useTodosDeleteMutation = () => {
         toast.success('Todo deleted', { id: context?.toastId });
       },
       // On error: show error toast
-      onError: (error, variables, context) => {
+      onError: (_error, _variables, context) => {
         toast.error('Failed to delete todo', { id: context?.toastId });
       }
     })

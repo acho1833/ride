@@ -40,7 +40,7 @@ export const useTodosUpdateMutation = () => {
         toast.success('Todo updated', { id: context?.toastId });
       },
       // On error: show error toast
-      onError: (error, variables, context) => {
+      onError: (_error, _variables, context) => {
         toast.error('Failed to update todo', { id: context?.toastId });
       }
     })

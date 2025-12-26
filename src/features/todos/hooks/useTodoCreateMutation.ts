@@ -30,7 +30,7 @@ export const useTodosCreateMutation = () => {
         toast.success('Todo created', { id: context?.toastId });
       },
       // On error: show error toast
-      onError: (error, variables, context) => {
+      onError: (_error, _variables, context) => {
         toast.error('Failed to create todo', { id: context?.toastId });
       }
     })

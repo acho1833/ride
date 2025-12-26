@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToggleMode } from '@/stores/ui/ui.selector';
+import { ROUTES } from '@/features/todos/const';
 
 const TodoListLoadingComponent = () => {
   return (
@@ -47,7 +48,7 @@ const TodoListComponent = () => {
               {todos?.map(todo => (
                 <li key={todo.id}>
                   <Link
-                    href={`/todos/${todo.id}`}
+                    href={ROUTES.TODO(todo.id)}
                     className={cn(
                       'hover:bg-muted/50 bg-muted block rounded-lg border p-4',
                       isPendingTodoDelete && variablesTodoDelete?.id === todo.id && 'pointer-events-none'

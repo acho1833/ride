@@ -1,3 +1,5 @@
+'use client';
+
 import TodoListComponent from '@/features/todos/components/todo-list.component';
 import TodoCreateComponent from '@/features/todos/components/todo-create.component';
 

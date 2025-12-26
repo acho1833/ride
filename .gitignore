@@ -56,3 +56,5 @@ dev-dist
 .dev.vars*
 
 .open-next
+
+tasks/
