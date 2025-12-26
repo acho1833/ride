@@ -8,24 +8,12 @@ import { useTodosQuery } from '@/features/todos/hooks/useTodosQuery';
 import { useTodosDeleteMutation } from '@/features/todos/hooks/useTodoDeleteMutation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToggleMode } from '@/stores/ui/ui.selector';
 import { ROUTES } from '@/features/todos/const';
-
-const TodoListLoadingComponent = () => {
-  return (
-    <div>
-      <Skeleton className="block h-[66px] w-full rounded-lg border" />
-      <Skeleton className="block h-[66px] w-full rounded-lg border" />
-      <Skeleton className="block h-[66px] w-full rounded-lg border" />
-    </div>
-  );
-};
+import TodoListLoadingComponent from '@/features/todos/components/todo-list-loading.component';
 
 const TodoListComponent = () => {
   const { data: todos, isPending } = useTodosQuery();
   const { mutate: todoDelete, isPending: isPendingTodoDelete, variables: variablesTodoDelete } = useTodosDeleteMutation();
-  const toggleMode = useToggleMode();
 
   const onDelete = (id: string) => {
     todoDelete({ id });
@@ -33,7 +21,6 @@ const TodoListComponent = () => {
 
   return (
     <div className="flex w-full flex-col gap-y-1">
-      <div>Toggle Mode: {toggleMode + ''}</div>
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Todo List</CardTitle>
@@ -57,7 +44,7 @@ const TodoListComponent = () => {
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         {todo.completed ? (
-                          <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+                          <CheckCircle2 className="text-primary h-5 w-5 shrink-0" />
                         ) : (
                           <Circle className="text-muted-foreground h-5 w-5 shrink-0" />
                         )}

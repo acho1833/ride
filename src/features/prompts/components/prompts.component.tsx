@@ -6,6 +6,9 @@ interface Props {
   pos: ToolbarPositions;
 }
 
+/** Simulated AI response delay in milliseconds */
+const AI_RESPONSE_DELAY_MS = 1500;
+
 // Types
 interface Message {
   id: string;
@@ -90,7 +93,7 @@ const PromptsComponent = ({ pos }: Props) => {
       };
       setMessages(prev => [...prev, aiMessage]);
       setIsLoading(false);
-    }, 1500);
+    }, AI_RESPONSE_DELAY_MS);
   };
 
   // Handle enter key

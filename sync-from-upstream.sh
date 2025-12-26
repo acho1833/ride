@@ -26,7 +26,11 @@ EXCLUDE=(
   "CLAUDE.md"
   "tasks/"
   ".next/"
-  "sync-from-upstream.sh"
+  "sync-from-upstream.sh",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml"
+  "bun.lock"
 )
 
 # =============================================================================
@@ -113,15 +117,36 @@ main() {
   log_info "Copying files..."
   eval rsync -av --quiet $EXCLUDE_ARGS "$TEMP_DIR/" "./"
 
-  if git diff --quiet && git diff --staged --quiet; then
+  # Check for changes (modified, added, untracked)
+  MODIFIED=$(git diff --name-only 2>/dev/null)
+  UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null)
+
+  if [ -z "$MODIFIED" ] && [ -z "$UNTRACKED" ]; then
     log_warn "No changes to sync."
   else
-    # Show what changed
-    log_info "Changes synced:"
-    git diff --stat
-
     echo ""
     echo "========================================"
+    echo "Changes synced:"
+    echo "----------------------------------------"
+
+    # Show modified files
+    if [ -n "$MODIFIED" ]; then
+      echo -e "${YELLOW}Modified:${NC}"
+      echo "$MODIFIED" | while read -r file; do
+        echo "  M  $file"
+      done
+    fi
+
+    # Show added files
+    if [ -n "$UNTRACKED" ]; then
+      echo -e "${GREEN}Added:${NC}"
+      echo "$UNTRACKED" | while read -r file; do
+        echo "  A  $file"
+      done
+    fi
+
+    echo "----------------------------------------"
+    echo ""
     echo "Upstream commit message:"
     echo "----------------------------------------"
     echo "$COMMIT_MSG"

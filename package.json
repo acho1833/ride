@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "devc": "NODE_ENV=development tsx watch --clear-screen=false src/server.ts",
     "dev": "next dev",
     "build": "npm run lint && next build",
     "start": "next start",
