@@ -70,26 +70,115 @@ Code is organized by feature in `src/features/`. Each feature contains:
 
 **All server-side code MUST be in the `server/` directory and use `import 'server-only'`.**
 
+#### ORPC Router Pattern
+
 ```typescript
 // src/features/todos/server/routers.ts
 import 'server-only';
 
+import { z } from 'zod';
 import { appProcedure } from '@/lib/orpc';
+import { todoSchema } from '@/models/todo.model';
 import * as todoService from '@/features/todos/server/services/todo.service';
 
+const API_TODO_PREFIX = '/todos';
+const tags = ['Todo'];
+
 export const todoRouter = appProcedure.router({
-  // ... procedures
+  getAll: appProcedure
+    .route({
+      method: 'GET',
+      path: API_TODO_PREFIX,
+      summary: 'Get all todos',
+      tags
+    })
+    .output(todoSchema.array())
+    .handler(async () => {
+      return todoService.getAllTodos();
+    }),
+
+  getById: appProcedure
+    .route({
+      method: 'GET',
+      path: `${API_TODO_PREFIX}/:id`,
+      summary: 'Get todo by ID',
+      tags
+    })
+    .input(z.object({ id: z.string() }))
+    .output(todoSchema)
+    .handler(async ({ input }) => {
+      return todoService.getTodoById(input.id);
+    }),
+
+  create: appProcedure
+    .route({
+      method: 'POST',
+      path: API_TODO_PREFIX,
+      summary: 'Create a todo',
+      tags
+    })
+    .input(z.object({ text: z.string() }))
+    .output(todoSchema)
+    .handler(async ({ input }) => {
+      return todoService.createTodo(input.text);
+    }),
+
+  update: appProcedure
+    .route({
+      method: 'PUT',
+      path: `${API_TODO_PREFIX}/:id`,
+      summary: 'Update a todo',
+      tags
+    })
+    .input(todoSchema)
+    .output(todoSchema)
+    .handler(async ({ input }) => {
+      const { id, ...updates } = input;
+      return todoService.updateTodo(id, updates);
+    }),
+
+  delete: appProcedure
+    .route({
+      method: 'DELETE',
+      path: `${API_TODO_PREFIX}/:id`,
+      summary: 'Delete a todo',
+      tags
+    })
+    .input(z.object({ id: z.string() }))
+    .output(z.void())
+    .handler(async ({ input }) => {
+      return todoService.deleteTodo(input.id);
+    })
 });
 ```
+
+#### Service Pattern
 
 ```typescript
 // src/features/todos/server/services/todo.service.ts
 import 'server-only';
 
+import { ORPCError } from '@orpc/server';
 import TodoCollection from '@/collections/todo.collection';
+import type { Todo } from '@/models/todo.model';
 
-export async function getAllTodos() {
+export async function getAllTodos(): Promise<Todo[]> {
   return (await TodoCollection.find()).reverse();
+}
+
+export async function getTodoById(id: string): Promise<Todo> {
+  try {
+    return await TodoCollection.findById(id).orFail();
+  } catch {
+    throw new ORPCError('BAD_REQUEST', {
+      message: 'Todo Not Found',
+      data: { id }
+    });
+  }
+}
+
+export async function createTodo(text: string): Promise<Todo> {
+  return new TodoCollection({ text, completed: false }).save();
 }
 ```
 
@@ -98,6 +187,9 @@ Key rules:
 - All files in `server/` MUST have `import 'server-only'` at the top
 - This prevents accidental imports from client components (build will fail)
 - Never import server code directly into client components
+- Routers define `.route({ method, path, summary, tags })` for OpenAPI generation
+- Services throw `ORPCError` for API errors (not generic Error)
+- Use API prefix constants (e.g., `const API_TODO_PREFIX = '/todos'`)
 
 ### API Layer (ORPC)
 
@@ -192,6 +284,73 @@ const TodoListComponent = () => {
   // ... render using Shadcn/ui components
 };
 ```
+
+### Form Handling Pattern (CRITICAL)
+
+**All forms MUST use React Hook Form + Zod + Shadcn Form components.**
+
+```typescript
+// src/features/todos/components/todo-create.component.tsx
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useTodosCreateMutation } from '@/features/todos/hooks/useTodoCreateMutation';
+
+// Define form schema (can be inline or imported from models)
+const todoCreateSchema = z.object({
+  text: z.string().min(1, 'Text is required')
+});
+
+type TodoCreateForm = z.infer<typeof todoCreateSchema>;
+
+const TodoCreateComponent = () => {
+  const { mutate: todoCreate, isPending } = useTodosCreateMutation();
+
+  const form = useForm<TodoCreateForm>({
+    resolver: zodResolver(todoCreateSchema),
+    defaultValues: { text: '' }
+  });
+
+  const onSubmit = (data: TodoCreateForm) => {
+    todoCreate({ text: data.text });
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField
+          control={form.control}
+          name="text"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <Input type="text" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={isPending}>
+          Create
+        </Button>
+      </form>
+    </Form>
+  );
+};
+```
+
+Key rules:
+- Always use `react-hook-form` with `zodResolver` for validation
+- Use Shadcn Form components: `Form`, `FormField`, `FormControl`, `FormItem`, `FormMessage`
+- Define form schema with Zod (inline or from models)
+- Infer TypeScript type from schema: `type FormType = z.infer<typeof schema>`
+- Disable submit button while mutation is pending
+- Never use uncontrolled forms or raw `<form>` elements
 
 ### State Management
 
@@ -419,11 +578,13 @@ MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin
 
 - Components: `<name>.component.tsx`
 - Views: `<name>-view.component.tsx`
-- Hooks: `use<Name>.ts`
+- Query Hooks: `use<Entity>Query.ts` or `use<Entities>Query.ts` (e.g., `useTodoQuery.ts`, `useTodosQuery.ts`)
+- Mutation Hooks: `use<Entity><Action>Mutation.ts` (e.g., `useTodoCreateMutation.ts`, `useTodoDeleteMutation.ts`)
 - Models: `<name>.model.ts`
 - Collections: `<name>.collection.ts`
 - Stores: `<name>.store.ts` (both main store and slice files)
 - Selectors: `<name>.selector.ts`
+- Services: `<name>.service.ts`
 
 ## Adding New Features
 
