@@ -1,4 +1,4 @@
-import MainView from '@/features/main/components/main.view';
+import MainView from '@/features/main/components/main-view.component';
 
 const Page = () => {
   return <MainView />;

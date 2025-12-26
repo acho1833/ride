@@ -4,8 +4,6 @@
  * Mock editor for .txt (text) files.
  */
 
-import React from 'react';
-
 interface Props {
   fileId: string;
   fileName: string;
@@ -37,7 +35,7 @@ const TextComponent = ({ fileId, fileName }: Props) => {
               </div>
             </div>
           </div>
-          <div className="flex-1 rounded-md border bg-white p-4 font-mono text-sm dark:bg-zinc-950">
+          <div className="bg-background flex-1 rounded-md border p-4 font-mono text-sm">
             <div className="space-y-1">
               <p className="text-muted-foreground">1 | This is a mock text editor.</p>
               <p className="text-muted-foreground">2 | </p>
