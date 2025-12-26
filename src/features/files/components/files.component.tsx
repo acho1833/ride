@@ -1,3 +1,5 @@
+'use client';
+
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
 import React, { useState } from 'react';
 import { ChevronsDownUp, ChevronsUpDown, FilePlus } from 'lucide-react';

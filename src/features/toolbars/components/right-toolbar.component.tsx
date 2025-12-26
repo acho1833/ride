@@ -1,3 +1,5 @@
+'use client';
+
 import { ToolType, ToolTypeOption } from '@/features/toolbars/types';
 import { BellIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';

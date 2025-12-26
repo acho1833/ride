@@ -1,7 +1,10 @@
+'use client';
+
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { Paperclip, Send } from 'lucide-react';
 
 interface Props {
@@ -124,13 +127,13 @@ const PromptsComponent = ({ pos }: Props) => {
         <div className="border-border bg-background border-t px-6 py-4">
           <div className="flex items-end gap-3">
             <div className="relative flex-1">
-              <textarea
+              <Textarea
                 ref={textareaRef}
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
-                className="bg-background border-input focus:ring-ring text-foreground placeholder:text-muted-foreground max-h-32 w-full resize-none rounded-2xl border px-4 py-3 pr-12 focus:border-transparent focus:ring-2 focus:outline-none"
+                className="max-h-32 resize-none rounded-2xl px-4 py-3 pr-12"
                 rows={1}
                 disabled={isLoading}
               />

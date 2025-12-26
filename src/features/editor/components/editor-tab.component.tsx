@@ -5,11 +5,14 @@
  * Shows close button on hover and supports context menu.
  */
 
+'use client';
+
 import React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { EditorGroup, OpenFile } from '@/stores/open-files/open-files.store';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   file: OpenFile;
@@ -48,15 +51,14 @@ const EditorTab = ({ file, isActive, group, onActivate, onClose, onMoveToOtherGr
           <span className="truncate">{file.name}</span>
 
           {/* Close button - shows on hover or when active */}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleClose}
-            className={cn(
-              'hover:bg-muted-foreground/20 h-5 w-5 items-center justify-center rounded-sm opacity-0 transition-colors',
-              (isHovered || isActive) && 'opacity-100'
-            )}
+            className={cn('h-5 w-5 opacity-0 transition-colors', (isHovered || isActive) && 'opacity-100')}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </ContextMenuTrigger>
 

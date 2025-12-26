@@ -1,3 +1,5 @@
+'use client';
+
 import { TreeNode } from '@/stores/files/files.store';
 import { useEffect, useRef } from 'react';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';

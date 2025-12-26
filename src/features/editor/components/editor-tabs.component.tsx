@@ -4,10 +4,13 @@
  * Tab bar with overflow handling and dropdown menu.
  */
 
+'use client';
+
 import React from 'react';
 import { ChevronDown, MoreVertical } from 'lucide-react';
 import { EditorGroup, OpenFile } from '@/stores/open-files/open-files.store';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import EditorTabComponent from '@/features/editor/components/editor-tab.component';
 
 interface Props {
@@ -65,9 +68,9 @@ const EditorTabs = ({ files, activeFileId, group, onActivate, onClose, onMoveToO
       {hasOverflow && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="border-border hover:bg-muted flex h-9 w-9 items-center justify-center border-l">
+            <Button variant="ghost" size="icon" className="border-border h-9 w-9 rounded-none border-l">
               <ChevronDown className="h-4 w-4" />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {files.map(file => (
@@ -83,9 +86,9 @@ const EditorTabs = ({ files, activeFileId, group, onActivate, onClose, onMoveToO
       {/* Group menu */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="hover:bg-muted flex h-9 w-9 items-center justify-center">
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none">
             <MoreVertical className="h-4 w-4" />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onCloseAll}>Close All Tabs</DropdownMenuItem>

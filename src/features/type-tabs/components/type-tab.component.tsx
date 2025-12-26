@@ -5,11 +5,14 @@
  * Shows close button on hover and supports context menu.
  */
 
+'use client';
+
 import React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Tab } from '@/stores/type-tabs/type-tabs.store';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   tab: Tab;
@@ -46,15 +49,14 @@ const TypeTab = ({ tab, isActive, onActivate, onClose, onCloseAll }: Props) => {
           <span className="truncate">{tab.name}</span>
 
           {/* Close button - shows on hover or when active */}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleClose}
-            className={cn(
-              'hover:bg-muted-foreground/20 flex h-5 w-5 items-center justify-center rounded-sm opacity-0 transition-all',
-              (isHovered || isActive) && 'opacity-100'
-            )}
+            className={cn('h-5 w-5 opacity-0 transition-all', (isHovered || isActive) && 'opacity-100')}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </ContextMenuTrigger>
 

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Type Tab Container Component
  *

@@ -1,3 +1,5 @@
+'use client';
+
 import { ReactNode } from 'react';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import { Button } from '@/components/ui/button';

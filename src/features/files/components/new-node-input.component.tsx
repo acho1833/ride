@@ -1,3 +1,5 @@
+'use client';
+
 // Props for the NewNodeInput component
 import { useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
