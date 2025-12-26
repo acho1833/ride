@@ -439,11 +439,11 @@ Combine all slices with middleware in `app.store.ts`:
 ```typescript
 // src/stores/app.store.ts
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
-import { createJSONStorage } from 'zustand/middleware';
+import { devtools, createJSONStorage, persist } from 'zustand/middleware';
+import { IS_DEV } from '@/const';
 
-import { createFileTreeSlice, FileTreeSlice } from './files/files.slice';
-import { createUiSlice, UiSlice } from './ui/ui.slice';
+import { createFileTreeSlice, FileTreeSlice } from './files/files.store';
+import { createUiSlice, UiSlice } from './ui/ui.store';
 
 // Combined store type
 type AppStore = FileTreeSlice & UiSlice;
@@ -461,7 +461,7 @@ export const useAppStore = create<AppStore>()(
         storage: createJSONStorage(() => sessionStorage)
       }
     ),
-    { name: 'App Store', enabled: process.env.NODE_ENV === 'development' }
+    { name: 'App Store', enabled: IS_DEV }
   )
 );
 ```
@@ -474,7 +474,7 @@ export const useAppStore = create<AppStore>()(
 // src/stores/files/files.selector.ts
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../app.store';
-import { FileTreeSlice } from './files.slice';
+import { FileTreeSlice } from './files.store';
 
 // State selectors - one hook per piece of state
 export const useFileStructure = () =>
@@ -588,12 +588,224 @@ MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin
 
 ## Adding New Features
 
-1. Create `src/features/<feature-name>/` with server, hooks, views, components subdirs
-2. Create server-side code in `server/`:
-   - `server/routers.ts` - ORPC procedures
-   - `server/services/<name>.service.ts` - Business logic (with `import 'server-only'`)
-3. Register router in `src/lib/orpc/router.ts`
-4. Create React Query hooks in `hooks/`
+Complete step-by-step guide for adding a new feature (e.g., "comments"):
+
+### Step 1: Create Model and Collection
+
+```typescript
+// src/models/comment.model.ts
+import { z } from 'zod';
+
+export interface Comment {
+  id: string;
+  text: string;
+  authorId: string;
+  createdAt: Date;
+}
+
+export const commentSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  authorId: z.string(),
+  createdAt: z.date()
+});
+```
+
+```typescript
+// src/collections/comment.collection.ts
+import mongoose, { model, Model, Schema } from 'mongoose';
+import { Comment } from '@/models/comment.model';
+
+const commentSchema = new Schema<Comment>({
+  text: { type: String, required: true },
+  authorId: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const CommentCollection = (mongoose.models.Comment ??
+  model<Comment>('Comment', commentSchema, 'comment')) as Model<Comment>;
+
+export default CommentCollection;
+```
+
+### Step 2: Create Feature Directory Structure
+
+```
+src/features/comments/
+├── server/
+│   ├── routers.ts
+│   └── services/
+│       └── comment.service.ts
+├── hooks/
+│   ├── useCommentsQuery.ts
+│   ├── useCommentQuery.ts
+│   ├── useCommentCreateMutation.ts
+│   └── useCommentDeleteMutation.ts
+├── views/
+│   └── comments-view.component.tsx
+├── components/
+│   ├── comment-list.component.tsx
+│   └── comment-create.component.tsx
+└── const.ts
+```
+
+### Step 3: Create Service
+
+```typescript
+// src/features/comments/server/services/comment.service.ts
+import 'server-only';
+
+import { ORPCError } from '@orpc/server';
+import CommentCollection from '@/collections/comment.collection';
+import type { Comment } from '@/models/comment.model';
+
+export async function getAllComments(): Promise<Comment[]> {
+  return (await CommentCollection.find()).reverse();
+}
+
+export async function getCommentById(id: string): Promise<Comment> {
+  try {
+    return await CommentCollection.findById(id).orFail();
+  } catch {
+    throw new ORPCError('BAD_REQUEST', { message: 'Comment Not Found', data: { id } });
+  }
+}
+
+export async function createComment(text: string, authorId: string): Promise<Comment> {
+  return new CommentCollection({ text, authorId }).save();
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  await CommentCollection.findByIdAndDelete(id);
+}
+```
+
+### Step 4: Create Router
+
+```typescript
+// src/features/comments/server/routers.ts
+import 'server-only';
+
+import { z } from 'zod';
+import { appProcedure } from '@/lib/orpc';
+import { commentSchema } from '@/models/comment.model';
+import * as commentService from '@/features/comments/server/services/comment.service';
+
+const API_COMMENT_PREFIX = '/comments';
+const tags = ['Comment'];
+
+export const commentRouter = appProcedure.router({
+  getAll: appProcedure
+    .route({ method: 'GET', path: API_COMMENT_PREFIX, summary: 'Get all comments', tags })
+    .output(commentSchema.array())
+    .handler(async () => commentService.getAllComments()),
+
+  create: appProcedure
+    .route({ method: 'POST', path: API_COMMENT_PREFIX, summary: 'Create comment', tags })
+    .input(z.object({ text: z.string(), authorId: z.string() }))
+    .output(commentSchema)
+    .handler(async ({ input }) => commentService.createComment(input.text, input.authorId)),
+
+  delete: appProcedure
+    .route({ method: 'DELETE', path: `${API_COMMENT_PREFIX}/:id`, summary: 'Delete comment', tags })
+    .input(z.object({ id: z.string() }))
+    .output(z.void())
+    .handler(async ({ input }) => commentService.deleteComment(input.id))
+});
+```
+
+### Step 5: Register Router
+
+```typescript
+// src/lib/orpc/router.ts
+import { commentRouter } from '@/features/comments/server/routers';
+
+export const router = {
+  // ... existing routers
+  comment: commentRouter
+};
+```
+
+### Step 6: Create Hooks
+
+```typescript
+// src/features/comments/hooks/useCommentsQuery.ts
+import { useQuery } from '@tanstack/react-query';
+import { orpc } from '@/lib/orpc/orpc';
+
+export const useCommentsQuery = () => {
+  return useQuery(orpc.comment.getAll.queryOptions());
+};
+```
+
+```typescript
+// src/features/comments/hooks/useCommentCreateMutation.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { orpc } from '@/lib/orpc/orpc';
+import { toast } from 'sonner';
+
+export const useCommentCreateMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation(
+    orpc.comment.create.mutationOptions({
+      onMutate: () => ({ toastId: toast.loading('Creating comment...') }),
+      onSuccess: async (_data, _variables, context) => {
+        await queryClient.invalidateQueries({ queryKey: orpc.comment.getAll.key() });
+        toast.success('Comment created', { id: context?.toastId });
+      },
+      onError: (_error, _variables, context) => {
+        toast.error('Failed to create comment', { id: context?.toastId });
+      }
+    })
+  );
+};
+```
+
+### Step 7: Create Components and Views
+
+```typescript
+// src/features/comments/views/comments-view.component.tsx
+'use client';
+
+import CommentListComponent from '@/features/comments/components/comment-list.component';
+import CommentCreateComponent from '@/features/comments/components/comment-create.component';
+
+const CommentsViewComponent = () => {
+  return (
+    <div className="container mx-auto flex h-full max-w-4xl flex-col gap-y-7 p-6">
+      <CommentCreateComponent />
+      <CommentListComponent />
+    </div>
+  );
+};
+
+export default CommentsViewComponent;
+```
+
+### Step 8: Create Page
+
+```typescript
+// src/app/comments/page.tsx
+import CommentsViewComponent from '@/features/comments/views/comments-view.component';
+
+export default function Page() {
+  return (
+    <div className="bg-background flex w-full items-center justify-center">
+      <CommentsViewComponent />
+    </div>
+  );
+}
+```
+
+### Step 9: Create Constants
+
+```typescript
+// src/features/comments/const.ts
+export const ROUTES = {
+  COMMENTS: '/comments',
+  COMMENT: (id: string) => `/comments/${id}`
+} as const;
+```
 
 ## Code Principles
 
