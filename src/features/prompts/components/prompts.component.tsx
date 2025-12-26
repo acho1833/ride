@@ -1,0 +1,160 @@
+import { ToolbarPositions } from '@/stores/ui/ui.store';
+import MainPanelsComponent from '@/components/main-panels/main-panels.component';
+import { useEffect, useRef, useState } from 'react';
+
+interface Props {
+  pos: ToolbarPositions;
+}
+
+// Types
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+const PromptsComponent = ({ pos }: Props) => {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: "Hello! I'm Claude, your AI assistant. How can I help you today?",
+      timestamp: new Date(Date.now() - 300000)
+    },
+    {
+      id: '2',
+      role: 'user',
+      content: 'Can you help me understand React hooks?',
+      timestamp: new Date(Date.now() - 240000)
+    },
+    {
+      id: '3',
+      role: 'assistant',
+      content:
+        'Of course! React hooks are functions that let you use state and other React features in functional components. The most common hooks are useState for managing state, useEffect for side effects, and useContext for consuming context. Would you like me to explain any specific hook in detail?',
+      timestamp: new Date(Date.now() - 180000)
+    }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Auto-resize textarea
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  // Handle send message
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: inputValue,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+
+    // Simulate AI response
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content:
+          "I'd be happy to help with that! This is a mock response. In a real application, this would be replaced with an actual API call to an AI service.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      setIsLoading(false);
+    }, 1500);
+  };
+
+  // Handle enter key
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  // Format timestamp
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+  return (
+    <MainPanelsComponent title="AI Prompts" pos={pos}>
+      <div className="bg-background flex h-full flex-col">
+        <div className="flex-1 p-5">
+          <div className="h-full rounded-2xl border p-2">Sample Response</div>
+        </div>
+        {/* Input Area */}
+        <div className="border-border bg-background border-t px-6 py-4">
+          <div className="flex items-end gap-3">
+            <div className="relative flex-1">
+              <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message..."
+                className="bg-background border-input focus:ring-ring text-foreground placeholder:text-muted-foreground max-h-32 w-full resize-none rounded-2xl border px-4 py-3 pr-12 focus:border-transparent focus:ring-2 focus:outline-none"
+                rows={1}
+                disabled={isLoading}
+              />
+              <button className="text-muted-foreground hover:text-foreground absolute right-2 bottom-2 p-2 transition-colors" type="button">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  />
+                </svg>
+              </button>
+            </div>
+            <button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isLoading}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground flex items-center gap-2 rounded-2xl px-5 py-3 font-medium transition-colors disabled:cursor-not-allowed"
+            >
+              <span>Send</span>
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </MainPanelsComponent>
+  );
+};
+
+export default PromptsComponent;
