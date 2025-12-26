@@ -1,3 +1,5 @@
+import 'server-only';
+
 /**
  * Todo Router
  *
@@ -8,7 +10,7 @@
 import { z } from 'zod';
 import { appProcedure } from '@/lib/orpc';
 import { todoSchema } from '@/models/todo.model';
-import * as todoService from '@/features/todos/services/todo.service';
+import * as todoService from '@/features/todos/server/services/todo.service';
 
 const API_TODO_PREFIX = '/todos';
 const tags = ['Todo'];

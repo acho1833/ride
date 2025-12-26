@@ -57,13 +57,47 @@ const Page = async ({ params }: { params: Promise<{ todoId: string }> }) => {
 ### Feature-Based Organization
 
 Code is organized by feature in `src/features/`. Each feature contains:
-- `server/routers.ts` - ORPC procedure definitions. Validate input/output only. Delegate business logic to services
-- `services/` - Business logic
+- `server/` - All server-side code (uses `import 'server-only'`)
+  - `routers.ts` - ORPC procedure definitions. Validate input/output only. Delegate business logic to services
+  - `services/` - Business logic (database operations, external APIs)
 - `hooks/` - React Query hooks using `@orpc/tanstack-query`
 - `views/` - Page-level components (consumed by app pages)
 - `components/` - Feature-specific components
 - `types.ts` - Feature-specific types
 - `utils.ts` - Feature-specific utils
+
+### Server Code Pattern (CRITICAL)
+
+**All server-side code MUST be in the `server/` directory and use `import 'server-only'`.**
+
+```typescript
+// src/features/todos/server/routers.ts
+import 'server-only';
+
+import { appProcedure } from '@/lib/orpc';
+import * as todoService from '@/features/todos/server/services/todo.service';
+
+export const todoRouter = appProcedure.router({
+  // ... procedures
+});
+```
+
+```typescript
+// src/features/todos/server/services/todo.service.ts
+import 'server-only';
+
+import TodoCollection from '@/collections/todo.collection';
+
+export async function getAllTodos() {
+  return (await TodoCollection.find()).reverse();
+}
+```
+
+Key rules:
+- All server code lives in `server/` directory
+- All files in `server/` MUST have `import 'server-only'` at the top
+- This prevents accidental imports from client components (build will fail)
+- Never import server code directly into client components
 
 ### API Layer (ORPC)
 
@@ -209,7 +243,9 @@ MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin
 ## Adding New Features
 
 1. Create `src/features/<feature-name>/` with server, hooks, views, components subdirs
-2. Define ORPC procedures in `server/routers.ts`
+2. Create server-side code in `server/`:
+   - `server/routers.ts` - ORPC procedures
+   - `server/services/<name>.service.ts` - Business logic (with `import 'server-only'`)
 3. Register router in `src/lib/orpc/router.ts`
 4. Create React Query hooks in `hooks/`
 
