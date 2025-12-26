@@ -198,6 +198,188 @@ const TodoListComponent = () => {
 - **Server state**: TanStack React Query (caching, background updates)
 - **Client state**: Zustand stores in `src/stores/`
 
+### Zustand Store Pattern (CRITICAL)
+
+**All client-side state MUST follow the slice-based Zustand pattern.**
+
+#### Store Organization
+
+```
+src/stores/
+├── app.store.ts              # Main store combining all slices
+├── files/
+│   ├── files.slice.ts        # Slice definition (state + actions)
+│   └── files.selector.ts     # Selector hooks for components
+├── open-files/
+│   ├── open-files.slice.ts
+│   └── open-files.selector.ts
+└── ui/
+    ├── ui.slice.ts
+    └── ui.selector.ts
+```
+
+#### Slice Definition Pattern
+
+Each feature defines state interface, actions interface, and a slice creator:
+
+```typescript
+// src/stores/files/files.slice.ts
+import { StateCreator } from 'zustand';
+
+// 1. Define state interface
+export interface FileTreeState {
+  files: {
+    structure: FolderNode;
+    selectedId: string | null;
+    openFolderIds: string[];
+  };
+}
+
+// 2. Define actions interface
+export interface FileTreeActions {
+  setFileStructure: (structure: FolderNode) => void;
+  setSelectedFileId: (id: string | null) => void;
+  toggleFolder: (folderId: string) => void;
+}
+
+// 3. Combined slice type
+export type FileTreeSlice = FileTreeState & FileTreeActions;
+
+// 4. Slice creator with StateCreator generic
+export const createFileTreeSlice: StateCreator<FileTreeSlice, [], [], FileTreeSlice> = set => ({
+  // Initial state
+  files: {
+    structure: { id: 'root', name: 'root', children: [] },
+    selectedId: null,
+    openFolderIds: []
+  },
+
+  // Actions - always use immutable updates
+  setFileStructure: (structure) =>
+    set(state => ({ files: { ...state.files, structure } })),
+
+  setSelectedFileId: (id) =>
+    set(state => ({ files: { ...state.files, selectedId: id } })),
+
+  toggleFolder: (folderId) =>
+    set(state => ({
+      files: {
+        ...state.files,
+        openFolderIds: state.files.openFolderIds.includes(folderId)
+          ? state.files.openFolderIds.filter(id => id !== folderId)
+          : [...state.files.openFolderIds, folderId]
+      }
+    }))
+});
+```
+
+#### Main Store Composition
+
+Combine all slices with middleware in `app.store.ts`:
+
+```typescript
+// src/stores/app.store.ts
+import { create } from 'zustand';
+import { devtools, persist } from 'zustand/middleware';
+import { createJSONStorage } from 'zustand/middleware';
+
+import { createFileTreeSlice, FileTreeSlice } from './files/files.slice';
+import { createUiSlice, UiSlice } from './ui/ui.slice';
+
+// Combined store type
+type AppStore = FileTreeSlice & UiSlice;
+
+// Store with middleware
+export const useAppStore = create<AppStore>()(
+  devtools(
+    persist(
+      (...a) => ({
+        ...createFileTreeSlice(...a),
+        ...createUiSlice(...a)
+      }),
+      {
+        name: 'app',
+        storage: createJSONStorage(() => sessionStorage)
+      }
+    ),
+    { name: 'App Store', enabled: process.env.NODE_ENV === 'development' }
+  )
+);
+```
+
+#### Selector Pattern (CRITICAL)
+
+**Components MUST use selector hooks, never access the store directly.**
+
+```typescript
+// src/stores/files/files.selector.ts
+import { useShallow } from 'zustand/react/shallow';
+import { useAppStore } from '../app.store';
+import { FileTreeSlice } from './files.slice';
+
+// State selectors - one hook per piece of state
+export const useFileStructure = () =>
+  useAppStore((state: FileTreeSlice) => state.files.structure);
+
+export const useSelectedFileId = () =>
+  useAppStore((state: FileTreeSlice) => state.files.selectedId);
+
+export const useOpenFolderIds = () =>
+  useAppStore((state: FileTreeSlice) => state.files.openFolderIds);
+
+// Action selector - batch related actions with useShallow
+export const useFileActions = () =>
+  useAppStore(
+    useShallow((state: FileTreeSlice) => ({
+      setFileStructure: state.setFileStructure,
+      setSelectedFileId: state.setSelectedFileId,
+      toggleFolder: state.toggleFolder
+    }))
+  );
+```
+
+#### Component Usage
+
+```typescript
+// src/features/editor/components/file-tree.component.tsx
+'use client';
+
+import { useFileStructure, useSelectedFileId, useFileActions } from '@/stores/files/files.selector';
+
+const FileTreeComponent = () => {
+  // Get state via selector hooks
+  const fileStructure = useFileStructure();
+  const selectedId = useSelectedFileId();
+
+  // Get actions via action selector
+  const { setSelectedFileId, toggleFolder } = useFileActions();
+
+  return (
+    <div onClick={() => setSelectedFileId('file-1')}>
+      {/* render file tree */}
+    </div>
+  );
+};
+```
+
+#### Key Rules
+
+1. **Slice per feature** - Each feature has its own slice file
+2. **Selector per slice** - Each slice has a corresponding selector file
+3. **Never access store directly** - Always use selector hooks in components
+4. **Use `useShallow` for action batching** - Prevents unnecessary re-renders
+5. **Immutable updates only** - Always spread state, never mutate
+6. **SessionStorage persistence** - Data persists during browser session
+7. **DevTools in dev only** - Enable Redux DevTools only in development
+
+#### Adding a New Store Slice
+
+1. Create `src/stores/<feature>/` directory
+2. Create `<feature>.slice.ts` with state, actions, and slice creator
+3. Create `<feature>.selector.ts` with state and action selector hooks
+4. Register slice in `src/stores/app.store.ts`
+5. Export selectors for component use
+
 ### Data Fetching Strategy (IMPORTANT)
 
 **This app uses CLIENT-SIDE data fetching only.**
@@ -230,6 +412,8 @@ MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin
 - `src/models/` - Zod schemas and TypeScript interfaces
 - `src/collections/` - Mongoose models
 - `src/components/ui/` - Shadcn/ui components
+- `src/stores/app.store.ts` - Main Zustand store combining all slices
+- `src/stores/*/` - Feature-specific slices and selectors
 
 ## File Naming Conventions
 
@@ -238,7 +422,9 @@ MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin
 - Hooks: `use<Name>.ts`
 - Models: `<name>.model.ts`
 - Collections: `<name>.collection.ts`
-- Stores: `<Name>.store.ts`
+- Stores: `<name>.store.ts` (main store only)
+- Slices: `<name>.slice.ts`
+- Selectors: `<name>.selector.ts`
 
 ## Adding New Features
 
