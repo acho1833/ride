@@ -58,3 +58,6 @@ dev-dist
 .open-next
 
 tasks/
+
+# Sync script temp files
+.upstream-commit-msg

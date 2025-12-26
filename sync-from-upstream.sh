@@ -6,9 +6,10 @@
 # Pulls files from upstream repo and overlays them into current repo.
 #
 # Usage:
-#   ./sync-from-upstream.sh           # Sync to latest
-#   ./sync-from-upstream.sh abc123f   # Sync to specific commit
-#   ./sync-from-upstream.sh v1.0.0    # Sync to tag
+#   ./sync-from-upstream.sh                    # Sync to latest (review only)
+#   ./sync-from-upstream.sh --commit           # Sync to latest + commit + push
+#   ./sync-from-upstream.sh abc123f            # Sync to specific commit
+#   ./sync-from-upstream.sh abc123f --commit   # Sync to specific commit + commit + push
 #
 
 set -e
@@ -24,7 +25,7 @@ EXCLUDE=(
   ".claude/"
   "CLAUDE.md"
   "tasks/"
-  ".next/",
+  ".next/"
   "sync-from-upstream.sh"
 )
 
@@ -32,7 +33,18 @@ EXCLUDE=(
 # Script - No need to edit below
 # =============================================================================
 
-COMMIT_REF="${1:-HEAD}"
+# Parse arguments
+COMMIT_REF="HEAD"
+DO_COMMIT=false
+
+for arg in "$@"; do
+  if [ "$arg" == "--commit" ]; then
+    DO_COMMIT=true
+  else
+    COMMIT_REF="$arg"
+  fi
+done
+
 TEMP_DIR="/tmp/upstream-sync-$$"
 
 # Colors
@@ -102,14 +114,37 @@ main() {
   eval rsync -av --quiet $EXCLUDE_ARGS "$TEMP_DIR/" "./"
 
   if git diff --quiet && git diff --staged --quiet; then
-    log_warn "No changes to commit."
+    log_warn "No changes to sync."
   else
-    git add .
-    git commit -m "$COMMIT_MSG"
-    log_info "Committed changes with upstream message."
-  fi
+    # Show what changed
+    log_info "Changes synced:"
+    git diff --stat
 
-  log_info "Sync complete! (upstream: $COMMIT_SHA)"
+    echo ""
+    echo "========================================"
+    echo "Upstream commit message:"
+    echo "----------------------------------------"
+    echo "$COMMIT_MSG"
+    echo "----------------------------------------"
+
+    if [ "$DO_COMMIT" = true ]; then
+      # Commit and push
+      echo ""
+      log_info "Committing changes..."
+      git add .
+      git commit -m "$COMMIT_MSG"
+
+      log_info "Pushing to origin main..."
+      git push origin main
+
+      log_info "Done! Changes committed and pushed."
+    else
+      echo ""
+      echo "To commit and push, run:"
+      echo "  ./sync-from-upstream.sh --commit"
+    fi
+    echo "========================================"
+  fi
 }
 
 main
