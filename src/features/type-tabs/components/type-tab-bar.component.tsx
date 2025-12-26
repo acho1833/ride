@@ -9,7 +9,7 @@
 
 import React from 'react';
 import TypeTab from './type-tab.component';
-import { useChartTabs, useChartActiveTabId, useTypeTabActions } from '@/stores/type-tabs/type-tabs.selectors';
+import { useChartTabs, useChartActiveTabId, useTypeTabActions } from '@/stores/type-tabs/type-tabs.selector';
 
 const TypeTabBar = () => {
   const tabs = useChartTabs();

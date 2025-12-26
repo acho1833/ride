@@ -10,7 +10,7 @@
 import React from 'react';
 import TypeTabBar from './type-tab-bar.component';
 import TypeTabContent from './type-tab-content.component';
-import { useChartActiveTab } from '@/stores/type-tabs/type-tabs.selectors';
+import { useChartActiveTab } from '@/stores/type-tabs/type-tabs.selector';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
 

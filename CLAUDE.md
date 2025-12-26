@@ -208,13 +208,13 @@ const TodoListComponent = () => {
 src/stores/
 ├── app.store.ts              # Main store combining all slices
 ├── files/
-│   ├── files.slice.ts        # Slice definition (state + actions)
+│   ├── files.store.ts        # Slice definition (state + actions)
 │   └── files.selector.ts     # Selector hooks for components
 ├── open-files/
-│   ├── open-files.slice.ts
+│   ├── open-files.store.ts
 │   └── open-files.selector.ts
 └── ui/
-    ├── ui.slice.ts
+    ├── ui.store.ts
     └── ui.selector.ts
 ```
 
@@ -223,7 +223,7 @@ src/stores/
 Each feature defines state interface, actions interface, and a slice creator:
 
 ```typescript
-// src/stores/files/files.slice.ts
+// src/stores/files/files.store.ts
 import { StateCreator } from 'zustand';
 
 // 1. Define state interface
@@ -375,7 +375,7 @@ const FileTreeComponent = () => {
 #### Adding a New Store Slice
 
 1. Create `src/stores/<feature>/` directory
-2. Create `<feature>.slice.ts` with state, actions, and slice creator
+2. Create `<feature>.store.ts` with state, actions, and slice creator
 3. Create `<feature>.selector.ts` with state and action selector hooks
 4. Register slice in `src/stores/app.store.ts`
 5. Export selectors for component use
@@ -422,8 +422,7 @@ MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin
 - Hooks: `use<Name>.ts`
 - Models: `<name>.model.ts`
 - Collections: `<name>.collection.ts`
-- Stores: `<name>.store.ts` (main store only)
-- Slices: `<name>.slice.ts`
+- Stores: `<name>.store.ts` (both main store and slice files)
 - Selectors: `<name>.selector.ts`
 
 ## Adding New Features
