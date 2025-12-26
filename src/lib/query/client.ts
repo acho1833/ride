@@ -2,7 +2,13 @@
  * TanStack Query Client Factory
  *
  * Creates configured QueryClient instances for the application.
- * Handles serialization for SSR hydration and caching strategies.
+ *
+ * NOTE: This app uses CLIENT-SIDE data fetching only.
+ * - No server-side prefetching
+ * - No React Suspense for data fetching
+ * - No SSR hydration
+ * All data fetching happens in client components via React Query hooks.
+ * The hydration/dehydration config below is kept for potential future use.
  */
 
 import { defaultShouldDehydrateQuery, QueryClient } from '@tanstack/react-query';
@@ -24,9 +30,11 @@ export function createQueryClient() {
           const [json, meta] = serializer.serialize(queryKey);
           return JSON.stringify({ json, meta });
         },
-        // Prevent immediate refetch on component mount (1 minute stale time)
-        staleTime: 60 * 1000
+        // Disable caching by default - queries that need caching should set staleTime individually
+        staleTime: 0
       },
+      // NOTE: Hydration config below is NOT currently used.
+      // Kept for future use if server-side prefetching is needed.
       // SSR dehydration config - serialize server state for client hydration
       dehydrate: {
         shouldDehydrateQuery: query => defaultShouldDehydrateQuery(query) || query.state.status === 'pending',

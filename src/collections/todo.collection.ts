@@ -12,6 +12,6 @@ const todoSchema = new Schema<Todo>({
   }
 });
 
-const TodoCollection = (mongoose.models.todoSchema ?? model<Todo>('todoSchema', todoSchema, 'todo')) as Model<Todo>;
+const TodoCollection = (mongoose.models.Todo ?? model<Todo>('Todo', todoSchema, 'todo')) as Model<Todo>;
 
 export default TodoCollection;

@@ -57,12 +57,29 @@ export const toJSONPlugin = (schema: Schema) => {
   schema.set('toObject', toJSONConfig as any);
 };
 
-// MongoDB connection configuration
-const MONGODB_USER_NAME: string = 'root';
-const MONGODB_USER_PASSWORD: string = 'password';
-const MONGODB_HOST_NAME: string = 'localhost';
-const MONGODB_DATABASE: string = 'todo';
-const MONGODB_PORT: string = '27017';
+// MongoDB connection configuration (all env vars required)
+const MONGODB_USER_NAME = process.env.MONGODB_USER;
+const MONGODB_USER_PASSWORD = process.env.MONGODB_PASSWORD;
+const MONGODB_HOST_NAME = process.env.MONGODB_HOST;
+const MONGODB_DATABASE = process.env.MONGODB_DATABASE;
+const MONGODB_PORT = process.env.MONGODB_PORT;
+
+// Validate required environment variables
+const requiredEnvVars = {
+  MONGODB_USER: MONGODB_USER_NAME,
+  MONGODB_PASSWORD: MONGODB_USER_PASSWORD,
+  MONGODB_HOST: MONGODB_HOST_NAME,
+  MONGODB_DATABASE: MONGODB_DATABASE,
+  MONGODB_PORT: MONGODB_PORT
+};
+
+const missingVars = Object.entries(requiredEnvVars)
+  .filter(([_, value]) => !value)
+  .map(([key]) => key);
+
+if (missingVars.length > 0) {
+  throw new Error(`Missing required MongoDB environment variables: ${missingVars.join(', ')}`);
+}
 
 // Construct MongoDB connection URL
 const MONGODB_URL: string = `mongodb://${MONGODB_USER_NAME}:${MONGODB_USER_PASSWORD}@${MONGODB_HOST_NAME}:${MONGODB_PORT}/?authMechanism=DEFAULT`;

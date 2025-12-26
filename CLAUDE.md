@@ -164,6 +164,27 @@ const TodoListComponent = () => {
 - **Server state**: TanStack React Query (caching, background updates)
 - **Client state**: Zustand stores in `src/stores/`
 
+### Data Fetching Strategy (IMPORTANT)
+
+**This app uses CLIENT-SIDE data fetching only.**
+
+- **NO server-side prefetching** - Do not use `prefetchQuery` in server components
+- **NO React Suspense for data** - Do not use `useSuspenseQuery` or `<Suspense>` for data fetching
+- **NO SSR hydration** - Do not use `HydrationBoundary` or `dehydrate`
+
+**Components must NOT use React Query directly.** Always create custom hooks in `features/*/hooks/`.
+
+```typescript
+// WRONG - Direct React Query usage in component
+const { data } = useQuery(orpc.todo.getAll.queryOptions());
+
+// CORRECT - Use custom hooks
+import { useTodosQuery } from '@/features/todos/hooks/useTodosQuery';
+const { data } = useTodosQuery();
+```
+
+**Caching is disabled by default** (`staleTime: 0`). Queries that need caching should set `staleTime` individually in their hooks.
+
 ### Database
 
 MongoDB via Mongoose. Connection singleton in `src/lib/db.ts`. The `toJSONPlugin` (applied at startup via `instrumentation.ts`) normalizes `_id` to `id`.

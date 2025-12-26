@@ -1,6 +1,8 @@
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Paperclip, Send } from 'lucide-react';
 
 interface Props {
   pos: ToolbarPositions;
@@ -132,27 +134,14 @@ const PromptsComponent = ({ pos }: Props) => {
                 rows={1}
                 disabled={isLoading}
               />
-              <button className="text-muted-foreground hover:text-foreground absolute right-2 bottom-2 p-2 transition-colors" type="button">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                  />
-                </svg>
-              </button>
+              <Button variant="ghost" size="icon" type="button" className="absolute right-2 bottom-2">
+                <Paperclip className="h-5 w-5" />
+              </Button>
             </div>
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground flex items-center gap-2 rounded-2xl px-5 py-3 font-medium transition-colors disabled:cursor-not-allowed"
-            >
+            <Button onClick={handleSendMessage} disabled={!inputValue.trim() || isLoading} className="rounded-2xl px-5 py-3">
               <span>Send</span>
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
+              <Send className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </div>
