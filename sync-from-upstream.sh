@@ -162,7 +162,19 @@ main() {
       log_info "Pushing to origin main..."
       git push origin main
 
+      echo ""
       log_info "Done! Changes committed and pushed."
+      echo "----------------------------------------"
+      echo "Summary:"
+      if [ -n "$MODIFIED" ]; then
+        MOD_COUNT=$(echo "$MODIFIED" | wc -l | tr -d ' ')
+        echo "  Modified: $MOD_COUNT file(s)"
+      fi
+      if [ -n "$UNTRACKED" ]; then
+        ADD_COUNT=$(echo "$UNTRACKED" | wc -l | tr -d ' ')
+        echo "  Added:    $ADD_COUNT file(s)"
+      fi
+      echo "  Commit:   $COMMIT_SHA"
     else
       echo ""
       echo "To commit and push, run:"
