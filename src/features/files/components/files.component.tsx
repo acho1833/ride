@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import { TreeNode } from '@/stores/files/files.store';
 import { useFileActions, useFileStructure, useOpenFolderIds, useSelectedFileId } from '@/stores/files/files.selector';
-import FileTreeComponent, { EditingNode, FileType } from '@/features/files/components/file-tree.component';
+import FileTreeComponent, { EditingNode } from '@/features/files/components/file-tree.component';
 import NewNodeInputComponent from '@/features/files/components/new-node-input.component';
 import { ScrollArea } from '@/components/ui/scroll-area';
 

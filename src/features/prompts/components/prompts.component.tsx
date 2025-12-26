@@ -109,14 +109,6 @@ const PromptsComponent = ({ pos }: Props) => {
     }
   };
 
-  // Format timestamp
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
   return (
     <MainPanelsComponent title="AI Prompts" pos={pos}>
       <div className="bg-background flex h-full flex-col">

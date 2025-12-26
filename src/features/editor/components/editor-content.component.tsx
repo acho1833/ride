@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import WorkspaceComponent from '@/features/workspace/components/workspace.component';
 import TextComponent from '@/features/text/components/text.component';
 
 interface Props {
