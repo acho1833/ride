@@ -10,7 +10,6 @@ interface Props {
 }
 
 const EntitySearchComponent = ({ pos }: Props) => {
-
   return (
     <MainPanelsComponent title="Entity Search" pos={pos}>
       <div className="flex flex-col gap-y-1">
@@ -23,8 +22,7 @@ const EntitySearchComponent = ({ pos }: Props) => {
         <div className="text-muted-foreground text-xs">8850 results</div>
       </div>
       <Separator className="my-1" />
-      <div className="flex flex-col gap-y-1">
-      </div>
+      <div className="flex flex-col gap-y-1"></div>
     </MainPanelsComponent>
   );
 };
