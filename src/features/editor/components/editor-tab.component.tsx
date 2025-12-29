@@ -1,8 +1,7 @@
 /**
  * Editor Tab Component
  *
- * Single tab component with IntelliJ-style design.
- * Shows close button on hover and supports context menu.
+ * Single tab with dynamic context menu based on available move directions.
  */
 
 'use client';
@@ -10,27 +9,59 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { EditorGroup, OpenFile } from '@/stores/open-files/open-files.store';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { OpenFile, GroupId } from '@/stores/open-files/open-files.store';
+import { useOpenFilesActions, useCanMoveInDirection } from '@/stores/open-files/open-files.selector';
 import { Button } from '@/components/ui/button';
+import { MoveDirection } from '@/features/editor/const';
 
 interface Props {
   file: OpenFile;
   isActive: boolean;
-  group: EditorGroup;
-  onActivate: (fileId: string) => void;
-  onClose: (fileId: string) => void;
-  onMoveToOtherGroup: (fileId: string) => void;
-  onCloseAll: () => void;
+  groupId: GroupId;
+  rowIndex: number;
+  groupIndex: number;
 }
 
-const EditorTab = ({ file, isActive, group, onActivate, onClose, onMoveToOtherGroup, onCloseAll }: Props) => {
+const EditorTabComponent = ({ file, isActive, groupId }: Props) => {
   const [isHovered, setIsHovered] = React.useState(false);
+
+  const { closeFile, setActiveFile, moveFileToNewGroup, closeAllFilesInGroup } = useOpenFilesActions();
+
+  const canMoveLeft = useCanMoveInDirection(groupId, 'left');
+  const canMoveRight = useCanMoveInDirection(groupId, 'right');
+  const canMoveUp = useCanMoveInDirection(groupId, 'up');
+  const canMoveDown = useCanMoveInDirection(groupId, 'down');
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onClose(file.id);
+    closeFile(file.id, groupId);
   };
+
+  const handleActivate = () => {
+    setActiveFile(file.id, groupId);
+  };
+
+  const handleMove = (direction: MoveDirection) => {
+    moveFileToNewGroup(file.id, groupId, direction);
+  };
+
+  // Get menu label based on whether it creates a new group
+  const getMoveLabel = (direction: MoveDirection, info: { canMove: boolean; isNewGroup: boolean }) => {
+    const directionLabels: Record<MoveDirection, string> = {
+      left: 'Left',
+      right: 'Right',
+      up: 'Up',
+      down: 'Down',
+    };
+
+    if (info.isNewGroup) {
+      return `Split and Move ${directionLabels[direction]}`;
+    }
+    return `Move ${directionLabels[direction]}`;
+  };
+
+  const hasAnyMoveOption = canMoveLeft.canMove || canMoveRight.canMove || canMoveUp.canMove || canMoveDown.canMove;
 
   return (
     <ContextMenu>
@@ -40,7 +71,7 @@ const EditorTab = ({ file, isActive, group, onActivate, onClose, onMoveToOtherGr
             'group border-border relative flex h-9 cursor-pointer items-center gap-2 border-r px-3 text-sm transition-colors',
             isActive ? 'bg-secondary text-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
           )}
-          onClick={() => onActivate(file.id)}
+          onClick={handleActivate}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
@@ -63,12 +94,39 @@ const EditorTab = ({ file, isActive, group, onActivate, onClose, onMoveToOtherGr
       </ContextMenuTrigger>
 
       <ContextMenuContent>
-        <ContextMenuItem onClick={() => onClose(file.id)}>Close Tab</ContextMenuItem>
-        <ContextMenuItem onClick={() => onMoveToOtherGroup(file.id)}>Move to {group === 'left' ? 'Right' : 'Left'} Group</ContextMenuItem>
-        <ContextMenuItem onClick={onCloseAll}>Close All Tabs</ContextMenuItem>
+        <ContextMenuItem onClick={() => closeFile(file.id, groupId)}>Close Tab</ContextMenuItem>
+
+        {hasAnyMoveOption && (
+          <>
+            <ContextMenuSeparator />
+            {canMoveLeft.canMove && (
+              <ContextMenuItem onClick={() => handleMove('left')}>
+                {getMoveLabel('left', canMoveLeft)}
+              </ContextMenuItem>
+            )}
+            {canMoveRight.canMove && (
+              <ContextMenuItem onClick={() => handleMove('right')}>
+                {getMoveLabel('right', canMoveRight)}
+              </ContextMenuItem>
+            )}
+            {canMoveUp.canMove && (
+              <ContextMenuItem onClick={() => handleMove('up')}>
+                {getMoveLabel('up', canMoveUp)}
+              </ContextMenuItem>
+            )}
+            {canMoveDown.canMove && (
+              <ContextMenuItem onClick={() => handleMove('down')}>
+                {getMoveLabel('down', canMoveDown)}
+              </ContextMenuItem>
+            )}
+          </>
+        )}
+
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => closeAllFilesInGroup(groupId)}>Close All Tabs</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
 };
 
-export default EditorTab;
+export default EditorTabComponent;
