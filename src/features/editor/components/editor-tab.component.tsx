@@ -1,7 +1,23 @@
 /**
  * Editor Tab Component
  *
- * Single tab with dynamic context menu based on available move directions.
+ * Individual draggable tab with context menu for close/move operations.
+ *
+ * @remarks
+ * Each tab is a draggable item (via dnd-kit's useSortable) and a context menu trigger.
+ *
+ * Key behaviors:
+ * - Click: Activate this tab (show its content)
+ * - Middle-click: Close tab (standard browser convention)
+ * - Drag: Reorder within group or move to another group
+ * - Right-click: Context menu with Close/Move options
+ *
+ * The context menu dynamically shows move options based on layout state:
+ * - "Move Left" if an adjacent group exists to the left
+ * - "Split and Move Left" if no left group exists (will create one)
+ * - Move options hidden if constraints prevent the move (e.g., single-file groups can't split)
+ *
+ * @see useCanMoveInDirection - Determines which move options are available
  */
 
 'use client';
@@ -19,14 +35,26 @@ import { useSelectOpenedFiles } from '@/stores/ui/ui.selector';
 import { Button } from '@/components/ui/button';
 import { MoveDirection } from '@/features/editor/const';
 
+/**
+ * Human-readable labels for move directions.
+ * Defined outside component to avoid object recreation on each render.
+ */
+const DIRECTION_LABELS: Record<MoveDirection, string> = {
+  left: 'Left',
+  right: 'Right',
+  up: 'Up',
+  down: 'Down'
+};
+
 interface Props {
   file: OpenFile;
   isActive: boolean;
   groupId: GroupId;
-  rowIndex: number;
-  groupIndex: number;
+  /** Disable CSS transform during drag to prevent visual glitches */
   disableTransform?: boolean;
+  /** Position in tab list - used for drop index calculation */
   tabIndex: number;
+  /** Show vertical line before this tab indicating drop position */
   showDropIndicator?: boolean;
 }
 
@@ -38,9 +66,11 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
   const { revealFile } = useFileActions();
   const selectOpenedFiles = useSelectOpenedFiles();
   const lastFocusedGroupId = useLastFocusedGroupId();
+  // Visual distinction: Active tab in the focused group gets a top highlight bar
   const isLastFocusedGroup = lastFocusedGroupId === groupId;
 
-  // Track client-side mounting to avoid hydration mismatch with dnd-kit
+  // SSR Guard: dnd-kit's useSortable generates IDs that differ server vs client.
+  // We disable drag functionality until after first client render.
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -80,6 +110,10 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
     }
   };
 
+  /**
+   * Activate this tab and optionally sync with file tree.
+   * When "Select Opened Files" toggle is ON, also reveals file in explorer.
+   */
   const handleActivate = () => {
     setActiveFile(file.id, groupId);
     if (selectOpenedFiles) {
@@ -93,17 +127,10 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
 
   // Get menu label based on whether it creates a new group
   const getMoveLabel = (direction: MoveDirection, info: { canMove: boolean; isNewGroup: boolean }) => {
-    const directionLabels: Record<MoveDirection, string> = {
-      left: 'Left',
-      right: 'Right',
-      up: 'Up',
-      down: 'Down'
-    };
-
     if (info.isNewGroup) {
-      return `Split and Move ${directionLabels[direction]}`;
+      return `Split and Move ${DIRECTION_LABELS[direction]}`;
     }
-    return `Move ${directionLabels[direction]}`;
+    return `Move ${DIRECTION_LABELS[direction]}`;
   };
 
   const hasAnyMoveOption = canMoveLeft.canMove || canMoveRight.canMove || canMoveUp.canMove || canMoveDown.canMove;

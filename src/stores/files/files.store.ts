@@ -1,7 +1,24 @@
 /**
  * Files State Store
  *
- * Zustand slice for managing file tree state.
+ * Zustand slice for managing the file explorer tree structure and selection state.
+ *
+ * @remarks
+ * This store manages:
+ * - `structure`: The hierarchical tree of files and folders
+ * - `selectedId`: Currently highlighted item in the explorer
+ * - `openFolderIds`: Which folders are expanded (visible children)
+ *
+ * The tree is recursive: folders contain children which can be files or folders.
+ * All mutations create new objects (immutable updates) to trigger React re-renders.
+ *
+ * Helper functions handle tree traversal:
+ * - `findAndAddNode`: Recursively finds a folder and adds a child
+ * - `findAndRemoveNode`: Recursively finds and removes a node
+ * - `findPathToFile`: Returns all parent folder IDs for a given file
+ *
+ * @see FileTreeSlice - Combined type for state + actions
+ * @see files.selector.ts - Selector hooks for accessing this state
  */
 
 import { StateCreator } from 'zustand';
@@ -130,7 +147,16 @@ export const findAndRenameNode = (tree: FolderNode, nodeId: string, newName: str
 };
 
 /**
- * Helper function to find the path (parent folder IDs) to a file
+ * Find the path of parent folder IDs from root to a file.
+ *
+ * @remarks
+ * Used by `revealFile` to know which folders to expand.
+ * Returns the folder IDs in order from root to immediate parent.
+ *
+ * @param tree - The folder to search within
+ * @param fileId - The ID of the file to find
+ * @param path - Accumulator for the path (internal use)
+ * @returns Array of folder IDs from root to parent, or null if not found
  */
 export const findPathToFile = (tree: FolderNode, fileId: string, path: string[] = []): string[] | null => {
   for (const child of tree.children) {
@@ -337,6 +363,10 @@ export const createFileTreeSlice: StateCreator<FileTreeSlice, [], [], FileTreeSl
       }
     })),
 
+  /**
+   * Reveal a file in the tree by expanding all parent folders and selecting it.
+   * Called when "Select Opened Files" is enabled and user clicks a tab.
+   */
   revealFile: (fileId: string) =>
     set(state => {
       const path = findPathToFile(state.files.structure, fileId);

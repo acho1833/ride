@@ -1,8 +1,30 @@
 /**
  * Open Files State Store
  *
- * Zustand slice for managing open files in dynamic editor groups.
- * Supports multiple rows (vertical) and unlimited groups per row (horizontal).
+ * Zustand slice for managing open files in the multi-pane editor layout.
+ *
+ * @remarks
+ * Data model hierarchy:
+ * - `rows[]`: Array of horizontal rows (vertical split creates new rows)
+ *   - `groups[]`: Array of editor groups per row (horizontal split creates new groups)
+ *     - `files[]`: Array of open files (tabs) in each group
+ *     - `activeFileId`: Which tab is currently displayed
+ * - `lastFocusedGroupId`: Where new files open by default
+ *
+ * Key behaviors:
+ * - Opening an already-open file activates it instead of duplicating
+ * - Closing the last file in a group triggers cleanup (removes empty groups/rows)
+ * - At least one row with one group is always maintained
+ * - `moveFileToNewGroup` respects EDITOR_CONFIG limits (yGroupLimit, xGroupLimit)
+ *
+ * Move direction logic:
+ * - Left/Right: Move within the same row (horizontal)
+ * - Up/Down: Move between rows (vertical)
+ * - If an adjacent group/row exists, file moves there
+ * - If not, a new group/row is created (respecting limits)
+ *
+ * @see EDITOR_CONFIG - Layout constraints (max rows, max groups per row)
+ * @see open-files.selector.ts - Selector hooks for this state
  */
 
 import { StateCreator } from 'zustand';
@@ -120,7 +142,17 @@ const findGroupContainingFile = (
   return null;
 };
 
-/** Remove empty groups and rows, returns cleaned rows */
+/**
+ * Remove empty groups and rows after file operations.
+ *
+ * @remarks
+ * Called after closeFile, moveFileToGroup, etc. to clean up the layout.
+ * Always maintains at least one row with one group (even if empty) so
+ * there's always somewhere to drop files.
+ *
+ * @param rows - Current row state
+ * @returns Cleaned rows with empty groups/rows removed
+ */
 const cleanupEmptyGroupsAndRows = (rows: EditorRow[]): EditorRow[] => {
   // Filter out empty groups from each row
   const cleanedRows = rows.map(row => ({

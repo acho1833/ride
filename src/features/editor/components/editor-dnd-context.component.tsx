@@ -1,7 +1,21 @@
 /**
  * Editor DnD Context Component
  *
- * Provides drag-and-drop context for tab reordering and moving between groups.
+ * Provides drag-and-drop context for tab reordering and cross-group moves.
+ *
+ * @remarks
+ * Architecture Decision: We use dnd-kit for tab operations (not native HTML5 drag/drop)
+ * because it provides better animation support, sortable lists, and accessibility.
+ * File tree drag uses native HTML5 drag/drop separately to avoid conflicts.
+ *
+ * Key behaviors:
+ * - Tracks active drag state and broadcasts via EditorDragContext
+ * - Uses pointerWithin collision detection for accurate drop targeting
+ * - Handles both reorder (same group) and move (cross-group) operations
+ * - Defers DnD initialization until client-side to prevent SSR hydration errors
+ *
+ * @see EditorTabComponent - Individual draggable tabs
+ * @see EditorTabsComponent - Drop zones and sortable context
  */
 
 'use client';
@@ -21,33 +35,48 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
+import { DRAG_ACTIVATION_DISTANCE } from '@/features/editor/const';
 
+/** Data attached to draggable tab items */
 interface DragData {
   fileId: string;
   fileName: string;
   fromGroupId: string;
 }
 
+/**
+ * Data for the invisible "end zone" droppable at the end of each tab bar.
+ * Allows dropping after the last tab without hitting a specific tab.
+ */
 interface EndZoneData {
   fileId: null;
   fileName: null;
   fromGroupId: string;
   isEndZone: true;
+  /** Index where file should be inserted (after last tab) */
   endIndex: number;
 }
 
 type OverData = DragData | EndZoneData;
 
-/** Active drag state for cross-group animations */
+/**
+ * Drag state shared with child components via context.
+ * Used to show drop indicators in the correct position.
+ */
 export interface ActiveDragState {
   fileId: string;
   fileName: string;
   fromGroupId: string;
+  /** Which group the cursor is currently over (null if outside all groups) */
   overGroupId: string | null;
+  /** Index position where file would be inserted */
   overIndex: number | null;
 }
 
-/** Context for sharing drag state with tab components */
+/**
+ * Context for sharing active drag state with tab components.
+ * Null when no drag is in progress.
+ */
 export const EditorDragContext = React.createContext<ActiveDragState | null>(null);
 
 interface Props {
@@ -59,15 +88,18 @@ const EditorDndContextComponent = ({ children }: Props) => {
   const [isMounted, setIsMounted] = React.useState(false);
   const { reorderFile, moveFileToGroup } = useOpenFilesActions();
 
-  // Only render DnD context on client to avoid hydration mismatch
+  // SSR Guard: dnd-kit generates unique IDs that differ between server and client,
+  // causing hydration mismatches. We defer DnD setup until after first client render.
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Configure drag sensors with activation threshold to distinguish
+  // intentional drags from accidental clicks
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8
+        distance: DRAG_ACTIVATION_DISTANCE
       }
     }),
     useSensor(KeyboardSensor, {
@@ -89,6 +121,10 @@ const EditorDndContextComponent = ({ children }: Props) => {
     }
   };
 
+  /**
+   * Track cursor position during drag to update drop indicators.
+   * Called frequently as user moves cursor between tabs and groups.
+   */
   const handleDragOver = (event: DragOverEvent) => {
     const { over } = event;
     if (!activeDragState) return;
@@ -96,7 +132,7 @@ const EditorDndContextComponent = ({ children }: Props) => {
     const overData = over?.data.current as OverData | undefined;
     const overGroupId = overData?.fromGroupId ?? null;
 
-    // Check if over end zone or sortable item
+    // Determine insert index: end zones store it directly, sortable items use their position
     let overIndex: number | null = null;
     if (overData && 'isEndZone' in overData && overData.isEndZone) {
       overIndex = overData.endIndex;
@@ -105,16 +141,20 @@ const EditorDndContextComponent = ({ children }: Props) => {
       overIndex = typeof overSortable?.index === 'number' ? overSortable.index : null;
     }
 
-    // Update if target group or index changed
+    // Only update state if position actually changed to avoid unnecessary re-renders
     if (overGroupId !== activeDragState.overGroupId || overIndex !== activeDragState.overIndex) {
       setActiveDragState(prev => (prev ? { ...prev, overGroupId, overIndex } : null));
     }
   };
 
+  /**
+   * Finalize the drag operation: either reorder within group or move across groups.
+   */
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragState(null);
 
+    // No valid drop target or dropped on self - do nothing
     if (!over || active.id === over.id) {
       return;
     }
@@ -139,13 +179,12 @@ const EditorDndContextComponent = ({ children }: Props) => {
       insertIndex = typeof overSortable?.index === 'number' ? overSortable.index : undefined;
     }
 
+    // Same group = reorder, different group = move
     if (fromGroupId === toGroupId) {
-      // Reorder within same group
       if (insertIndex !== undefined) {
         reorderFile(fileId, fromGroupId, insertIndex);
       }
     } else {
-      // Move to different group
       moveFileToGroup(fileId, fromGroupId, toGroupId, insertIndex);
     }
   };

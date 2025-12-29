@@ -1,7 +1,27 @@
 /**
  * Editor Layout Component
  *
- * Main layout rendering rows vertically with resizable panels.
+ * Top-level layout for the editor area. Renders rows vertically with resizable panels.
+ *
+ * @remarks
+ * Layout hierarchy: EditorLayout (vertical) → EditorRow (horizontal) → EditorGroup
+ *
+ * This is the root of the split view system. Vertical splits create new rows here.
+ * Maximum rows controlled by EDITOR_CONFIG.yGroupLimit (currently 2 = top/bottom only).
+ *
+ * @example
+ * // Two rows stacked vertically, each with its own groups
+ * ┌─────────────────────────────┐
+ * │          Row 1              │
+ * │  ┌─────────┬─────────┐      │
+ * │  │ Group A │ Group B │      │
+ * │  └─────────┴─────────┘      │
+ * ├─────────────────────────────┤ ← Drag handle
+ * │          Row 2              │
+ * │  ┌─────────────────┐        │
+ * │  │     Group C     │        │
+ * │  └─────────────────┘        │
+ * └─────────────────────────────┘
  */
 
 'use client';
@@ -13,7 +33,8 @@ import EditorRowComponent from '@/features/editor/components/editor-row.componen
 const EditorLayoutComponent = () => {
   const rows = useEditorRows();
 
-  // No rows - shouldn't happen but handle gracefully
+  // Edge case: All files closed. cleanupEmptyGroupsAndRows should prevent this,
+  // but we handle it gracefully just in case.
   if (rows.length === 0) {
     return (
       <div className="text-muted-foreground flex h-full w-full items-center justify-center">
@@ -22,27 +43,29 @@ const EditorLayoutComponent = () => {
     );
   }
 
-  // Single row - no vertical resizing needed
+  // Optimization: Skip ResizablePanelGroup when only one row exists.
+  // This is the common case - most users don't use vertical splits.
   if (rows.length === 1) {
     return (
       <div className="h-full w-full">
-        <EditorRowComponent row={rows[0]} rowIndex={0} />
+        <EditorRowComponent row={rows[0]} />
       </div>
     );
   }
 
-  // Multiple rows - use vertical resizable panels
+  // Multiple rows: Create vertical panels with drag handles between them
   const defaultSize = 100 / rows.length;
 
   return (
     <ResizablePanelGroup direction="vertical" className="h-full w-full">
-      {rows.flatMap((row, rowIndex) => {
+      {rows.flatMap((row, index) => {
         const panel = (
           <ResizablePanel key={row.id} defaultSize={defaultSize} minSize={15}>
-            <EditorRowComponent row={row} rowIndex={rowIndex} />
+            <EditorRowComponent row={row} />
           </ResizablePanel>
         );
-        if (rowIndex === 0) return [panel];
+        // First row has no preceding handle; subsequent rows get [handle, panel]
+        if (index === 0) return [panel];
         return [<ResizableHandle key={`handle-${row.id}`} />, panel];
       })}
     </ResizablePanelGroup>

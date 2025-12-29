@@ -72,24 +72,42 @@ Drag files from file explorer directly into editor tab bars using native HTML5 d
 - `src/features/editor/components/editor-tabs.component.tsx` - Drop target handling
 
 **Implementation:**
-- Uses native HTML5 drag/drop with `application/x-file-tree` custom data type
+- Uses native HTML5 drag/drop with `FILE_TREE_MIME_TYPE` constant (`application/x-file-tree`)
 - Calculates drop index based on mouse position relative to tabs (`calculateDropIndex`)
 - Shows drop indicator at insertion point
 - Opens file at specific position in target group using `openFile(fileId, fileName, groupId, insertIndex)`
+- Uses type-safe JSON parsing with validation before using parsed data
 
 **Key Code:**
 ```typescript
 // file-tree.component.tsx - drag start
 const handleDragStart = (e: React.DragEvent) => {
-  e.dataTransfer.setData('application/x-file-tree', JSON.stringify({ fileId: node.id, fileName: node.name }));
+  e.dataTransfer.setData(FILE_TREE_MIME_TYPE, JSON.stringify({ fileId: node.id, fileName: node.name }));
   e.dataTransfer.effectAllowed = 'copyMove';
 };
 
-// editor-tabs.component.tsx - drop handling
+// editor-tabs.component.tsx - drop handling with type validation
 const handleDrop = (e: React.DragEvent) => {
-  const data = e.dataTransfer.getData('application/x-file-tree');
-  const { fileId, fileName } = JSON.parse(data);
-  openFile(fileId, fileName, groupId, insertIndex ?? undefined);
+  const data = e.dataTransfer.getData(FILE_TREE_MIME_TYPE);
+  if (data) {
+    try {
+      const parsed: unknown = JSON.parse(data);
+      // Validate parsed data has expected shape
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        'fileId' in parsed &&
+        'fileName' in parsed &&
+        typeof (parsed as { fileId: unknown }).fileId === 'string' &&
+        typeof (parsed as { fileName: unknown }).fileName === 'string'
+      ) {
+        const { fileId, fileName } = parsed as { fileId: string; fileName: string };
+        openFile(fileId, fileName, groupId, insertIndex ?? undefined);
+      }
+    } catch {
+      // Invalid JSON, ignore
+    }
+  }
 };
 ```
 
@@ -208,12 +226,53 @@ revealFile: (fileId: string) => set(state => {
 
 ---
 
+### 9. CLAUDE.md Compliance & Code Quality Review
+
+A thorough review was conducted to ensure all code follows CLAUDE.md standards and eliminate code smells.
+
+**Files Modified:**
+- `src/features/editor/const.ts` - Added constants, removed dead code
+- `src/features/editor/components/editor-dnd-context.component.tsx` - Uses `DRAG_ACTIVATION_DISTANCE` constant
+- `src/features/editor/components/editor-tabs.component.tsx` - Uses `FILE_TREE_MIME_TYPE`, added JSON validation
+- `src/features/editor/components/editor-tab.component.tsx` - Moved `DIRECTION_LABELS` outside component
+- `src/features/editor/components/editor-group.component.tsx` - Removed unused props
+- `src/features/editor/components/editor-row.component.tsx` - Removed unused props
+- `src/features/editor/components/editor-layout.component.tsx` - Removed unused props
+- `src/stores/open-files/open-files.selector.ts` - Added useMemo, removed unused hooks
+- `src/features/files/components/file-tree-context.tsx` - **NEW** - Context for file tree
+- `src/features/files/components/file-tree.component.tsx` - Uses context, simplified props
+- `src/features/files/components/files.component.tsx` - Uses FileTreeProvider
+
+**Issues Fixed:**
+
+| Issue | Description | Fix |
+|-------|-------------|-----|
+| Magic MIME Type String | `'application/x-file-tree'` hardcoded in 3 places | Extracted to `FILE_TREE_MIME_TYPE` constant |
+| Magic Number | `8` for drag activation distance | Extracted to `DRAG_ACTIVATION_DISTANCE` constant |
+| Unused Props | `rowIndex`/`groupIndex` passed through 5 components | Removed from entire component tree |
+| Set Recreation | `useOpenFileIds` created new Set every render | Added `useMemo` to memoize Set creation |
+| Object Recreation | `directionLabels` recreated every render | Moved `DIRECTION_LABELS` outside component |
+| Unsafe JSON.parse | No type validation after parsing | Added proper type checking before use |
+| Dead Code | `DROP_ZONES`, `DropZone`, `useGroupRowIndex`, `useGroupIndexInRow` unused | Removed from codebase |
+| Optional Chaining | Inconsistent use on required prop | Fixed in file-tree.component.tsx |
+| Prop Drilling | 14 props passed recursively through file tree | Created `FileTreeContext` (reduced to 3 props) |
+
+**Summary:**
+- 9 issues fixed
+- 11 files modified
+- 1 new file created (file-tree-context.tsx)
+- Prop drilling reduced from 14 to 3 props
+- Build passes with no errors or warnings
+
+---
+
 ## All Modified Files
 
 ### New Files
 | File | Purpose |
 |------|---------|
 | `src/features/editor/components/editor-dnd-context.component.tsx` | DnD context provider with drag state management |
+| `src/features/files/components/file-tree-context.tsx` | FileTree context provider to eliminate prop drilling |
 | `FILE.md` | This documentation file |
 
 ### Modified UI Components
@@ -229,13 +288,13 @@ revealFile: (fileId: string) => set(state => {
 | `src/features/editor/components/editor-row.component.tsx` | Renders groups with horizontal ResizablePanelGroup |
 | `src/features/editor/components/editor-tab.component.tsx` | Draggable tab with context menu, reveal integration |
 | `src/features/editor/components/editor-tabs.component.tsx` | SortableContext, file tree drop handling, overflow dropdown |
-| `src/features/editor/const.ts` | Added `EDITOR_CONFIG`, `DROP_ZONES`, `MoveDirection` type |
+| `src/features/editor/const.ts` | Added `EDITOR_CONFIG`, `MoveDirection` type, `FILE_TREE_MIME_TYPE`, `DRAG_ACTIVATION_DISTANCE` constants |
 
 ### Modified Files Components
 | File | Changes |
 |------|---------|
-| `src/features/files/components/file-tree.component.tsx` | Native drag source, optional chaining fix |
-| `src/features/files/components/files.component.tsx` | Toolbar with toggle button, auto-reveal on toggle |
+| `src/features/files/components/file-tree.component.tsx` | Native drag source, uses FileTreeContext (reduced from 14 to 3 props) |
+| `src/features/files/components/files.component.tsx` | Toolbar with toggle button, auto-reveal on toggle, FileTreeProvider wrapper |
 
 ### Modified Workspaces
 | File | Changes |
@@ -251,7 +310,7 @@ revealFile: (fileId: string) => set(state => {
 | `src/stores/files/files.store.ts` | Added `revealFile` action and `findPathToFile` helper |
 | `src/stores/files/files.selector.ts` | Exposed `revealFile` in `useFileActions` |
 | `src/stores/open-files/open-files.store.ts` | Complete rewrite for rows/groups, all move/reorder actions |
-| `src/stores/open-files/open-files.selector.ts` | Added `useCanMoveInDirection`, row/group selectors |
+| `src/stores/open-files/open-files.selector.ts` | Added `useCanMoveInDirection`, row/group selectors, memoized `useOpenFileIds` with useMemo |
 
 ### Other
 | File | Changes |
@@ -289,6 +348,9 @@ Two separate systems:
 3. **Optional chaining** - Defensive programming for undefined values
 4. **Cleanup on close** - `cleanupEmptyGroupsAndRows` removes empty containers
 5. **SSR safety** - `isMounted` state prevents hydration mismatches with dnd-kit
+6. **No magic values** - All strings/numbers extracted to constants in `const.ts`
+7. **Context for prop drilling** - Use React Context when passing 5+ props recursively
+8. **Memoization** - Use `useMemo` for expensive operations (React Compiler handles most cases)
 
 ### Component Hierarchy
 ```
@@ -311,6 +373,15 @@ export const EDITOR_CONFIG = {
   yGroupLimit: 2,    // Max 2 rows (top/bottom)
   xGroupLimit: -1    // Unlimited horizontal groups
 };
+
+/** Direction for moving files */
+export type MoveDirection = 'left' | 'right' | 'up' | 'down';
+
+/** MIME type for file tree drag and drop */
+export const FILE_TREE_MIME_TYPE = 'application/x-file-tree';
+
+/** Minimum drag distance in pixels before drag activates */
+export const DRAG_ACTIVATION_DISTANCE = 8;
 ```
 
 ---

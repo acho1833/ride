@@ -1,7 +1,23 @@
 /**
  * Editor Group Component
  *
- * Single editor group containing tabs and content area.
+ * Single editor group containing a tab bar and content area.
+ *
+ * @remarks
+ * A "group" is the atomic unit of the split view system - one tab bar + one content pane.
+ * Multiple groups can exist in a row (horizontal split) or across rows (vertical split).
+ *
+ * Focus tracking: When user clicks/focuses this group, we update lastFocusedGroupId.
+ * This determines where new files open when no specific group is targeted.
+ *
+ * @example
+ * ┌─────────────────────────────┐
+ * │ [Tab1] [Tab2] [Tab3]  [▼]   │  ← EditorTabsComponent
+ * ├─────────────────────────────┤
+ * │                             │
+ * │     File Content Area       │  ← EditorContentComponent
+ * │                             │
+ * └─────────────────────────────┘
  */
 
 'use client';
@@ -13,14 +29,13 @@ import EditorContentComponent from '@/features/editor/components/editor-content.
 
 interface Props {
   groupId: GroupId;
-  rowIndex: number;
-  groupIndex: number;
 }
 
-const EditorGroupComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
+const EditorGroupComponent = ({ groupId }: Props) => {
   const group = useEditorGroup(groupId);
   const { setLastFocusedGroup } = useOpenFilesActions();
 
+  // Group may not exist briefly during cleanup transitions
   if (!group) {
     return null;
   }
@@ -28,16 +43,17 @@ const EditorGroupComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
   const { files, activeFileId } = group;
   const activeFile = files.find(f => f.id === activeFileId);
 
+  // Track which group user last interacted with.
+  // Used by openFile() to determine default target when no group specified.
   const handleFocus = () => {
     setLastFocusedGroup(groupId);
   };
 
   return (
+    // Both onFocus and onMouseDown ensure we catch focus from keyboard and mouse
     <div className="flex h-full flex-col" onFocus={handleFocus} onMouseDown={handleFocus}>
-      {/* Tab bar */}
-      <EditorTabsComponent groupId={groupId} rowIndex={rowIndex} groupIndex={groupIndex} />
+      <EditorTabsComponent groupId={groupId} />
 
-      {/* Content area */}
       <div className="flex-1 overflow-auto">
         {activeFile ? (
           <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} />

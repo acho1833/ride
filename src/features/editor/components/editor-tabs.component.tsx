@@ -1,7 +1,25 @@
 /**
  * Editor Tabs Component
  *
- * Tab bar with overflow handling and dropdown menu.
+ * Tab bar for a single editor group with drag-drop support, overflow handling, and dropdown menus.
+ *
+ * @remarks
+ * This component manages two separate drag-drop systems:
+ * 1. **dnd-kit** (SortableContext) - For tab-to-tab drag operations within/across groups
+ * 2. **Native HTML5 DnD** - For file tree to tab bar drops
+ *
+ * These two systems are kept separate because:
+ * - dnd-kit provides smooth animations and collision detection for tab reordering
+ * - HTML5 DnD is simpler for one-way drops from external sources (file tree)
+ * - Using custom MIME type (FILE_TREE_MIME_TYPE) prevents conflicts between the two
+ *
+ * Drop indicator logic:
+ * - `dropIndex` from EditorDragContext tracks dnd-kit (tab) drags
+ * - `fileTreeDropIndex` local state tracks HTML5 (file tree) drags
+ * - Both use the same visual indicator but are mutually exclusive
+ *
+ * @see EditorDragContext - Provides dnd-kit drag state
+ * @see FILE_TREE_MIME_TYPE - Custom MIME type for file tree operations
  */
 
 'use client';
@@ -16,14 +34,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import EditorTabComponent from '@/features/editor/components/editor-tab.component';
 import { EditorDragContext } from '@/features/editor/components/editor-dnd-context.component';
+import { FILE_TREE_MIME_TYPE } from '@/features/editor/const';
 
 interface Props {
   groupId: GroupId;
-  rowIndex: number;
-  groupIndex: number;
 }
 
-const EditorTabsComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
+const EditorTabsComponent = ({ groupId }: Props) => {
   const group = useEditorGroup(groupId);
   const { setActiveFile, closeAllFilesInGroup, openFile } = useOpenFilesActions();
   const activeDragState = React.useContext(EditorDragContext);
@@ -47,7 +64,17 @@ const EditorTabsComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
     return files.map(f => f.id);
   }, [files]);
 
-  // Droppable zone at end of tabs for cross-group drops
+  /**
+   * Droppable zone at end of tabs for cross-group drops.
+   *
+   * @remarks
+   * Without this end zone, users couldn't drop tabs at the END of another group's tab list.
+   * The SortableContext only handles drops BETWEEN existing tabs. This invisible zone
+   * extends from the last tab to the end of the container.
+   *
+   * The `isEndZone: true` and `endIndex` in data help handleDragEnd in EditorDndContext
+   * know this is an append operation, not an insert.
+   */
   const endDropId = `${groupId}-end`;
   const { setNodeRef: setEndDropRef, isOver: isOverEnd } = useDroppable({
     id: endDropId,
@@ -83,7 +110,20 @@ const EditorTabsComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
     closeAllFilesInGroup(groupId);
   };
 
-  // Calculate drop index based on mouse position relative to tabs
+  /**
+   * Calculate drop index based on mouse X position relative to tab midpoints.
+   *
+   * @remarks
+   * Uses midpoint comparison to determine insertion point:
+   * - If cursor is left of a tab's midpoint → insert before that tab
+   * - If cursor is right of all midpoints → append at end
+   *
+   * This feels natural because the drop happens on whichever "side" of the tab
+   * you're hovering over.
+   *
+   * @param clientX - Mouse X position from drag event
+   * @returns Index where the dropped file should be inserted
+   */
   const calculateDropIndex = (clientX: number): number => {
     const container = tabsContainerRef.current;
     if (!container) return files.length;
@@ -100,9 +140,12 @@ const EditorTabsComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
     return files.length;
   };
 
-  // Handle file tree drag over
+  /**
+   * Handle HTML5 dragover for file tree drops.
+   * Only responds to our custom MIME type to avoid interfering with dnd-kit.
+   */
   const handleDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-file-tree')) {
+    if (e.dataTransfer.types.includes(FILE_TREE_MIME_TYPE)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
       const dropIndex = calculateDropIndex(e.clientX);
@@ -110,30 +153,52 @@ const EditorTabsComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
     }
   };
 
+  /**
+   * Handle HTML5 dragleave - reset drop indicator.
+   * Only resets when leaving the container entirely (not when moving between children).
+   */
   const handleDragLeave = (e: React.DragEvent) => {
-    // Only reset if leaving the container entirely
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setFileTreeDropIndex(null);
     }
   };
 
+  /**
+   * Handle HTML5 drop for files dragged from file tree.
+   *
+   * @remarks
+   * Type-safe parsing: We parse JSON as `unknown` first, then validate the shape
+   * before using it. This prevents runtime errors if malformed data is dropped.
+   */
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const insertIndex = fileTreeDropIndex;
     setFileTreeDropIndex(null);
 
-    const data = e.dataTransfer.getData('application/x-file-tree');
+    const data = e.dataTransfer.getData(FILE_TREE_MIME_TYPE);
     if (data) {
       try {
-        const { fileId, fileName } = JSON.parse(data);
-        openFile(fileId, fileName, groupId, insertIndex ?? undefined);
+        const parsed: unknown = JSON.parse(data);
+        // Validate parsed data has expected shape before using
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'fileId' in parsed &&
+          'fileName' in parsed &&
+          typeof (parsed as { fileId: unknown }).fileId === 'string' &&
+          typeof (parsed as { fileName: unknown }).fileName === 'string'
+        ) {
+          const { fileId, fileName } = parsed as { fileId: string; fileName: string };
+          openFile(fileId, fileName, groupId, insertIndex ?? undefined);
+        }
       } catch {
-        // Invalid data, ignore
+        // Invalid JSON, ignore silently
       }
     }
   };
 
-  // Empty group - show drop zone only
+  // Empty group shows a placeholder drop zone. This can happen briefly during cleanup
+  // transitions or when all tabs are closed but the group hasn't been removed yet.
   if (files.length === 0) {
     return (
       <div
@@ -166,8 +231,6 @@ const EditorTabsComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
               file={file}
               isActive={file.id === activeFileId}
               groupId={groupId}
-              rowIndex={rowIndex}
-              groupIndex={groupIndex}
               disableTransform={isDragging}
               tabIndex={index}
               showDropIndicator={dropIndex === index || fileTreeDropIndex === index}
