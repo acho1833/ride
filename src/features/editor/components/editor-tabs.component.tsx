@@ -8,24 +8,27 @@
 
 import React from 'react';
 import { ChevronDown, MoreVertical } from 'lucide-react';
-import { EditorGroup, OpenFile } from '@/stores/open-files/open-files.store';
+import { useEditorGroup, useOpenFilesActions } from '@/stores/open-files/open-files.selector';
+import { GroupId } from '@/stores/open-files/open-files.store';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import EditorTabComponent from '@/features/editor/components/editor-tab.component';
 
 interface Props {
-  files: OpenFile[];
-  activeFileId: string | null;
-  group: EditorGroup;
-  onActivate: (fileId: string) => void;
-  onClose: (fileId: string) => void;
-  onMoveToOtherGroup: (fileId: string) => void;
-  onCloseAll: () => void;
+  groupId: GroupId;
+  rowIndex: number;
+  groupIndex: number;
 }
 
-const EditorTabs = ({ files, activeFileId, group, onActivate, onClose, onMoveToOtherGroup, onCloseAll }: Props) => {
+const EditorTabsComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
+  const group = useEditorGroup(groupId);
+  const { setActiveFile, closeAllFilesInGroup } = useOpenFilesActions();
+
   const tabsContainerRef = React.useRef<HTMLDivElement>(null);
   const [hasOverflow, setHasOverflow] = React.useState(false);
+
+  const files = group?.files ?? [];
+  const activeFileId = group?.activeFileId ?? null;
 
   // Check for overflow
   React.useEffect(() => {
@@ -46,6 +49,14 @@ const EditorTabs = ({ files, activeFileId, group, onActivate, onClose, onMoveToO
     return null;
   }
 
+  const handleActivate = (fileId: string) => {
+    setActiveFile(fileId, groupId);
+  };
+
+  const handleCloseAll = () => {
+    closeAllFilesInGroup(groupId);
+  };
+
   return (
     <div className="bg-muted/30 flex h-9 items-center border-b">
       {/* Tabs container with horizontal scroll */}
@@ -55,11 +66,9 @@ const EditorTabs = ({ files, activeFileId, group, onActivate, onClose, onMoveToO
             key={file.id}
             file={file}
             isActive={file.id === activeFileId}
-            group={group}
-            onActivate={onActivate}
-            onClose={onClose}
-            onMoveToOtherGroup={() => onMoveToOtherGroup(file.id)}
-            onCloseAll={onCloseAll}
+            groupId={groupId}
+            rowIndex={rowIndex}
+            groupIndex={groupIndex}
           />
         ))}
       </div>
@@ -74,7 +83,7 @@ const EditorTabs = ({ files, activeFileId, group, onActivate, onClose, onMoveToO
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {files.map(file => (
-              <DropdownMenuItem key={file.id} onClick={() => onActivate(file.id)}>
+              <DropdownMenuItem key={file.id} onClick={() => handleActivate(file.id)}>
                 {file.id === activeFileId && <span className="mr-2">●</span>}
                 {file.name}
               </DropdownMenuItem>
@@ -91,11 +100,11 @@ const EditorTabs = ({ files, activeFileId, group, onActivate, onClose, onMoveToO
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onCloseAll}>Close All Tabs</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleCloseAll}>Close All Tabs</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
 };
 
-export default EditorTabs;
+export default EditorTabsComponent;
