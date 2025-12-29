@@ -161,19 +161,420 @@ const initialState: OpenFilesState['openFiles'] = {
 };
 
 // ============================================================================
-// Slice Creator (placeholder - will be implemented in Task 4)
+// Slice Creator
 // ============================================================================
 
 export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFilesSlice> = set => ({
   openFiles: initialState,
 
-  // Placeholder actions - will be implemented in Task 4
-  openFile: () => {},
-  closeFile: () => {},
-  setActiveFile: () => {},
-  closeAllFilesInGroup: () => {},
-  moveFileToGroup: () => {},
-  moveFileToNewGroup: () => {},
-  reorderFile: () => {},
-  setLastFocusedGroup: () => {},
+  // Open file in group (or last focused, or first available)
+  openFile: (fileId: string, name: string, groupId?: GroupId) =>
+    set(state => {
+      const { rows, lastFocusedGroupId } = state.openFiles;
+
+      // Check if file already exists anywhere
+      const existing = findGroupContainingFile(rows, fileId);
+      if (existing) {
+        // Activate existing file
+        const newRows = rows.map((row, ri) =>
+          ri === existing.rowIndex
+            ? {
+                ...row,
+                groups: row.groups.map((g, gi) =>
+                  gi === existing.groupIndex ? { ...g, activeFileId: fileId } : g
+                ),
+              }
+            : row
+        );
+        return {
+          openFiles: {
+            rows: newRows,
+            lastFocusedGroupId: existing.group.id,
+          },
+        };
+      }
+
+      // Determine target group
+      const targetGroupId = groupId ?? lastFocusedGroupId ?? rows[0]?.groups[0]?.id;
+      if (!targetGroupId) return state;
+
+      const location = findGroupLocation(rows, targetGroupId);
+      if (!location) return state;
+
+      // Add file to end of target group
+      const newRows = rows.map((row, ri) =>
+        ri === location.rowIndex
+          ? {
+              ...row,
+              groups: row.groups.map((g, gi) =>
+                gi === location.groupIndex
+                  ? {
+                      ...g,
+                      files: [...g.files, { id: fileId, name }],
+                      activeFileId: fileId,
+                    }
+                  : g
+              ),
+            }
+          : row
+      );
+
+      return {
+        openFiles: {
+          rows: newRows,
+          lastFocusedGroupId: targetGroupId,
+        },
+      };
+    }),
+
+  // Close file from specific group
+  closeFile: (fileId: string, groupId: GroupId) =>
+    set(state => {
+      const { rows } = state.openFiles;
+      const location = findGroupLocation(rows, groupId);
+      if (!location) return state;
+
+      const { group } = location;
+      const fileIndex = group.files.findIndex(f => f.id === fileId);
+      if (fileIndex === -1) return state;
+
+      const newFiles = group.files.filter(f => f.id !== fileId);
+      let newActiveFileId = group.activeFileId;
+
+      // If closing active file, select next/prev
+      if (group.activeFileId === fileId) {
+        if (newFiles.length > 0) {
+          const nextIndex = Math.min(fileIndex, newFiles.length - 1);
+          newActiveFileId = newFiles[nextIndex].id;
+        } else {
+          newActiveFileId = null;
+        }
+      }
+
+      const newRows = rows.map((row, ri) =>
+        ri === location.rowIndex
+          ? {
+              ...row,
+              groups: row.groups.map((g, gi) =>
+                gi === location.groupIndex
+                  ? { ...g, files: newFiles, activeFileId: newActiveFileId }
+                  : g
+              ),
+            }
+          : row
+      );
+
+      // Cleanup empty groups/rows
+      const cleanedRows = cleanupEmptyGroupsAndRows(newRows);
+
+      // Update lastFocusedGroupId if needed
+      let newLastFocusedGroupId = state.openFiles.lastFocusedGroupId;
+      if (newLastFocusedGroupId === groupId && newFiles.length === 0) {
+        // Group was removed, focus first available
+        newLastFocusedGroupId = cleanedRows[0]?.groups[0]?.id ?? null;
+      }
+
+      return {
+        openFiles: {
+          rows: cleanedRows,
+          lastFocusedGroupId: newLastFocusedGroupId,
+        },
+      };
+    }),
+
+  // Set active file in group
+  setActiveFile: (fileId: string, groupId: GroupId) =>
+    set(state => {
+      const { rows } = state.openFiles;
+      const location = findGroupLocation(rows, groupId);
+      if (!location) return state;
+
+      const newRows = rows.map((row, ri) =>
+        ri === location.rowIndex
+          ? {
+              ...row,
+              groups: row.groups.map((g, gi) =>
+                gi === location.groupIndex ? { ...g, activeFileId: fileId } : g
+              ),
+            }
+          : row
+      );
+
+      return {
+        openFiles: {
+          rows: newRows,
+          lastFocusedGroupId: groupId,
+        },
+      };
+    }),
+
+  // Close all files in group
+  closeAllFilesInGroup: (groupId: GroupId) =>
+    set(state => {
+      const { rows } = state.openFiles;
+      const location = findGroupLocation(rows, groupId);
+      if (!location) return state;
+
+      const newRows = rows.map((row, ri) =>
+        ri === location.rowIndex
+          ? {
+              ...row,
+              groups: row.groups.map((g, gi) =>
+                gi === location.groupIndex ? { ...g, files: [], activeFileId: null } : g
+              ),
+            }
+          : row
+      );
+
+      const cleanedRows = cleanupEmptyGroupsAndRows(newRows);
+      const newLastFocusedGroupId = cleanedRows[0]?.groups[0]?.id ?? null;
+
+      return {
+        openFiles: {
+          rows: cleanedRows,
+          lastFocusedGroupId: newLastFocusedGroupId,
+        },
+      };
+    }),
+
+  // Move file to existing group
+  moveFileToGroup: (fileId: string, fromGroupId: GroupId, toGroupId: GroupId, insertIndex?: number) =>
+    set(state => {
+      if (fromGroupId === toGroupId) return state;
+
+      const { rows } = state.openFiles;
+      const fromLocation = findGroupLocation(rows, fromGroupId);
+      const toLocation = findGroupLocation(rows, toGroupId);
+      if (!fromLocation || !toLocation) return state;
+
+      const file = fromLocation.group.files.find(f => f.id === fileId);
+      if (!file) return state;
+
+      // Remove from source
+      const newFromFiles = fromLocation.group.files.filter(f => f.id !== fileId);
+      let newFromActiveId = fromLocation.group.activeFileId;
+      if (fromLocation.group.activeFileId === fileId) {
+        newFromActiveId = newFromFiles.length > 0 ? newFromFiles[0].id : null;
+      }
+
+      // Add to target at specified index or end
+      const targetFiles = [...toLocation.group.files];
+      const idx = insertIndex ?? targetFiles.length;
+      targetFiles.splice(idx, 0, file);
+
+      // Build new rows
+      let newRows = rows.map((row, ri) => {
+        if (ri === fromLocation.rowIndex && ri === toLocation.rowIndex) {
+          // Same row
+          return {
+            ...row,
+            groups: row.groups.map((g, gi) => {
+              if (gi === fromLocation.groupIndex) {
+                return { ...g, files: newFromFiles, activeFileId: newFromActiveId };
+              }
+              if (gi === toLocation.groupIndex) {
+                return { ...g, files: targetFiles, activeFileId: fileId };
+              }
+              return g;
+            }),
+          };
+        }
+        if (ri === fromLocation.rowIndex) {
+          return {
+            ...row,
+            groups: row.groups.map((g, gi) =>
+              gi === fromLocation.groupIndex
+                ? { ...g, files: newFromFiles, activeFileId: newFromActiveId }
+                : g
+            ),
+          };
+        }
+        if (ri === toLocation.rowIndex) {
+          return {
+            ...row,
+            groups: row.groups.map((g, gi) =>
+              gi === toLocation.groupIndex ? { ...g, files: targetFiles, activeFileId: fileId } : g
+            ),
+          };
+        }
+        return row;
+      });
+
+      newRows = cleanupEmptyGroupsAndRows(newRows);
+
+      return {
+        openFiles: {
+          rows: newRows,
+          lastFocusedGroupId: toGroupId,
+        },
+      };
+    }),
+
+  // Move file to new group in direction
+  moveFileToNewGroup: (fileId: string, fromGroupId: GroupId, direction: MoveDirection) =>
+    set(state => {
+      const { rows } = state.openFiles;
+      const fromLocation = findGroupLocation(rows, fromGroupId);
+      if (!fromLocation) return state;
+
+      const file = fromLocation.group.files.find(f => f.id === fileId);
+      if (!file) return state;
+
+      // Can't move if only 1 file in group
+      if (fromLocation.group.files.length < 2) return state;
+
+      const { yGroupLimit, xGroupLimit } = EDITOR_CONFIG;
+
+      // Remove file from source
+      const newFromFiles = fromLocation.group.files.filter(f => f.id !== fileId);
+      let newFromActiveId = fromLocation.group.activeFileId;
+      if (fromLocation.group.activeFileId === fileId) {
+        newFromActiveId = newFromFiles.length > 0 ? newFromFiles[0].id : null;
+      }
+
+      // Create new group with the file
+      const newGroup: EditorGroup = {
+        id: generateId(),
+        files: [file],
+        activeFileId: fileId,
+      };
+
+      let newRows = [...rows];
+
+      if (direction === 'left' || direction === 'right') {
+        // Check xGroupLimit
+        const currentRow = rows[fromLocation.rowIndex];
+        if (xGroupLimit !== -1 && currentRow.groups.length >= xGroupLimit) {
+          return state;
+        }
+
+        // Insert new group in same row
+        const insertIdx = direction === 'left' ? fromLocation.groupIndex : fromLocation.groupIndex + 1;
+        const newGroups = [...currentRow.groups];
+
+        // Update source group first
+        newGroups[fromLocation.groupIndex] = {
+          ...fromLocation.group,
+          files: newFromFiles,
+          activeFileId: newFromActiveId,
+        };
+
+        // Insert new group
+        newGroups.splice(insertIdx, 0, newGroup);
+
+        newRows[fromLocation.rowIndex] = { ...currentRow, groups: newGroups };
+      } else {
+        // up or down
+        const targetRowIndex = direction === 'up' ? 0 : 1;
+        const isCreatingNewRow = rows.length < 2 || (direction === 'up' && fromLocation.rowIndex === 0) || (direction === 'down' && fromLocation.rowIndex === rows.length - 1);
+
+        if (isCreatingNewRow) {
+          // Check yGroupLimit
+          if (yGroupLimit !== -1 && rows.length >= yGroupLimit) {
+            return state;
+          }
+
+          // Update source group
+          newRows = newRows.map((row, ri) =>
+            ri === fromLocation.rowIndex
+              ? {
+                  ...row,
+                  groups: row.groups.map((g, gi) =>
+                    gi === fromLocation.groupIndex
+                      ? { ...g, files: newFromFiles, activeFileId: newFromActiveId }
+                      : g
+                  ),
+                }
+              : row
+          );
+
+          // Create new row
+          const newRow: EditorRow = {
+            id: generateId(),
+            groups: [newGroup],
+          };
+
+          if (direction === 'up') {
+            newRows = [newRow, ...newRows];
+          } else {
+            newRows = [...newRows, newRow];
+          }
+        } else {
+          // Move to existing row
+          const existingTargetRow = rows[targetRowIndex];
+
+          // Update source group
+          newRows = newRows.map((row, ri) =>
+            ri === fromLocation.rowIndex
+              ? {
+                  ...row,
+                  groups: row.groups.map((g, gi) =>
+                    gi === fromLocation.groupIndex
+                      ? { ...g, files: newFromFiles, activeFileId: newFromActiveId }
+                      : g
+                  ),
+                }
+              : row
+          );
+
+          // Add group to target row
+          newRows[targetRowIndex] = {
+            ...existingTargetRow,
+            groups: [...existingTargetRow.groups, newGroup],
+          };
+        }
+      }
+
+      newRows = cleanupEmptyGroupsAndRows(newRows);
+
+      return {
+        openFiles: {
+          rows: newRows,
+          lastFocusedGroupId: newGroup.id,
+        },
+      };
+    }),
+
+  // Reorder file within same group
+  reorderFile: (fileId: string, groupId: GroupId, newIndex: number) =>
+    set(state => {
+      const { rows } = state.openFiles;
+      const location = findGroupLocation(rows, groupId);
+      if (!location) return state;
+
+      const { group } = location;
+      const currentIndex = group.files.findIndex(f => f.id === fileId);
+      if (currentIndex === -1 || currentIndex === newIndex) return state;
+
+      const newFiles = [...group.files];
+      const [movedFile] = newFiles.splice(currentIndex, 1);
+      newFiles.splice(newIndex, 0, movedFile);
+
+      const newRows = rows.map((row, ri) =>
+        ri === location.rowIndex
+          ? {
+              ...row,
+              groups: row.groups.map((g, gi) =>
+                gi === location.groupIndex ? { ...g, files: newFiles } : g
+              ),
+            }
+          : row
+      );
+
+      return {
+        openFiles: {
+          ...state.openFiles,
+          rows: newRows,
+        },
+      };
+    }),
+
+  // Set last focused group
+  setLastFocusedGroup: (groupId: GroupId) =>
+    set(state => ({
+      openFiles: {
+        ...state.openFiles,
+        lastFocusedGroupId: groupId,
+      },
+    })),
 });
