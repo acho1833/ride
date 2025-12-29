@@ -36,14 +36,15 @@ const EditorLayoutComponent = () => {
 
   return (
     <ResizablePanelGroup direction="vertical" className="h-full w-full">
-      {rows.map((row, rowIndex) => (
-        <div key={row.id} className="contents">
-          {rowIndex > 0 && <ResizableHandle />}
-          <ResizablePanel defaultSize={defaultSize} minSize={15}>
+      {rows.flatMap((row, rowIndex) => {
+        const panel = (
+          <ResizablePanel key={row.id} defaultSize={defaultSize} minSize={15}>
             <EditorRowComponent row={row} rowIndex={rowIndex} />
           </ResizablePanel>
-        </div>
-      ))}
+        );
+        if (rowIndex === 0) return [panel];
+        return [<ResizableHandle key={`handle-${row.id}`} />, panel];
+      })}
     </ResizablePanelGroup>
   );
 };

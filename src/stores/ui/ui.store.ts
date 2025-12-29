@@ -18,6 +18,7 @@ export interface UiComponentState {
       right: ToolType | null;
       bottom: ToolType | null;
     };
+    selectOpenedFiles: boolean;
   };
 }
 
@@ -25,6 +26,7 @@ export interface UiComponentState {
 export interface UiActions {
   setToggleMode: (mode: boolean) => void;
   toggleToolbar: (position: ToolbarPositions, toolType: ToolType | null) => void;
+  toggleSelectOpenedFiles: () => void;
 }
 
 /** Combined UI store type */
@@ -40,7 +42,8 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
       left: 'FILES' as ToolType,
       right: 'ALERT' as ToolType,
       bottom: 'CHARTS' as ToolType
-    }
+    },
+    selectOpenedFiles: false
   },
 
   // UI Actions
@@ -58,5 +61,10 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
           [pos]: state.ui.toolbar[pos] === toolType ? null : toolType
         }
       }
+    })),
+
+  toggleSelectOpenedFiles: () =>
+    set(state => ({
+      ui: { ...state.ui, selectOpenedFiles: !state.ui.selectOpenedFiles }
     }))
 });

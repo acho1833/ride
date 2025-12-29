@@ -1,12 +1,14 @@
 'use client';
 
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
-import React, { useState } from 'react';
-import { ChevronsDownUp, ChevronsUpDown, FilePlus } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronsDownUp, ChevronsUpDown, FilePlus, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import { TreeNode } from '@/stores/files/files.store';
 import { useFileActions, useFileStructure, useOpenFolderIds, useSelectedFileId } from '@/stores/files/files.selector';
+import { useOpenFileIds, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
+import { useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
 import FileTreeComponent, { EditingNode } from '@/features/files/components/file-tree.component';
 import NewNodeInputComponent from '@/features/files/components/new-node-input.component';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,9 +25,30 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   const fileStructure = useFileStructure();
   const selectedId = useSelectedFileId();
   const openFolderIds = useOpenFolderIds();
+  const openFileIds = useOpenFileIds();
 
   // Get actions from file store
-  const { setSelectedFileId, toggleFolder, addNode, deleteNode, renameNode, expandAllFolders, collapseAllFolders } = useFileActions();
+  const { setSelectedFileId, toggleFolder, addNode, deleteNode, renameNode, expandAllFolders, collapseAllFolders, revealFile } =
+    useFileActions();
+
+  // Get UI state and actions
+  const selectOpenedFiles = useSelectOpenedFiles();
+  const { toggleSelectOpenedFiles } = useUiActions();
+
+  // Get active file from last focused group
+  const lastFocusedGroupId = useLastFocusedGroupId();
+  const lastFocusedGroup = useEditorGroup(lastFocusedGroupId ?? '');
+  const activeFileId = lastFocusedGroup?.activeFileId ?? null;
+
+  // Track previous selectOpenedFiles state to detect when it's enabled
+  const prevSelectOpenedFiles = useRef(selectOpenedFiles);
+  useEffect(() => {
+    // When toggle is turned on, reveal the currently active file
+    if (selectOpenedFiles && !prevSelectOpenedFiles.current && activeFileId) {
+      revealFile(activeFileId);
+    }
+    prevSelectOpenedFiles.current = selectOpenedFiles;
+  }, [selectOpenedFiles, activeFileId, revealFile]);
 
   // Local state for tracking editing and renaming
   const [editingNode, setEditingNode] = useState<EditingNode | null>(null);
@@ -133,11 +156,20 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
       <Button variant="ghost" size="xs" onClick={handleAddFileToRoot} title="New File">
         <FilePlus className="h-4 w-4" />
       </Button>
+      <Button
+        variant="ghost"
+        size="xs"
+        onClick={toggleSelectOpenedFiles}
+        title="Select Opened Files"
+        className={selectOpenedFiles ? 'text-primary' : ''}
+      >
+        <Crosshair className="h-4 w-4" />
+      </Button>
       <Button variant="ghost" size="xs" onClick={expandAllFolders} title="Expand All">
-        <ChevronsDownUp className="h-4 w-4" />
+        <ChevronsUpDown className="h-4 w-4" />
       </Button>
       <Button variant="ghost" size="xs" onClick={collapseAllFolders} title="Collapse All">
-        <ChevronsUpDown className="h-4 w-4" />
+        <ChevronsDownUp className="h-4 w-4" />
       </Button>
     </>
   );
@@ -172,6 +204,7 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
           onCancelEditing={handleCancelEditing}
           renamingId={renamingId}
           onStartRename={handleStartRename}
+          openFileIds={openFileIds}
         />
       </ScrollArea>
     </MainPanelsComponent>

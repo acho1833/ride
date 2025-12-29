@@ -63,8 +63,11 @@ Code is organized by feature in `src/features/`. Each feature contains:
 - `hooks/` - React Query hooks using `@orpc/tanstack-query`
 - `views/` - Page-level components (consumed by app pages)
 - `components/` - Feature-specific components
+- `const.ts` - Feature-specific constants and configuration
 - `types.ts` - Feature-specific types
 - `utils.ts` - Feature-specific utils
+
+**Note:** Not all features require server code. Client-only features (like the editor) may only have `components/`, `views/`, and `const.ts`. The structure adapts to what the feature needs.
 
 ### Server Code Pattern (CRITICAL)
 

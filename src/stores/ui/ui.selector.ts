@@ -18,6 +18,9 @@ export const useToggleMode = (): boolean => useAppStore((state: UiSlice): boolea
 /** Hook for toolbar state */
 export const useToolbarMode = () => useAppStore((state: UiSlice) => state.ui.toolbar);
 
+/** Hook for select opened files state */
+export const useSelectOpenedFiles = (): boolean => useAppStore((state: UiSlice): boolean => state.ui.selectOpenedFiles);
+
 /** Hook for entire ui object */
 export const useUi = () => useAppStore((state: UiSlice) => state.ui);
 
@@ -26,6 +29,7 @@ export const useUiActions = () =>
   useAppStore(
     useShallow((state: UiSlice) => ({
       setToggleMode: state.setToggleMode,
-      toggleToolbar: state.toggleToolbar
+      toggleToolbar: state.toggleToolbar,
+      toggleSelectOpenedFiles: state.toggleSelectOpenedFiles
     }))
   );

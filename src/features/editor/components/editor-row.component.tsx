@@ -32,14 +32,15 @@ const EditorRowComponent = ({ row, rowIndex }: Props) => {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-      {groups.map((group, groupIndex) => (
-        <div key={group.id} className="contents">
-          {groupIndex > 0 && <ResizableHandle />}
-          <ResizablePanel defaultSize={defaultSize} minSize={15}>
+      {groups.flatMap((group, groupIndex) => {
+        const panel = (
+          <ResizablePanel key={group.id} defaultSize={defaultSize} minSize={15}>
             <EditorGroupComponent groupId={group.id} rowIndex={rowIndex} groupIndex={groupIndex} />
           </ResizablePanel>
-        </div>
-      ))}
+        );
+        if (groupIndex === 0) return [panel];
+        return [<ResizableHandle key={`handle-${group.id}`} />, panel];
+      })}
     </ResizablePanelGroup>
   );
 };

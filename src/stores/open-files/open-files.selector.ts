@@ -15,9 +15,28 @@ import { OpenFilesSlice, EditorGroup, GroupId } from './open-files.store';
 /** Hook for all rows */
 export const useEditorRows = () => useAppStore((state: OpenFilesSlice) => state.openFiles.rows);
 
+/** Hook for all open file IDs (for highlighting in file tree) */
+export const useOpenFileIds = (): Set<string> => {
+  const ids = useAppStore(
+    useShallow((state: OpenFilesSlice) => {
+      const idList: string[] = [];
+      for (const row of state.openFiles.rows) {
+        for (const group of row.groups) {
+          for (const file of group.files) {
+            if (!idList.includes(file.id)) {
+              idList.push(file.id);
+            }
+          }
+        }
+      }
+      return idList;
+    })
+  );
+  return new Set(ids);
+};
+
 /** Hook for last focused group ID */
-export const useLastFocusedGroupId = () =>
-  useAppStore((state: OpenFilesSlice) => state.openFiles.lastFocusedGroupId);
+export const useLastFocusedGroupId = () => useAppStore((state: OpenFilesSlice) => state.openFiles.lastFocusedGroupId);
 
 /** Hook for a specific group by ID */
 export const useEditorGroup = (groupId: GroupId): EditorGroup | null =>
@@ -65,10 +84,11 @@ export const useOpenFilesActions = () =>
       closeFile: state.closeFile,
       setActiveFile: state.setActiveFile,
       closeAllFilesInGroup: state.closeAllFilesInGroup,
+      closeOtherFiles: state.closeOtherFiles,
       moveFileToGroup: state.moveFileToGroup,
       moveFileToNewGroup: state.moveFileToNewGroup,
       reorderFile: state.reorderFile,
-      setLastFocusedGroup: state.setLastFocusedGroup,
+      setLastFocusedGroup: state.setLastFocusedGroup
     }))
   );
 
@@ -81,52 +101,64 @@ export const useCanMoveInDirection = (
   groupId: GroupId,
   direction: 'left' | 'right' | 'up' | 'down'
 ): { canMove: boolean; isNewGroup: boolean } =>
-  useAppStore((state: OpenFilesSlice) => {
-    const { rows } = state.openFiles;
+  useAppStore(
+    useShallow((state: OpenFilesSlice) => {
+      const { rows } = state.openFiles;
 
-    // Find group location
-    let rowIndex = -1;
-    let groupIndex = -1;
-    let group: EditorGroup | null = null;
+      // Find group location
+      let rowIndex = -1;
+      let groupIndex = -1;
+      let group: EditorGroup | null = null;
 
-    for (let ri = 0; ri < rows.length; ri++) {
-      const gi = rows[ri].groups.findIndex(g => g.id === groupId);
-      if (gi !== -1) {
-        rowIndex = ri;
-        groupIndex = gi;
-        group = rows[ri].groups[gi];
-        break;
+      for (let ri = 0; ri < rows.length; ri++) {
+        const gi = rows[ri].groups.findIndex(g => g.id === groupId);
+        if (gi !== -1) {
+          rowIndex = ri;
+          groupIndex = gi;
+          group = rows[ri].groups[gi];
+          break;
+        }
       }
-    }
 
-    if (!group || group.files.length < 2) {
-      return { canMove: false, isNewGroup: false };
-    }
-
-    const row = rows[rowIndex];
-
-    switch (direction) {
-      case 'left':
-        return {
-          canMove: true,
-          isNewGroup: groupIndex === 0,
-        };
-      case 'right':
-        return {
-          canMove: true,
-          isNewGroup: groupIndex === row.groups.length - 1,
-        };
-      case 'up':
-        return {
-          canMove: rowIndex > 0 || rows.length < 2,
-          isNewGroup: rowIndex === 0 || rows.length < 2,
-        };
-      case 'down':
-        return {
-          canMove: rowIndex < rows.length - 1 || rows.length < 2,
-          isNewGroup: rowIndex === rows.length - 1 || rows.length < 2,
-        };
-      default:
+      if (!group) {
         return { canMove: false, isNewGroup: false };
-    }
-  });
+      }
+
+      const row = rows[rowIndex];
+      const hasMultipleFiles = group.files.length >= 2;
+
+      switch (direction) {
+        case 'left': {
+          const isNewGroup = groupIndex === 0;
+          // Can't split and move if only 1 file
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        case 'right': {
+          const isNewGroup = groupIndex === row.groups.length - 1;
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        case 'up': {
+          const isNewGroup = rowIndex === 0 || rows.length < 2;
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        case 'down': {
+          const isNewGroup = rowIndex === rows.length - 1 || rows.length < 2;
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        default:
+          return { canMove: false, isNewGroup: false };
+      }
+    })
+  );

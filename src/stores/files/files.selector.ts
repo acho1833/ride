@@ -36,6 +36,7 @@ export const useFileActions = () =>
       deleteNode: state.deleteNode,
       renameNode: state.renameNode,
       expandAllFolders: state.expandAllFolders,
-      collapseAllFolders: state.collapseAllFolders
+      collapseAllFolders: state.collapseAllFolders,
+      revealFile: state.revealFile
     }))
   );

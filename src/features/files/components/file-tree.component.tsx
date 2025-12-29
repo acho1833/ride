@@ -36,6 +36,7 @@ interface Props {
   onCancelEditing: () => void; // Callback to cancel editing
   renamingId: string | null; // ID of node currently being renamed
   onStartRename: (id: string) => void; // Callback to start renaming a node
+  openFileIds: Set<string>; // Set of file IDs that are currently open in editor
 }
 
 /**
@@ -58,12 +59,14 @@ const FileTreeComponent = ({
   onFinishEditing,
   onCancelEditing,
   renamingId,
-  onStartRename
+  onStartRename,
+  openFileIds
 }: Props) => {
   const isOpen = openFolderIds.includes(node.id); // Check if this folder is expanded
+  const isFileOpen = node.type === 'file' && openFileIds?.has(node.id); // Check if file is open in editor
   const inputRef = useRef<HTMLInputElement>(null); // Reference to the input field for renaming
   const isRenaming = renamingId === node.id; // Check if this node is being renamed
-  const { openFileById } = useOpenFilesActions();
+  const { openFile } = useOpenFilesActions();
 
   // Auto-focus the input field when renaming starts
   useEffect(() => {
@@ -97,6 +100,12 @@ const FileTreeComponent = ({
     }
   };
 
+  // Handle drag start for file tree items
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('application/x-file-tree', JSON.stringify({ fileId: node.id, fileName: node.name }));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
   // Render a file node
   if (node.type === 'file') {
     return (
@@ -107,12 +116,14 @@ const FileTreeComponent = ({
               selectedId === node.id ? 'bg-accent' : ''
             }`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }} // Indent based on depth
+            draggable
+            onDragStart={handleDragStart}
             onDoubleClick={() => {
-              openFileById(node.id, node.name);
+              openFile(node.id, node.name);
             }}
             onClick={() => onSelect(node.id)}
           >
-            <FileIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+            <FileIcon className={`h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
             {isRenaming ? (
               // Show input field when renaming
               <Input
@@ -208,6 +219,7 @@ const FileTreeComponent = ({
                   onCancelEditing={onCancelEditing}
                   renamingId={renamingId}
                   onStartRename={onStartRename}
+                  openFileIds={openFileIds}
                 />
               ))}
             </CollapsibleContent>

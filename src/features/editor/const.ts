@@ -3,12 +3,15 @@
 /**
  * Editor configuration constants
  */
-export const EDITOR_CONFIG = {
+export const EDITOR_CONFIG: {
   /** Max vertical rows (2 = top/bottom only, -1 = unlimited) */
-  yGroupLimit: 2,
+  yGroupLimit: number;
   /** Max horizontal groups per row (-1 = unlimited) */
+  xGroupLimit: number;
+} = {
+  yGroupLimit: 2,
   xGroupLimit: -1
-} as const;
+};
 
 /** Drop zone identifiers */
 export const DROP_ZONES = {

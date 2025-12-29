@@ -48,10 +48,11 @@ export interface OpenFilesState {
 /** Open files action methods */
 export interface OpenFilesActions {
   // File operations
-  openFile: (fileId: string, name: string, groupId?: GroupId) => void;
+  openFile: (fileId: string, name: string, groupId?: GroupId, insertIndex?: number) => void;
   closeFile: (fileId: string, groupId: GroupId) => void;
   setActiveFile: (fileId: string, groupId: GroupId) => void;
   closeAllFilesInGroup: (groupId: GroupId) => void;
+  closeOtherFiles: (fileId: string, groupId: GroupId) => void;
 
   // Move operations
   moveFileToGroup: (fileId: string, fromGroupId: GroupId, toGroupId: GroupId, insertIndex?: number) => void;
@@ -78,13 +79,13 @@ const generateId = (): string => crypto.randomUUID();
 const createGroup = (id?: string): EditorGroup => ({
   id: id ?? generateId(),
   files: [],
-  activeFileId: null,
+  activeFileId: null
 });
 
 /** Create row with one empty group */
 const createRow = (id?: string): EditorRow => ({
   id: id ?? generateId(),
-  groups: [createGroup()],
+  groups: [createGroup()]
 });
 
 /** Find group and row by group ID */
@@ -124,7 +125,7 @@ const cleanupEmptyGroupsAndRows = (rows: EditorRow[]): EditorRow[] => {
   // Filter out empty groups from each row
   const cleanedRows = rows.map(row => ({
     ...row,
-    groups: row.groups.filter(g => g.files.length > 0),
+    groups: row.groups.filter(g => g.files.length > 0)
   }));
 
   // Filter out empty rows
@@ -142,7 +143,8 @@ const cleanupEmptyGroupsAndRows = (rows: EditorRow[]): EditorRow[] => {
 // Initial State
 // ============================================================================
 
-const initialGroupId = generateId();
+const initialGroupId1 = generateId();
+const initialGroupId2 = generateId();
 
 const initialState: OpenFilesState['openFiles'] = {
   rows: [
@@ -150,14 +152,26 @@ const initialState: OpenFilesState['openFiles'] = {
       id: generateId(),
       groups: [
         {
-          id: initialGroupId,
-          files: [{ id: 'id3', name: 'sample3.ws' }],
-          activeFileId: 'id3',
+          id: initialGroupId1,
+          files: [
+            { id: 'ws1', name: 'WS1.ws' },
+            { id: 'ws2', name: 'WS2.ws' },
+            { id: 'txt1', name: 'TXT1.txt' }
+          ],
+          activeFileId: 'ws1'
         },
-      ],
-    },
+        {
+          id: initialGroupId2,
+          files: [
+            { id: 'ws3', name: 'WS3.ws' },
+            { id: 'txt2', name: 'TXT2.txt' }
+          ],
+          activeFileId: 'ws3'
+        }
+      ]
+    }
   ],
-  lastFocusedGroupId: initialGroupId,
+  lastFocusedGroupId: initialGroupId1
 };
 
 // ============================================================================
@@ -168,7 +182,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
   openFiles: initialState,
 
   // Open file in group (or last focused, or first available)
-  openFile: (fileId: string, name: string, groupId?: GroupId) =>
+  openFile: (fileId: string, name: string, groupId?: GroupId, insertIndex?: number) =>
     set(state => {
       const { rows, lastFocusedGroupId } = state.openFiles;
 
@@ -180,17 +194,15 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
           ri === existing.rowIndex
             ? {
                 ...row,
-                groups: row.groups.map((g, gi) =>
-                  gi === existing.groupIndex ? { ...g, activeFileId: fileId } : g
-                ),
+                groups: row.groups.map((g, gi) => (gi === existing.groupIndex ? { ...g, activeFileId: fileId } : g))
               }
             : row
         );
         return {
           openFiles: {
             rows: newRows,
-            lastFocusedGroupId: existing.group.id,
-          },
+            lastFocusedGroupId: existing.group.id
+          }
         };
       }
 
@@ -201,7 +213,11 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       const location = findGroupLocation(rows, targetGroupId);
       if (!location) return state;
 
-      // Add file to end of target group
+      // Add file at specified index or end of target group
+      const newFiles = [...location.group.files];
+      const idx = insertIndex ?? newFiles.length;
+      newFiles.splice(idx, 0, { id: fileId, name });
+
       const newRows = rows.map((row, ri) =>
         ri === location.rowIndex
           ? {
@@ -210,11 +226,11 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
                 gi === location.groupIndex
                   ? {
                       ...g,
-                      files: [...g.files, { id: fileId, name }],
-                      activeFileId: fileId,
+                      files: newFiles,
+                      activeFileId: fileId
                     }
                   : g
-              ),
+              )
             }
           : row
       );
@@ -222,8 +238,8 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       return {
         openFiles: {
           rows: newRows,
-          lastFocusedGroupId: targetGroupId,
-        },
+          lastFocusedGroupId: targetGroupId
+        }
       };
     }),
 
@@ -255,11 +271,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
         ri === location.rowIndex
           ? {
               ...row,
-              groups: row.groups.map((g, gi) =>
-                gi === location.groupIndex
-                  ? { ...g, files: newFiles, activeFileId: newActiveFileId }
-                  : g
-              ),
+              groups: row.groups.map((g, gi) => (gi === location.groupIndex ? { ...g, files: newFiles, activeFileId: newActiveFileId } : g))
             }
           : row
       );
@@ -277,8 +289,8 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       return {
         openFiles: {
           rows: cleanedRows,
-          lastFocusedGroupId: newLastFocusedGroupId,
-        },
+          lastFocusedGroupId: newLastFocusedGroupId
+        }
       };
     }),
 
@@ -293,9 +305,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
         ri === location.rowIndex
           ? {
               ...row,
-              groups: row.groups.map((g, gi) =>
-                gi === location.groupIndex ? { ...g, activeFileId: fileId } : g
-              ),
+              groups: row.groups.map((g, gi) => (gi === location.groupIndex ? { ...g, activeFileId: fileId } : g))
             }
           : row
       );
@@ -303,8 +313,8 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       return {
         openFiles: {
           rows: newRows,
-          lastFocusedGroupId: groupId,
-        },
+          lastFocusedGroupId: groupId
+        }
       };
     }),
 
@@ -319,9 +329,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
         ri === location.rowIndex
           ? {
               ...row,
-              groups: row.groups.map((g, gi) =>
-                gi === location.groupIndex ? { ...g, files: [], activeFileId: null } : g
-              ),
+              groups: row.groups.map((g, gi) => (gi === location.groupIndex ? { ...g, files: [], activeFileId: null } : g))
             }
           : row
       );
@@ -332,8 +340,35 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       return {
         openFiles: {
           rows: cleanedRows,
-          lastFocusedGroupId: newLastFocusedGroupId,
-        },
+          lastFocusedGroupId: newLastFocusedGroupId
+        }
+      };
+    }),
+
+  // Close all files except the specified one
+  closeOtherFiles: (fileId: string, groupId: GroupId) =>
+    set(state => {
+      const { rows } = state.openFiles;
+      const location = findGroupLocation(rows, groupId);
+      if (!location) return state;
+
+      const fileToKeep = location.group.files.find(f => f.id === fileId);
+      if (!fileToKeep) return state;
+
+      const newRows = rows.map((row, ri) =>
+        ri === location.rowIndex
+          ? {
+              ...row,
+              groups: row.groups.map((g, gi) => (gi === location.groupIndex ? { ...g, files: [fileToKeep], activeFileId: fileId } : g))
+            }
+          : row
+      );
+
+      return {
+        openFiles: {
+          ...state.openFiles,
+          rows: newRows
+        }
       };
     }),
 
@@ -376,25 +411,21 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
                 return { ...g, files: targetFiles, activeFileId: fileId };
               }
               return g;
-            }),
+            })
           };
         }
         if (ri === fromLocation.rowIndex) {
           return {
             ...row,
             groups: row.groups.map((g, gi) =>
-              gi === fromLocation.groupIndex
-                ? { ...g, files: newFromFiles, activeFileId: newFromActiveId }
-                : g
-            ),
+              gi === fromLocation.groupIndex ? { ...g, files: newFromFiles, activeFileId: newFromActiveId } : g
+            )
           };
         }
         if (ri === toLocation.rowIndex) {
           return {
             ...row,
-            groups: row.groups.map((g, gi) =>
-              gi === toLocation.groupIndex ? { ...g, files: targetFiles, activeFileId: fileId } : g
-            ),
+            groups: row.groups.map((g, gi) => (gi === toLocation.groupIndex ? { ...g, files: targetFiles, activeFileId: fileId } : g))
           };
         }
         return row;
@@ -405,8 +436,8 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       return {
         openFiles: {
           rows: newRows,
-          lastFocusedGroupId: toGroupId,
-        },
+          lastFocusedGroupId: toGroupId
+        }
       };
     }),
 
@@ -420,9 +451,6 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       const file = fromLocation.group.files.find(f => f.id === fileId);
       if (!file) return state;
 
-      // Can't move if only 1 file in group
-      if (fromLocation.group.files.length < 2) return state;
-
       const { yGroupLimit, xGroupLimit } = EDITOR_CONFIG;
 
       // Remove file from source
@@ -432,47 +460,105 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
         newFromActiveId = newFromFiles.length > 0 ? newFromFiles[0].id : null;
       }
 
-      // Create new group with the file
-      const newGroup: EditorGroup = {
-        id: generateId(),
-        files: [file],
-        activeFileId: fileId,
-      };
+      // Track target group ID for lastFocusedGroupId
+      let targetGroupId = generateId();
 
       let newRows = [...rows];
 
       if (direction === 'left' || direction === 'right') {
-        // Check xGroupLimit
         const currentRow = rows[fromLocation.rowIndex];
-        if (xGroupLimit !== -1 && currentRow.groups.length >= xGroupLimit) {
-          return state;
+        const targetGroupIndex = direction === 'left' ? fromLocation.groupIndex - 1 : fromLocation.groupIndex + 1;
+        const hasExistingGroup = targetGroupIndex >= 0 && targetGroupIndex < currentRow.groups.length;
+
+        if (hasExistingGroup) {
+          // Move to existing adjacent group
+          const targetGroup = currentRow.groups[targetGroupIndex];
+          targetGroupId = targetGroup.id;
+
+          newRows = newRows.map((row, ri) =>
+            ri === fromLocation.rowIndex
+              ? {
+                  ...row,
+                  groups: row.groups.map((g, gi) => {
+                    if (gi === fromLocation.groupIndex) {
+                      return { ...g, files: newFromFiles, activeFileId: newFromActiveId };
+                    }
+                    if (gi === targetGroupIndex) {
+                      return { ...g, files: [...g.files, file], activeFileId: fileId };
+                    }
+                    return g;
+                  })
+                }
+              : row
+          );
+        } else {
+          // Create new group - check xGroupLimit first
+          if (xGroupLimit !== -1 && currentRow.groups.length >= xGroupLimit) {
+            return state;
+          }
+
+          const newGroup: EditorGroup = {
+            id: targetGroupId,
+            files: [file],
+            activeFileId: fileId
+          };
+
+          const newGroups = [...currentRow.groups];
+
+          // Update source group first
+          newGroups[fromLocation.groupIndex] = {
+            ...fromLocation.group,
+            files: newFromFiles,
+            activeFileId: newFromActiveId
+          };
+
+          // Insert new group at the correct position
+          // For left: insert at position 0 (leftmost)
+          // For right: insert after the source group
+          const insertIdx = direction === 'left' ? 0 : fromLocation.groupIndex + 1;
+          newGroups.splice(insertIdx, 0, newGroup);
+
+          newRows[fromLocation.rowIndex] = { ...currentRow, groups: newGroups };
         }
-
-        // Insert new group in same row
-        const insertIdx = direction === 'left' ? fromLocation.groupIndex : fromLocation.groupIndex + 1;
-        const newGroups = [...currentRow.groups];
-
-        // Update source group first
-        newGroups[fromLocation.groupIndex] = {
-          ...fromLocation.group,
-          files: newFromFiles,
-          activeFileId: newFromActiveId,
-        };
-
-        // Insert new group
-        newGroups.splice(insertIdx, 0, newGroup);
-
-        newRows[fromLocation.rowIndex] = { ...currentRow, groups: newGroups };
       } else {
         // up or down
-        const targetRowIndex = direction === 'up' ? 0 : 1;
-        const isCreatingNewRow = rows.length < 2 || (direction === 'up' && fromLocation.rowIndex === 0) || (direction === 'down' && fromLocation.rowIndex === rows.length - 1);
+        const targetRowIndex = direction === 'up' ? fromLocation.rowIndex - 1 : fromLocation.rowIndex + 1;
+        const hasExistingRow = targetRowIndex >= 0 && targetRowIndex < rows.length;
 
-        if (isCreatingNewRow) {
-          // Check yGroupLimit
+        if (hasExistingRow) {
+          // Move to existing row - add file to first group in that row
+          const existingTargetRow = rows[targetRowIndex];
+          const targetGroup = existingTargetRow.groups[0];
+          targetGroupId = targetGroup.id;
+
+          newRows = newRows.map((row, ri) => {
+            if (ri === fromLocation.rowIndex) {
+              return {
+                ...row,
+                groups: row.groups.map((g, gi) =>
+                  gi === fromLocation.groupIndex ? { ...g, files: newFromFiles, activeFileId: newFromActiveId } : g
+                )
+              };
+            }
+            if (ri === targetRowIndex) {
+              return {
+                ...row,
+                groups: row.groups.map((g, gi) => (gi === 0 ? { ...g, files: [...g.files, file], activeFileId: fileId } : g))
+              };
+            }
+            return row;
+          });
+        } else {
+          // Create new row - check yGroupLimit first
           if (yGroupLimit !== -1 && rows.length >= yGroupLimit) {
             return state;
           }
+
+          const newGroup: EditorGroup = {
+            id: targetGroupId,
+            files: [file],
+            activeFileId: fileId
+          };
 
           // Update source group
           newRows = newRows.map((row, ri) =>
@@ -480,10 +566,8 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
               ? {
                   ...row,
                   groups: row.groups.map((g, gi) =>
-                    gi === fromLocation.groupIndex
-                      ? { ...g, files: newFromFiles, activeFileId: newFromActiveId }
-                      : g
-                  ),
+                    gi === fromLocation.groupIndex ? { ...g, files: newFromFiles, activeFileId: newFromActiveId } : g
+                  )
                 }
               : row
           );
@@ -491,7 +575,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
           // Create new row
           const newRow: EditorRow = {
             id: generateId(),
-            groups: [newGroup],
+            groups: [newGroup]
           };
 
           if (direction === 'up') {
@@ -499,29 +583,6 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
           } else {
             newRows = [...newRows, newRow];
           }
-        } else {
-          // Move to existing row
-          const existingTargetRow = rows[targetRowIndex];
-
-          // Update source group
-          newRows = newRows.map((row, ri) =>
-            ri === fromLocation.rowIndex
-              ? {
-                  ...row,
-                  groups: row.groups.map((g, gi) =>
-                    gi === fromLocation.groupIndex
-                      ? { ...g, files: newFromFiles, activeFileId: newFromActiveId }
-                      : g
-                  ),
-                }
-              : row
-          );
-
-          // Add group to target row
-          newRows[targetRowIndex] = {
-            ...existingTargetRow,
-            groups: [...existingTargetRow.groups, newGroup],
-          };
         }
       }
 
@@ -530,8 +591,8 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       return {
         openFiles: {
           rows: newRows,
-          lastFocusedGroupId: newGroup.id,
-        },
+          lastFocusedGroupId: targetGroupId
+        }
       };
     }),
 
@@ -554,9 +615,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
         ri === location.rowIndex
           ? {
               ...row,
-              groups: row.groups.map((g, gi) =>
-                gi === location.groupIndex ? { ...g, files: newFiles } : g
-              ),
+              groups: row.groups.map((g, gi) => (gi === location.groupIndex ? { ...g, files: newFiles } : g))
             }
           : row
       );
@@ -564,8 +623,8 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       return {
         openFiles: {
           ...state.openFiles,
-          rows: newRows,
-        },
+          rows: newRows
+        }
       };
     }),
 
@@ -574,7 +633,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
     set(state => ({
       openFiles: {
         ...state.openFiles,
-        lastFocusedGroupId: groupId,
-      },
-    })),
+        lastFocusedGroupId: groupId
+      }
+    }))
 });
