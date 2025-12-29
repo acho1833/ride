@@ -4,37 +4,38 @@
  * Single editor group containing tabs and content area.
  */
 
-import React from 'react';
-import { EditorGroup as EditorGroupType, OpenFile } from '@/stores/open-files/open-files.store';
+'use client';
+
+import { useEditorGroup, useOpenFilesActions } from '@/stores/open-files/open-files.selector';
+import { GroupId } from '@/stores/open-files/open-files.store';
 import EditorTabsComponent from '@/features/editor/components/editor-tabs.component';
 import EditorContentComponent from '@/features/editor/components/editor-content.component';
 
 interface Props {
-  files: OpenFile[];
-  activeFileId: string | null;
-  group: EditorGroupType;
-  onActivate: (fileId: string) => void;
-  onClose: (fileId: string) => void;
-  onMoveToOtherGroup: (fileId: string) => void;
-  onCloseAll: () => void;
-  onFocus: () => void;
+  groupId: GroupId;
+  rowIndex: number;
+  groupIndex: number;
 }
 
-const EditorGroupComponent = ({ files, activeFileId, group, onActivate, onClose, onMoveToOtherGroup, onCloseAll, onFocus }: Props) => {
+const EditorGroupComponent = ({ groupId, rowIndex, groupIndex }: Props) => {
+  const group = useEditorGroup(groupId);
+  const { setLastFocusedGroup } = useOpenFilesActions();
+
+  if (!group) {
+    return null;
+  }
+
+  const { files, activeFileId } = group;
   const activeFile = files.find(f => f.id === activeFileId);
 
+  const handleFocus = () => {
+    setLastFocusedGroup(groupId);
+  };
+
   return (
-    <div className="flex h-full flex-col" onFocus={onFocus} onMouseDown={onFocus}>
+    <div className="flex h-full flex-col" onFocus={handleFocus} onMouseDown={handleFocus}>
       {/* Tab bar */}
-      <EditorTabsComponent
-        files={files}
-        activeFileId={activeFileId}
-        group={group}
-        onActivate={onActivate}
-        onClose={onClose}
-        onMoveToOtherGroup={onMoveToOtherGroup}
-        onCloseAll={onCloseAll}
-      />
+      <EditorTabsComponent groupId={groupId} rowIndex={rowIndex} groupIndex={groupIndex} />
 
       {/* Content area */}
       <div className="flex-1 overflow-auto">
