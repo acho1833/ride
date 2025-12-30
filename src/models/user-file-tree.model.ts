@@ -39,8 +39,5 @@ const baseFolderNodeSchema = z.object({
 
 // Recursive tree node schema using z.lazy
 export const treeNodeSchema: z.ZodType<TreeNode> = z.lazy(() =>
-  z.union([
-    baseFileNodeSchema,
-    baseFolderNodeSchema.extend({ children: z.array(treeNodeSchema) })
-  ])
+  z.union([baseFileNodeSchema, baseFolderNodeSchema.extend({ children: z.array(treeNodeSchema) })])
 );

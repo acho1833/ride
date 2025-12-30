@@ -47,9 +47,7 @@ function addNodeToTree(tree: FolderNode, parentId: string, node: TreeNode): Fold
 
   return {
     ...tree,
-    children: tree.children.map(child =>
-      child.type === 'folder' ? addNodeToTree(child, parentId, node) : child
-    )
+    children: tree.children.map(child => (child.type === 'folder' ? addNodeToTree(child, parentId, node) : child))
   };
 }
 
@@ -91,7 +89,7 @@ function renameNodeInTree(tree: FolderNode, nodeId: string, newName: string): Fo
  * Save updated tree to database
  */
 async function saveTree(sid: string, structure: FolderNode): Promise<FolderNode> {
-  const doc = await UserFileTreeCollection.findOneAndUpdate({ sid }, { structure }, { new: true });
+  const doc = await UserFileTreeCollection.findOneAndUpdate({ sid }, { $set: { structure } }, { new: true });
 
   if (!doc) {
     throw new ORPCError('BAD_REQUEST', { message: 'User file tree not found' });

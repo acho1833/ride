@@ -21,10 +21,12 @@ const NewNodeInputComponent = ({ depth, type, onFinish, onCancel }: Props) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus the input when it appears
+  // Use setTimeout to ensure focus happens after context menu closes
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // Handle keyboard input

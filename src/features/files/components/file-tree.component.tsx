@@ -36,6 +36,20 @@ import { useFileTreeContext } from '@/features/files/components/file-tree-contex
 // Re-export types from context for backwards compatibility
 export type { FileType, EditingNode } from '@/features/files/components/file-tree-context';
 
+/**
+ * Sort children: folders first, then files, both alphabetically (case-insensitive)
+ */
+function sortChildren(children: TreeNode[]): TreeNode[] {
+  return [...children].sort((a, b) => {
+    // Folders come before files
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1;
+    }
+    // Alphabetical, case-insensitive
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+}
+
 interface Props {
   /** The tree node to render (file or folder) */
   node: TreeNode;
@@ -144,6 +158,24 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false }: Props) => {
     );
   }
 
+  // For root folder, render children directly without showing the root itself
+  if (isRoot && node.type === 'folder') {
+    return (
+      <>
+        {editingNode && editingNode.parentId === node.id && (
+          <NewNodeInputComponent
+            key={editingNode.tempId}
+            depth={0}
+            type={editingNode.type}
+            onFinish={onFinishEditing}
+            onCancel={onCancelEditing}
+          />
+        )}
+        {node.children && sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={0} />)}
+      </>
+    );
+  }
+
   // Render a folder node
   return (
     <ContextMenu>
@@ -189,9 +221,8 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false }: Props) => {
                   onCancel={onCancelEditing}
                 />
               )}
-              {node.children?.map(child => (
-                <FileTreeComponent key={child.id} node={child} depth={depth + 1} />
-              ))}
+              {node.children &&
+                sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={depth + 1} />)}
             </CollapsibleContent>
           </Collapsible>
         </div>
@@ -200,7 +231,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false }: Props) => {
         <ContextMenuItem onClick={() => onAddFile(node.id)}>New File</ContextMenuItem>
         <ContextMenuItem onClick={() => onAddFolder(node.id)}>New Folder</ContextMenuItem>
         <ContextMenuItem onClick={() => onStartRename(node.id)}>Rename</ContextMenuItem>
-        {!isRoot && <ContextMenuItem onClick={() => onDelete(node.id)}>Delete</ContextMenuItem>}
+        <ContextMenuItem onClick={() => onDelete(node.id)}>Delete</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );

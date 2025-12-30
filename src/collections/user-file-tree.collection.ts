@@ -1,21 +1,11 @@
 import mongoose, { model, Model, Schema } from 'mongoose';
 import type { UserFileTree } from '@/models/user-file-tree.model';
 
-// Recursive schema for tree nodes
-const treeNodeSchema = new Schema(
-  {
-    id: { type: String, required: true },
-    name: { type: String, required: true },
-    type: { type: String, enum: ['file', 'folder'], required: true },
-    metadata: { type: Schema.Types.Mixed, default: {} },
-    children: { type: [Schema.Types.Mixed], default: undefined }
-  },
-  { _id: false }
-);
-
+// Use Mixed type for the entire structure to allow deeply nested updates
+// Mongoose doesn't track changes in nested schemas well, so Mixed is simpler
 const userFileTreeSchema = new Schema<UserFileTree>({
   sid: { type: String, required: true, unique: true, index: true },
-  structure: { type: treeNodeSchema, required: true }
+  structure: { type: Schema.Types.Mixed, required: true }
 });
 
 const UserFileTreeCollection = (mongoose.models.UserFileTree ??

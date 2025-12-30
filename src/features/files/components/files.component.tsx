@@ -33,8 +33,8 @@ import { useOpenFileIds, useLastFocusedGroupId, useEditorGroup } from '@/stores/
 import { useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
 import FileTreeComponent from '@/features/files/components/file-tree.component';
 import { EditingNode, FileTreeProvider } from '@/features/files/components/file-tree-context';
-import NewNodeInputComponent from '@/features/files/components/new-node-input.component';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useFileAddMutation } from '@/features/files/hooks/useFileAddMutation';
 import { useFileDeleteMutation } from '@/features/files/hooks/useFileDeleteMutation';
 import { useFileRenameMutation } from '@/features/files/hooks/useFileRenameMutation';
@@ -226,22 +226,19 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
 
   return (
     <MainPanelsComponent title="Files" pos={pos} tools={toolbarButtons}>
-      {/* Show new node input at root level if editing at root */}
-      {editingNode && editingNode.parentId === fileStructure.id && (
-        <NewNodeInputComponent
-          key={editingNode.tempId}
-          depth={0}
-          type={editingNode.type}
-          onFinish={handleFinishEditing}
-          onCancel={handleCancelEditing}
-        />
-      )}
-      {/* Render the entire file tree starting from the root */}
-      <ScrollArea className="flex-1 overflow-y-auto">
-        <FileTreeProvider value={fileTreeContextValue}>
-          <FileTreeComponent node={fileStructure} isRoot={true} />
-        </FileTreeProvider>
-      </ScrollArea>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <ScrollArea className="flex-1 overflow-y-auto">
+            <FileTreeProvider value={fileTreeContextValue}>
+              <FileTreeComponent node={fileStructure} isRoot={true} />
+            </FileTreeProvider>
+          </ScrollArea>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={handleAddFileToRoot}>New File</ContextMenuItem>
+          <ContextMenuItem onClick={() => handleAddFolder(fileStructure.id)}>New Folder</ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     </MainPanelsComponent>
   );
 };
