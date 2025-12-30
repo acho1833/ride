@@ -9,13 +9,11 @@ import type { NextRequest } from 'next/server';
 
 /**
  * Creates the context object for ORPC handlers
- * @param _req - The incoming Next.js request (can be used to extract auth info)
- * @returns Context object with user information
+ * @param req - The incoming Next.js request
+ * @returns Context object with request for services to use
  */
-export async function createContext(_req: NextRequest) {
-  return {
-    userId: 'user1'
-  };
+export async function createContext(req: NextRequest) {
+  return { req };
 }
 
 /** Type representing the context available in ORPC handlers */

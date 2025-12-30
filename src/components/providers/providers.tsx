@@ -15,6 +15,7 @@ import { ReactNode, useState } from 'react';
 import { createQueryClient } from '@/lib/query/client';
 import { ThemeProvider } from 'next-themes';
 import ToasterProvider from '@/components/providers/toaster.provider';
+import AppConfigProviderComponent from '@/components/providers/app-config-provider.component';
 
 /**
  * Root provider component that wraps the entire application
@@ -27,7 +28,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <AppConfigProviderComponent>{children}</AppConfigProviderComponent>
         {/* DevTools for debugging queries (bottom-right corner) */}
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
       </QueryClientProvider>

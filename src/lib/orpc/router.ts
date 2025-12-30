@@ -6,10 +6,12 @@
  */
 
 import type { RouterClient } from '@orpc/server';
+import { appConfigRouter } from '@/features/app-config/server/routers';
 import { todoRouter } from '@/features/todos/server/routers';
 
 /** Main application router combining all feature routers */
 export const router = {
+  appConfig: appConfigRouter,
   todo: todoRouter
 };
 
