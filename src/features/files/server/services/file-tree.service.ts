@@ -8,12 +8,12 @@ import defaultFileTree from '@/features/files/server/default-file-tree.json';
 /**
  * Get user's file tree, creating default if none exists
  */
-export async function getFileTree(userId: string): Promise<FolderNode> {
-  let doc = await UserFileTreeCollection.findOne({ userId });
+export async function getFileTree(sid: string): Promise<FolderNode> {
+  let doc = await UserFileTreeCollection.findOne({ sid });
 
   if (!doc) {
     doc = await UserFileTreeCollection.create({
-      userId,
+      sid,
       structure: defaultFileTree as FolderNode
     });
   }
@@ -90,8 +90,8 @@ function renameNodeInTree(tree: FolderNode, nodeId: string, newName: string): Fo
 /**
  * Save updated tree to database
  */
-async function saveTree(userId: string, structure: FolderNode): Promise<FolderNode> {
-  const doc = await UserFileTreeCollection.findOneAndUpdate({ userId }, { structure }, { new: true });
+async function saveTree(sid: string, structure: FolderNode): Promise<FolderNode> {
+  const doc = await UserFileTreeCollection.findOneAndUpdate({ sid }, { structure }, { new: true });
 
   if (!doc) {
     throw new ORPCError('BAD_REQUEST', { message: 'User file tree not found' });
@@ -103,8 +103,8 @@ async function saveTree(userId: string, structure: FolderNode): Promise<FolderNo
 /**
  * Add a new node (file or folder)
  */
-export async function addNode(userId: string, parentId: string, node: TreeNode): Promise<FolderNode> {
-  const currentTree = await getFileTree(userId);
+export async function addNode(sid: string, parentId: string, node: TreeNode): Promise<FolderNode> {
+  const currentTree = await getFileTree(sid);
   const parent = findNode(currentTree, parentId);
 
   if (!parent || parent.type !== 'folder') {
@@ -112,14 +112,14 @@ export async function addNode(userId: string, parentId: string, node: TreeNode):
   }
 
   const newTree = addNodeToTree(currentTree, parentId, node);
-  return saveTree(userId, newTree);
+  return saveTree(sid, newTree);
 }
 
 /**
  * Delete a node
  */
-export async function deleteNode(userId: string, nodeId: string): Promise<FolderNode> {
-  const currentTree = await getFileTree(userId);
+export async function deleteNode(sid: string, nodeId: string): Promise<FolderNode> {
+  const currentTree = await getFileTree(sid);
 
   if (currentTree.id === nodeId) {
     throw new ORPCError('BAD_REQUEST', { message: 'Cannot delete root folder' });
@@ -131,14 +131,14 @@ export async function deleteNode(userId: string, nodeId: string): Promise<Folder
   }
 
   const newTree = removeNodeFromTree(currentTree, nodeId);
-  return saveTree(userId, newTree);
+  return saveTree(sid, newTree);
 }
 
 /**
  * Rename a node
  */
-export async function renameNode(userId: string, nodeId: string, newName: string): Promise<FolderNode> {
-  const currentTree = await getFileTree(userId);
+export async function renameNode(sid: string, nodeId: string, newName: string): Promise<FolderNode> {
+  const currentTree = await getFileTree(sid);
 
   const node = findNode(currentTree, nodeId);
   if (!node) {
@@ -146,14 +146,14 @@ export async function renameNode(userId: string, nodeId: string, newName: string
   }
 
   const newTree = renameNodeInTree(currentTree, nodeId, newName);
-  return saveTree(userId, newTree);
+  return saveTree(sid, newTree);
 }
 
 /**
  * Move a node to a new parent
  */
-export async function moveNode(userId: string, nodeId: string, newParentId: string): Promise<FolderNode> {
-  const currentTree = await getFileTree(userId);
+export async function moveNode(sid: string, nodeId: string, newParentId: string): Promise<FolderNode> {
+  const currentTree = await getFileTree(sid);
 
   if (currentTree.id === nodeId) {
     throw new ORPCError('BAD_REQUEST', { message: 'Cannot move root folder' });
@@ -173,15 +173,15 @@ export async function moveNode(userId: string, nodeId: string, newParentId: stri
   const treeWithoutNode = removeNodeFromTree(currentTree, nodeId);
   const newTree = addNodeToTree(treeWithoutNode, newParentId, node);
 
-  return saveTree(userId, newTree);
+  return saveTree(sid, newTree);
 }
 
 /**
  * Reset user's file tree to default (for dev tooling)
  */
-export async function resetFileTree(userId: string): Promise<FolderNode> {
+export async function resetFileTree(sid: string): Promise<FolderNode> {
   const doc = await UserFileTreeCollection.findOneAndUpdate(
-    { userId },
+    { sid },
     { structure: defaultFileTree as FolderNode },
     { new: true, upsert: true }
   );

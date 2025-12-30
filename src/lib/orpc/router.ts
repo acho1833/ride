@@ -7,11 +7,13 @@
 
 import type { RouterClient } from '@orpc/server';
 import { appConfigRouter } from '@/features/app-config/server/routers';
+import { filesRouter } from '@/features/files/server/routers';
 import { todoRouter } from '@/features/todos/server/routers';
 
 /** Main application router combining all feature routers */
 export const router = {
   appConfig: appConfigRouter,
+  files: filesRouter,
   todo: todoRouter
 };
 

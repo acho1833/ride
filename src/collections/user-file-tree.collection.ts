@@ -14,7 +14,7 @@ const treeNodeSchema = new Schema(
 );
 
 const userFileTreeSchema = new Schema<UserFileTree>({
-  userId: { type: String, required: true, unique: true, index: true },
+  sid: { type: String, required: true, unique: true, index: true },
   structure: { type: treeNodeSchema, required: true }
 });
 
