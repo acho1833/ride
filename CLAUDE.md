@@ -886,6 +886,31 @@ export default UserCard;
 - **Type everything**: Use TypeScript types/interfaces, avoid `any`
 - **Handle errors**: Always handle error states in UI and API calls
 
+### TypeScript & Zod Best Practices
+
+**Avoid `z.infer` - it slows down IDE autocomplete.**
+
+```typescript
+// BAD - z.infer slows IDE
+const todoSchema = z.object({ id: z.string(), text: z.string() });
+type Todo = z.infer<typeof todoSchema>;
+
+// GOOD - Define interface separately
+export interface Todo {
+  id: string;
+  text: string;
+}
+
+export const todoSchema = z.object({
+  id: z.string(),
+  text: z.string()
+});
+```
+
+- Define TypeScript interfaces/types explicitly in model files
+- Zod schemas are for API validation in routers, not for type generation
+- Keep model files simple: interfaces + Zod schemas (no `z.infer`)
+
 ## UI & Code Generation Rules (CRITICAL — MUST FOLLOW)
 
 ### Shadcn/ui Usage (HIGHEST PRIORITY)
