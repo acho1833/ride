@@ -27,7 +27,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronsDownUp, ChevronsUpDown, FilePlus, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
-import { TreeNode } from '@/stores/files/files.store';
+import type { TreeNode } from '@/models/user-file-tree.model';
 import { useFileActions, useFileStructure, useOpenFolderIds, useSelectedFileId } from '@/stores/files/files.selector';
 import { useOpenFileIds, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
 import { useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
@@ -35,6 +35,9 @@ import FileTreeComponent from '@/features/files/components/file-tree.component';
 import { EditingNode, FileTreeProvider } from '@/features/files/components/file-tree-context';
 import NewNodeInputComponent from '@/features/files/components/new-node-input.component';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useFileAddMutation } from '@/features/files/hooks/useFileAddMutation';
+import { useFileDeleteMutation } from '@/features/files/hooks/useFileDeleteMutation';
+import { useFileRenameMutation } from '@/features/files/hooks/useFileRenameMutation';
 
 interface Props {
   /** Position of this panel in the layout (for MainPanelsComponent) */
@@ -42,15 +45,19 @@ interface Props {
 }
 
 const FilesComponent: React.FC<Props> = ({ pos }) => {
-  // Get state from store
-  const fileStructure = useFileStructure();
+  // Get state from store - fileStructure is guaranteed to be loaded by AppLoaderProvider
+  const fileStructure = useFileStructure()!;
   const selectedId = useSelectedFileId();
   const openFolderIds = useOpenFolderIds();
   const openFileIds = useOpenFileIds();
 
   // Get actions from file store
-  const { setSelectedFileId, toggleFolder, addNode, deleteNode, renameNode, expandAllFolders, collapseAllFolders, revealFile } =
-    useFileActions();
+  const { setSelectedFileId, toggleFolder, expandAllFolders, collapseAllFolders, revealFile } = useFileActions();
+
+  // Server mutations
+  const { mutate: addNode } = useFileAddMutation();
+  const { mutate: deleteNode } = useFileDeleteMutation();
+  const { mutate: renameNode } = useFileRenameMutation();
 
   // Get UI state and actions
   const selectOpenedFiles = useSelectOpenedFiles();
@@ -123,7 +130,8 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
         ? {
             id: crypto.randomUUID(),
             name: name.trim(),
-            type: 'file'
+            type: 'file',
+            metadata: {}
           }
         : {
             id: crypto.randomUUID(),
@@ -132,8 +140,8 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
             children: []
           };
 
-    // Add the node to the store
-    addNode(editingNode.parentId, newNode);
+    // Add the node via server mutation
+    addNode({ parentId: editingNode.parentId, node: newNode });
     setEditingNode(null);
   };
 
@@ -149,14 +157,14 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
    */
   const handleDelete = (nodeId: string): void => {
     if (nodeId === fileStructure.id) return; // Can't delete root folder
-    deleteNode(nodeId);
+    deleteNode({ nodeId });
   };
 
   /**
    * Renames a node in the tree
    */
   const handleRename = (nodeId: string, newName: string): void => {
-    renameNode(nodeId, newName);
+    renameNode({ nodeId, newName });
     setRenamingId(null); // Clear the renaming state
   };
 

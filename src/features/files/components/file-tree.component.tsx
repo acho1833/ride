@@ -22,7 +22,7 @@
 
 'use client';
 
-import { TreeNode } from '@/stores/files/files.store';
+import type { TreeNode } from '@/models/user-file-tree.model';
 import { useEffect, useRef } from 'react';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Input } from '@/components/ui/input';
