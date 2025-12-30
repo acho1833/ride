@@ -2,11 +2,11 @@
  * App State Store
  *
  * Main Zustand store that combines all slices.
- * Persisted to sessionStorage and includes Redux DevTools integration.
+ * State persists to sessionStorage.
  */
 
 import { create } from 'zustand';
-import { devtools, createJSONStorage, persist } from 'zustand/middleware';
+import { devtools, persist, createJSONStorage } from 'zustand/middleware';
 import { IS_DEV } from '@/const';
 
 // Import slices
@@ -19,7 +19,7 @@ import { createTypeTabSlice, TypeTabSlice } from '@/stores/type-tabs/type-tabs.s
 type AppStore = UiSlice & FileTreeSlice & OpenFilesSlice & TypeTabSlice;
 
 /**
- * Main app store with persistence and devtools
+ * Main app store with devtools and sessionStorage persistence
  */
 export const useAppStore = create<AppStore>()(
   devtools(
@@ -31,7 +31,7 @@ export const useAppStore = create<AppStore>()(
         ...createTypeTabSlice(...a)
       }),
       {
-        name: 'app',
+        name: 'app-store',
         storage: createJSONStorage(() => sessionStorage)
       }
     ),

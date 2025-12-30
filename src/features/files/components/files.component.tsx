@@ -1,31 +1,78 @@
+/**
+ * Files Component
+ *
+ * Main file explorer panel containing the file tree and toolbar.
+ *
+ * @remarks
+ * This component serves as the container and data provider for the file explorer.
+ * It manages:
+ * - File tree structure from Zustand store
+ * - Local state for inline editing (creating/renaming nodes)
+ * - Toolbar buttons (New File, Select Opened Files, Expand/Collapse All)
+ * - FileTreeContext provider for passing state to nested tree nodes
+ *
+ * "Select Opened Files" feature:
+ * When enabled, clicking a tab in the editor will reveal and select that file
+ * in the file tree. This helps users locate the file they're currently editing.
+ * When the toggle is turned ON, it immediately reveals the currently active file.
+ *
+ * @see FileTreeContext - Context for sharing state with nested FileTreeComponents
+ * @see FileTreeComponent - Renders individual nodes in the tree
+ */
+
 'use client';
 
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
-import React, { useState } from 'react';
-import { ChevronsDownUp, ChevronsUpDown, FilePlus } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronsDownUp, ChevronsUpDown, FilePlus, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import { TreeNode } from '@/stores/files/files.store';
 import { useFileActions, useFileStructure, useOpenFolderIds, useSelectedFileId } from '@/stores/files/files.selector';
-import FileTreeComponent, { EditingNode } from '@/features/files/components/file-tree.component';
+import { useOpenFileIds, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
+import { useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
+import FileTreeComponent from '@/features/files/components/file-tree.component';
+import { EditingNode, FileTreeProvider } from '@/features/files/components/file-tree-context';
 import NewNodeInputComponent from '@/features/files/components/new-node-input.component';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Props {
+  /** Position of this panel in the layout (for MainPanelsComponent) */
   pos: ToolbarPositions;
 }
 
-/**
- * Main component that manages the entire file tree
- */
 const FilesComponent: React.FC<Props> = ({ pos }) => {
   // Get state from store
   const fileStructure = useFileStructure();
   const selectedId = useSelectedFileId();
   const openFolderIds = useOpenFolderIds();
+  const openFileIds = useOpenFileIds();
 
   // Get actions from file store
-  const { setSelectedFileId, toggleFolder, addNode, deleteNode, renameNode, expandAllFolders, collapseAllFolders } = useFileActions();
+  const { setSelectedFileId, toggleFolder, addNode, deleteNode, renameNode, expandAllFolders, collapseAllFolders, revealFile } =
+    useFileActions();
+
+  // Get UI state and actions
+  const selectOpenedFiles = useSelectOpenedFiles();
+  const { toggleSelectOpenedFiles } = useUiActions();
+
+  // Get active file from last focused group
+  const lastFocusedGroupId = useLastFocusedGroupId();
+  const lastFocusedGroup = useEditorGroup(lastFocusedGroupId ?? '');
+  const activeFileId = lastFocusedGroup?.activeFileId ?? null;
+
+  /**
+   * Auto-reveal on toggle enable.
+   * When user turns ON the "Select Opened Files" toggle, immediately reveal
+   * the currently active file so they see the effect right away.
+   */
+  const prevSelectOpenedFiles = useRef(selectOpenedFiles);
+  useEffect(() => {
+    if (selectOpenedFiles && !prevSelectOpenedFiles.current && activeFileId) {
+      revealFile(activeFileId);
+    }
+    prevSelectOpenedFiles.current = selectOpenedFiles;
+  }, [selectOpenedFiles, activeFileId, revealFile]);
 
   // Local state for tracking editing and renaming
   const [editingNode, setEditingNode] = useState<EditingNode | null>(null);
@@ -127,17 +174,44 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     handleAddFile(fileStructure.id);
   };
 
+  // Context value for FileTreeProvider - React Compiler handles memoization
+  const fileTreeContextValue = {
+    selectedId,
+    openFolderIds,
+    openFileIds,
+    editingNode,
+    renamingId,
+    onSelect: setSelectedFileId,
+    onAddFile: handleAddFile,
+    onAddFolder: handleAddFolder,
+    onDelete: handleDelete,
+    onRename: handleRename,
+    onToggleFolder: toggleFolder,
+    onFinishEditing: handleFinishEditing,
+    onCancelEditing: handleCancelEditing,
+    onStartRename: handleStartRename
+  };
+
   // Toolbar buttons that appear at the top of the file tree
   const toolbarButtons = (
     <>
       <Button variant="ghost" size="xs" onClick={handleAddFileToRoot} title="New File">
         <FilePlus className="h-4 w-4" />
       </Button>
+      <Button
+        variant="ghost"
+        size="xs"
+        onClick={toggleSelectOpenedFiles}
+        title="Select Opened Files"
+        className={selectOpenedFiles ? 'text-primary' : ''}
+      >
+        <Crosshair className="h-4 w-4" />
+      </Button>
       <Button variant="ghost" size="xs" onClick={expandAllFolders} title="Expand All">
-        <ChevronsDownUp className="h-4 w-4" />
+        <ChevronsUpDown className="h-4 w-4" />
       </Button>
       <Button variant="ghost" size="xs" onClick={collapseAllFolders} title="Collapse All">
-        <ChevronsUpDown className="h-4 w-4" />
+        <ChevronsDownUp className="h-4 w-4" />
       </Button>
     </>
   );
@@ -156,23 +230,9 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
       )}
       {/* Render the entire file tree starting from the root */}
       <ScrollArea className="flex-1 overflow-y-auto">
-        <FileTreeComponent
-          node={fileStructure}
-          selectedId={selectedId}
-          onSelect={setSelectedFileId}
-          onAddFile={handleAddFile}
-          onAddFolder={handleAddFolder}
-          onDelete={handleDelete}
-          onRename={handleRename}
-          isRoot={true}
-          openFolderIds={openFolderIds}
-          onToggleFolder={toggleFolder}
-          editingNode={editingNode}
-          onFinishEditing={handleFinishEditing}
-          onCancelEditing={handleCancelEditing}
-          renamingId={renamingId}
-          onStartRename={handleStartRename}
-        />
+        <FileTreeProvider value={fileTreeContextValue}>
+          <FileTreeComponent node={fileStructure} isRoot={true} />
+        </FileTreeProvider>
       </ScrollArea>
     </MainPanelsComponent>
   );

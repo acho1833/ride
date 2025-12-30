@@ -1,47 +1,185 @@
 /**
  * Open Files Selectors
  *
- * Selector functions and hooks for open files state.
+ * Selector hooks for accessing open files state from components.
+ *
+ * @remarks
+ * Key patterns used:
+ * - `useShallow` for object selectors to prevent re-renders on reference changes
+ * - `useMemo` for derived data (like Set creation) to maintain stable references
+ * - Granular selectors for minimal subscription scope
+ *
+ * @see open-files.store.ts - The underlying store slice
  */
 
+import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../app.store';
-import { OpenFilesSlice } from './open-files.store';
+import { OpenFilesSlice, EditorGroup, GroupId } from './open-files.store';
 
 // ============================================================================
-// Selector Hooks
+// State Selectors
 // ============================================================================
 
-/** Hook for left group files */
-export const useLeftGroupFiles = () => useAppStore((state: OpenFilesSlice) => state.openFiles.left.files);
+/** Get all editor rows (the top-level layout structure) */
+export const useEditorRows = () => useAppStore((state: OpenFilesSlice) => state.openFiles.rows);
 
-/** Hook for right group files */
-export const useRightGroupFiles = () => useAppStore((state: OpenFilesSlice) => state.openFiles.right.files);
+/**
+ * Get all open file IDs as a Set.
+ *
+ * @remarks
+ * Used by file tree to show visual indicator on open files.
+ * Uses useShallow to get a stable array reference, then useMemo to create
+ * a stable Set. Without memoization, new Set() on every render would cause
+ * unnecessary re-renders in consuming components.
+ */
+export const useOpenFileIds = (): Set<string> => {
+  const ids = useAppStore(
+    useShallow((state: OpenFilesSlice) => {
+      const idList: string[] = [];
+      for (const row of state.openFiles.rows) {
+        for (const group of row.groups) {
+          for (const file of group.files) {
+            if (!idList.includes(file.id)) {
+              idList.push(file.id);
+            }
+          }
+        }
+      }
+      return idList;
+    })
+  );
+  return useMemo(() => new Set(ids), [ids]);
+};
 
-/** Hook for left group active file ID */
-export const useLeftActiveFileId = () => useAppStore((state: OpenFilesSlice) => state.openFiles.left.activeFileId);
+/** Get the ID of the group that was last clicked/focused. Used as default target for new files. */
+export const useLastFocusedGroupId = () => useAppStore((state: OpenFilesSlice) => state.openFiles.lastFocusedGroupId);
 
-/** Hook for right group active file ID */
-export const useRightActiveFileId = () => useAppStore((state: OpenFilesSlice) => state.openFiles.right.activeFileId);
+/**
+ * Get a specific editor group by ID.
+ * Returns null if the group doesn't exist (e.g., during cleanup transitions).
+ */
+export const useEditorGroup = (groupId: GroupId): EditorGroup | null =>
+  useAppStore((state: OpenFilesSlice) => {
+    for (const row of state.openFiles.rows) {
+      const group = row.groups.find(g => g.id === groupId);
+      if (group) return group;
+    }
+    return null;
+  });
 
-/** Hook for entire openFiles state */
-export const useOpenFilesState = () => useAppStore((state: OpenFilesSlice) => state.openFiles);
+/** Get total number of rows in the editor layout */
+export const useRowCount = () => useAppStore((state: OpenFilesSlice) => state.openFiles.rows.length);
 
-/** Hook for last focused group */
-export const useLastFocusedGroup = () => useAppStore((state: OpenFilesSlice) => state.openFiles.lastFocusedGroup);
+/** Get number of groups in a specific row */
+export const useGroupCountInRow = (rowIndex: number): number =>
+  useAppStore((state: OpenFilesSlice) => state.openFiles.rows[rowIndex]?.groups.length ?? 0);
 
-/** Hook for open files actions */
+// ============================================================================
+// Action Selector
+// ============================================================================
+
+/**
+ * Get all open files actions.
+ * Uses useShallow to return a stable object reference.
+ */
 export const useOpenFilesActions = () =>
   useAppStore(
     useShallow((state: OpenFilesSlice) => ({
       openFile: state.openFile,
-      openFileById: state.openFileById,
       closeFile: state.closeFile,
       setActiveFile: state.setActiveFile,
-      closeAllFiles: state.closeAllFiles,
-      splitFileToRight: state.splitFileToRight,
+      closeAllFilesInGroup: state.closeAllFilesInGroup,
+      closeOtherFiles: state.closeOtherFiles,
       moveFileToGroup: state.moveFileToGroup,
-      closeRightGroup: state.closeRightGroup,
+      moveFileToNewGroup: state.moveFileToNewGroup,
+      reorderFile: state.reorderFile,
       setLastFocusedGroup: state.setLastFocusedGroup
     }))
+  );
+
+// ============================================================================
+// Utility Selectors (for context menu logic)
+// ============================================================================
+
+/**
+ * Determine if a file can be moved in a given direction from a group.
+ *
+ * @remarks
+ * Used by EditorTabComponent to show/hide context menu options.
+ * Returns both whether the move is possible AND whether it would create a new group.
+ *
+ * Logic:
+ * - If there's an adjacent group/row in that direction → Move to existing (isNewGroup: false)
+ * - If not → Would create new group/row (isNewGroup: true)
+ * - Can't split if only 1 file in source group (nothing would remain)
+ *
+ * @param groupId - The group containing the file to move
+ * @param direction - The direction to check
+ * @returns Object with canMove boolean and isNewGroup boolean
+ */
+export const useCanMoveInDirection = (
+  groupId: GroupId,
+  direction: 'left' | 'right' | 'up' | 'down'
+): { canMove: boolean; isNewGroup: boolean } =>
+  useAppStore(
+    useShallow((state: OpenFilesSlice) => {
+      const { rows } = state.openFiles;
+
+      // Find group location
+      let rowIndex = -1;
+      let groupIndex = -1;
+      let group: EditorGroup | null = null;
+
+      for (let ri = 0; ri < rows.length; ri++) {
+        const gi = rows[ri].groups.findIndex(g => g.id === groupId);
+        if (gi !== -1) {
+          rowIndex = ri;
+          groupIndex = gi;
+          group = rows[ri].groups[gi];
+          break;
+        }
+      }
+
+      if (!group) {
+        return { canMove: false, isNewGroup: false };
+      }
+
+      const row = rows[rowIndex];
+      const hasMultipleFiles = group.files.length >= 2;
+
+      switch (direction) {
+        case 'left': {
+          const isNewGroup = groupIndex === 0;
+          // Can't split and move if only 1 file
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        case 'right': {
+          const isNewGroup = groupIndex === row.groups.length - 1;
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        case 'up': {
+          const isNewGroup = rowIndex === 0 || rows.length < 2;
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        case 'down': {
+          const isNewGroup = rowIndex === rows.length - 1 || rows.length < 2;
+          return {
+            canMove: isNewGroup ? hasMultipleFiles : true,
+            isNewGroup
+          };
+        }
+        default:
+          return { canMove: false, isNewGroup: false };
+      }
+    })
   );

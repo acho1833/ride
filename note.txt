@@ -1,0 +1,2 @@
+- blue bar could be replaced with actual replacement without the animations. might be possible
+- file tabs scroll. ask ai if that can be improved...maybe

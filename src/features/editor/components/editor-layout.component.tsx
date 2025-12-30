@@ -1,124 +1,73 @@
 /**
  * Editor Layout Component
  *
- * Main layout with resizable split view for left and right editor groups.
+ * Top-level layout for the editor area. Renders rows vertically with resizable panels.
+ *
+ * @remarks
+ * Layout hierarchy: EditorLayout (vertical) → EditorRow (horizontal) → EditorGroup
+ *
+ * This is the root of the split view system. Vertical splits create new rows here.
+ * Maximum rows controlled by EDITOR_CONFIG.yGroupLimit (currently 2 = top/bottom only).
+ *
+ * @example
+ * // Two rows stacked vertically, each with its own groups
+ * ┌─────────────────────────────┐
+ * │          Row 1              │
+ * │  ┌─────────┬─────────┐      │
+ * │  │ Group A │ Group B │      │
+ * │  └─────────┴─────────┘      │
+ * ├─────────────────────────────┤ ← Drag handle
+ * │          Row 2              │
+ * │  ┌─────────────────┐        │
+ * │  │     Group C     │        │
+ * │  └─────────────────┘        │
+ * └─────────────────────────────┘
  */
 
 'use client';
 
-import React from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import {
-  useLeftActiveFileId,
-  useLeftGroupFiles,
-  useOpenFilesActions,
-  useRightActiveFileId,
-  useRightGroupFiles
-} from '@/stores/open-files/open-files.selector';
-import EditorGroupComponent from '@/features/editor/components/editor-group.component';
+import { useEditorRows } from '@/stores/open-files/open-files.selector';
+import EditorRowComponent from '@/features/editor/components/editor-row.component';
 
 const EditorLayoutComponent = () => {
-  const leftFiles = useLeftGroupFiles();
-  const rightFiles = useRightGroupFiles();
-  const leftActiveFileId = useLeftActiveFileId();
-  const rightActiveFileId = useRightActiveFileId();
-  // const lastFocusedGroup = useLastFocusedGroup();
+  const rows = useEditorRows();
 
-  const { setActiveFile, closeFile, moveFileToGroup, closeAllFiles, setLastFocusedGroup } = useOpenFilesActions();
-
-  const hasRightFiles = rightFiles.length > 0;
-
-  // Handlers for left group
-  const handleLeftActivate = (fileId: string) => {
-    setActiveFile(fileId, 'left');
-  };
-
-  const handleLeftClose = (fileId: string) => {
-    closeFile(fileId, 'left');
-  };
-
-  const handleLeftMoveToRight = (fileId: string) => {
-    const file = leftFiles.find(f => f.id === fileId);
-    if (file) {
-      moveFileToGroup(fileId, 'left', 'right');
-    }
-  };
-
-  const handleLeftCloseAll = () => {
-    closeAllFiles('left');
-  };
-
-  // Handlers for right group
-  const handleRightActivate = (fileId: string) => {
-    setActiveFile(fileId, 'right');
-  };
-
-  const handleRightClose = (fileId: string) => {
-    closeFile(fileId, 'right');
-  };
-
-  const handleRightMoveToLeft = (fileId: string) => {
-    const file = rightFiles.find(f => f.id === fileId);
-    if (file) {
-      moveFileToGroup(fileId, 'right', 'left');
-    }
-  };
-
-  const handleRightCloseAll = () => {
-    closeAllFiles('right');
-  };
-
-  // Single editor group (no split)
-  if (!hasRightFiles) {
+  // Edge case: All files closed. cleanupEmptyGroupsAndRows should prevent this,
+  // but we handle it gracefully just in case.
+  if (rows.length === 0) {
     return (
-      <div className="h-full w-full">
-        <EditorGroupComponent
-          files={leftFiles}
-          activeFileId={leftActiveFileId}
-          group="left"
-          onActivate={handleLeftActivate}
-          onClose={handleLeftClose}
-          onMoveToOtherGroup={handleLeftMoveToRight}
-          onCloseAll={handleLeftCloseAll}
-          onFocus={() => setLastFocusedGroup('left')}
-        />
+      <div className="text-muted-foreground flex h-full w-full items-center justify-center">
+        <p>No editor groups</p>
       </div>
     );
   }
 
-  // Split view with both groups
+  // Optimization: Skip ResizablePanelGroup when only one row exists.
+  // This is the common case - most users don't use vertical splits.
+  if (rows.length === 1) {
+    return (
+      <div className="h-full w-full">
+        <EditorRowComponent row={rows[0]} />
+      </div>
+    );
+  }
+
+  // Multiple rows: Create vertical panels with drag handles between them
+  const defaultSize = 100 / rows.length;
+
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-      {/* Left editor group */}
-      <ResizablePanel defaultSize={50} minSize={30}>
-        <EditorGroupComponent
-          files={leftFiles}
-          activeFileId={leftActiveFileId}
-          group="left"
-          onActivate={handleLeftActivate}
-          onClose={handleLeftClose}
-          onMoveToOtherGroup={handleLeftMoveToRight}
-          onCloseAll={handleLeftCloseAll}
-          onFocus={() => setLastFocusedGroup('left')}
-        />
-      </ResizablePanel>
-
-      {/* Resize handle */}
-      <ResizableHandle />
-
-      {/* Right editor group */}
-      <ResizablePanel defaultSize={50} minSize={30}>
-        <EditorGroupComponent
-          files={rightFiles}
-          activeFileId={rightActiveFileId}
-          group="right"
-          onActivate={handleRightActivate}
-          onClose={handleRightClose}
-          onMoveToOtherGroup={handleRightMoveToLeft}
-          onCloseAll={handleRightCloseAll}
-          onFocus={() => setLastFocusedGroup('right')}
-        />
-      </ResizablePanel>
+    <ResizablePanelGroup direction="vertical" className="h-full w-full">
+      {rows.flatMap((row, index) => {
+        const panel = (
+          <ResizablePanel key={row.id} defaultSize={defaultSize} minSize={15}>
+            <EditorRowComponent row={row} />
+          </ResizablePanel>
+        );
+        // First row has no preceding handle; subsequent rows get [handle, panel]
+        if (index === 0) return [panel];
+        return [<ResizableHandle key={`handle-${row.id}`} />, panel];
+      })}
     </ResizablePanelGroup>
   );
 };

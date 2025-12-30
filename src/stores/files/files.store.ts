@@ -1,7 +1,24 @@
 /**
  * Files State Store
  *
- * Zustand slice for managing file tree state.
+ * Zustand slice for managing the file explorer tree structure and selection state.
+ *
+ * @remarks
+ * This store manages:
+ * - `structure`: The hierarchical tree of files and folders
+ * - `selectedId`: Currently highlighted item in the explorer
+ * - `openFolderIds`: Which folders are expanded (visible children)
+ *
+ * The tree is recursive: folders contain children which can be files or folders.
+ * All mutations create new objects (immutable updates) to trigger React re-renders.
+ *
+ * Helper functions handle tree traversal:
+ * - `findAndAddNode`: Recursively finds a folder and adds a child
+ * - `findAndRemoveNode`: Recursively finds and removes a node
+ * - `findPathToFile`: Returns all parent folder IDs for a given file
+ *
+ * @see FileTreeSlice - Combined type for state + actions
+ * @see files.selector.ts - Selector hooks for accessing this state
  */
 
 import { StateCreator } from 'zustand';
@@ -45,6 +62,7 @@ export interface FileTreeActions {
   renameNode: (nodeId: string, newName: string) => void;
   expandAllFolders: () => void;
   collapseAllFolders: () => void;
+  revealFile: (fileId: string) => void;
 }
 
 /** Combined file tree store type */
@@ -129,6 +147,31 @@ export const findAndRenameNode = (tree: FolderNode, nodeId: string, newName: str
 };
 
 /**
+ * Find the path of parent folder IDs from root to a file.
+ *
+ * @remarks
+ * Used by `revealFile` to know which folders to expand.
+ * Returns the folder IDs in order from root to immediate parent.
+ *
+ * @param tree - The folder to search within
+ * @param fileId - The ID of the file to find
+ * @param path - Accumulator for the path (internal use)
+ * @returns Array of folder IDs from root to parent, or null if not found
+ */
+export const findPathToFile = (tree: FolderNode, fileId: string, path: string[] = []): string[] | null => {
+  for (const child of tree.children) {
+    if (child.id === fileId) {
+      return [...path, tree.id];
+    }
+    if (child.type === 'folder') {
+      const result = findPathToFile(child, fileId, [...path, tree.id]);
+      if (result) return result;
+    }
+  }
+  return null;
+};
+
+/**
  * Initial file structure
  */
 export const initialFileStructure: FolderNode = {
@@ -147,18 +190,18 @@ export const initialFileStructure: FolderNode = {
           type: 'folder',
           children: [
             {
-              id: crypto.randomUUID(),
-              name: 'sample1.ws',
+              id: 'ws1',
+              name: 'WS1.ws',
               type: 'file'
             },
             {
-              id: crypto.randomUUID(),
-              name: 'sample2.ws',
+              id: 'ws2',
+              name: 'WS2.ws',
               type: 'file'
             },
             {
-              id: 'id3',
-              name: 'sample3.ws',
+              id: 'txt1',
+              name: 'TXT1.txt',
               type: 'file'
             }
           ]
@@ -169,30 +212,30 @@ export const initialFileStructure: FolderNode = {
           type: 'folder',
           children: [
             {
-              id: crypto.randomUUID(),
-              name: 'sample1.ws',
+              id: 'ws3',
+              name: 'WS3.ws',
               type: 'file'
             },
             {
-              id: crypto.randomUUID(),
-              name: 'sample2.ws',
+              id: 'txt2',
+              name: 'TXT2.txt',
               type: 'file'
             },
             {
-              id: crypto.randomUUID(),
-              name: 'sample3.ws',
+              id: 'ws4',
+              name: 'WS4.ws',
               type: 'file'
             }
           ]
         },
         {
-          id: crypto.randomUUID(),
-          name: 'App.jsx',
+          id: 'jsx1',
+          name: 'JSX1.jsx',
           type: 'file'
         },
         {
-          id: crypto.randomUUID(),
-          name: 'index.js',
+          id: 'js1',
+          name: 'JS1.js',
           type: 'file'
         }
       ]
@@ -203,30 +246,30 @@ export const initialFileStructure: FolderNode = {
       type: 'folder',
       children: [
         {
-          id: crypto.randomUUID(),
-          name: 'sample1.ws',
+          id: 'ws5',
+          name: 'WS5.ws',
           type: 'file'
         },
         {
-          id: crypto.randomUUID(),
-          name: 'sample2.ws',
+          id: 'ws6',
+          name: 'WS6.ws',
           type: 'file'
         }
       ]
     },
     {
-      id: crypto.randomUUID(),
-      name: 'high_level.ws',
+      id: 'ws7',
+      name: 'WS7.ws',
       type: 'file'
     },
     {
-      id: crypto.randomUUID(),
-      name: 'low_level.ws',
+      id: 'ws8',
+      name: 'WS8.ws',
       type: 'file'
     },
     {
-      id: crypto.randomUUID(),
-      name: 'note.txt',
+      id: 'txt3',
+      name: 'TXT3.txt',
       type: 'file'
     }
   ]
@@ -242,7 +285,7 @@ export const initialFileStructure: FolderNode = {
 export const createFileTreeSlice: StateCreator<FileTreeSlice, [], [], FileTreeSlice> = set => ({
   files: {
     structure: initialFileStructure,
-    selectedId: 'id3',
+    selectedId: 'ws1',
     openFolderIds: getAllFolderIds(initialFileStructure)
   },
 
@@ -318,5 +361,31 @@ export const createFileTreeSlice: StateCreator<FileTreeSlice, [], [], FileTreeSl
         ...state.files,
         openFolderIds: [state.files.structure.id]
       }
-    }))
+    })),
+
+  /**
+   * Reveal a file in the tree by expanding all parent folders and selecting it.
+   * Called when "Select Opened Files" is enabled and user clicks a tab.
+   */
+  revealFile: (fileId: string) =>
+    set(state => {
+      const path = findPathToFile(state.files.structure, fileId);
+      if (!path) return state;
+
+      // Expand all parent folders and select the file
+      const newOpenFolderIds = [...state.files.openFolderIds];
+      for (const folderId of path) {
+        if (!newOpenFolderIds.includes(folderId)) {
+          newOpenFolderIds.push(folderId);
+        }
+      }
+
+      return {
+        files: {
+          ...state.files,
+          selectedId: fileId,
+          openFolderIds: newOpenFolderIds
+        }
+      };
+    })
 });

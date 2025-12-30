@@ -1,3 +1,25 @@
+/**
+ * File Tree Component
+ *
+ * Recursive component that renders individual nodes in the file explorer tree.
+ *
+ * @remarks
+ * This component uses FileTreeContext to access shared state and callbacks,
+ * reducing prop drilling from 14+ props to just 3 (node, depth, isRoot).
+ *
+ * Key behaviors:
+ * - **Files**: Click to select, double-click to open in editor, draggable to editor tabs
+ * - **Folders**: Click to select, click chevron to toggle expand/collapse
+ * - **Context menus**: Right-click for actions (Rename, Delete, New File, New Folder)
+ * - **Inline renaming**: Triggered from context menu, uses focused input field
+ *
+ * Drag-drop uses native HTML5 DnD with FILE_TREE_MIME_TYPE to allow dropping
+ * files into editor tab bars. This is separate from dnd-kit used for tab reordering.
+ *
+ * @see FileTreeContext - Provides all shared state and callbacks
+ * @see FILE_TREE_MIME_TYPE - Custom MIME type for file tree drag operations
+ */
+
 'use client';
 
 import { TreeNode } from '@/stores/files/files.store';
@@ -8,96 +30,83 @@ import { ChevronDownIcon, ChevronRightIcon, FileIcon, FolderIcon, FolderOpenIcon
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import NewNodeInputComponent from '@/features/files/components/new-node-input.component';
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
+import { FILE_TREE_MIME_TYPE } from '@/features/editor/const';
+import { useFileTreeContext } from '@/features/files/components/file-tree-context';
 
-export type FileType = 'file' | 'folder';
+// Re-export types from context for backwards compatibility
+export type { FileType, EditingNode } from '@/features/files/components/file-tree-context';
 
-// Type for tracking which node is currently being created (file or folder)
-export type EditingNode = {
-  parentId: string; // ID of the parent folder where the new node will be created
-  type: FileType; // Type of node being created
-  tempId: string; // Temporary ID to track the editing state
-};
-
-// Props for the FileTreeNode component (individual file/folder in the tree)
 interface Props {
-  node: TreeNode; // The current node to render
-  depth?: number; // Indentation depth in the tree (0 for root)
-  selectedId: string | null; // ID of currently selected node
-  onSelect: (id: string) => void; // Callback when a node is clicked
-  onAddFile: (parentId: string) => void; // Callback to add a new file
-  onAddFolder: (parentId: string) => void; // Callback to add a new folder
-  onDelete: (nodeId: string) => void; // Callback to delete a node
-  onRename: (nodeId: string, newName: string) => void; // Callback to rename a node
-  isRoot?: boolean; // Whether this is the root node (prevents deletion)
-  openFolderIds: string[]; // Array of folder IDs that are currently expanded
-  onToggleFolder: (folderId: string) => void; // Callback to expand/collapse a folder
-  editingNode: EditingNode | null; // Currently editing node (if any)
-  onFinishEditing: (name: string) => void; // Callback when editing is complete
-  onCancelEditing: () => void; // Callback to cancel editing
-  renamingId: string | null; // ID of node currently being renamed
-  onStartRename: (id: string) => void; // Callback to start renaming a node
+  /** The tree node to render (file or folder) */
+  node: TreeNode;
+  /** Nesting depth for indentation calculation. Defaults to 0 for root. */
+  depth?: number;
+  /** True if this is the root folder. Root cannot be deleted. */
+  isRoot?: boolean;
 }
 
-/**
- * Component that renders a single node in the file tree
- * Handles both files and folders with different rendering logic
- */
-const FileTreeComponent = ({
-  node,
-  depth = 0,
-  selectedId,
-  onSelect,
-  onAddFile,
-  onAddFolder,
-  onDelete,
-  onRename,
-  isRoot = false,
-  openFolderIds,
-  onToggleFolder,
-  editingNode,
-  onFinishEditing,
-  onCancelEditing,
-  renamingId,
-  onStartRename
-}: Props) => {
-  const isOpen = openFolderIds.includes(node.id); // Check if this folder is expanded
-  const inputRef = useRef<HTMLInputElement>(null); // Reference to the input field for renaming
-  const isRenaming = renamingId === node.id; // Check if this node is being renamed
-  const { openFileById } = useOpenFilesActions();
+const FileTreeComponent = ({ node, depth = 0, isRoot = false }: Props) => {
+  const {
+    selectedId,
+    openFolderIds,
+    openFileIds,
+    editingNode,
+    renamingId,
+    onSelect,
+    onAddFile,
+    onAddFolder,
+    onDelete,
+    onRename,
+    onToggleFolder,
+    onFinishEditing,
+    onCancelEditing,
+    onStartRename
+  } = useFileTreeContext();
+
+  const isOpen = openFolderIds.includes(node.id);
+  const isFileOpen = node.type === 'file' && openFileIds.has(node.id);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isRenaming = renamingId === node.id;
+  const { openFile } = useOpenFilesActions();
 
   // Auto-focus the input field when renaming starts
   useEffect(() => {
     if (isRenaming && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select(); // Select all text for easy overwriting
+      inputRef.current.select();
     }
   }, [isRenaming]);
 
-  // Handle keyboard input during rename
   const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      // Confirm rename on Enter key
       const newName = e.currentTarget.value.trim();
       if (newName) {
         onRename(node.id, newName);
       }
     } else if (e.key === 'Escape') {
-      // Cancel rename on Escape key
       onStartRename('');
     }
   };
 
-  // Handle losing focus during rename
   const handleRenameBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const newName = e.currentTarget.value.trim();
     if (newName) {
-      onRename(node.id, newName); // Save the new name
+      onRename(node.id, newName);
     } else {
-      onStartRename(''); // Cancel if empty
+      onStartRename('');
     }
   };
 
-  // Render a file node
+  /**
+   * Initiate HTML5 drag with file data in custom MIME type.
+   * This allows dropping files onto editor tab bars.
+   */
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData(FILE_TREE_MIME_TYPE, JSON.stringify({ fileId: node.id, fileName: node.name }));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  // Render a file node (leaf in the tree)
   if (node.type === 'file') {
     return (
       <ContextMenu>
@@ -106,30 +115,27 @@ const FileTreeComponent = ({
             className={`hover:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
               selectedId === node.id ? 'bg-accent' : ''
             }`}
-            style={{ paddingLeft: `${depth * 12 + 8}px` }} // Indent based on depth
-            onDoubleClick={() => {
-              openFileById(node.id, node.name);
-            }}
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+            draggable
+            onDragStart={handleDragStart}
+            onDoubleClick={() => openFile(node.id, node.name)}
             onClick={() => onSelect(node.id)}
           >
-            <FileIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+            <FileIcon className={`h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
             {isRenaming ? (
-              // Show input field when renaming
               <Input
                 ref={inputRef}
                 defaultValue={node.name}
                 className="h-6 text-sm"
                 onKeyDown={handleRenameKeyDown}
                 onBlur={handleRenameBlur}
-                onClick={e => e.stopPropagation()} // Prevent selection when clicking input
+                onClick={e => e.stopPropagation()}
               />
             ) : (
-              // Show file name normally
               <span className="text-sm">{node.name}</span>
             )}
           </div>
         </ContextMenuTrigger>
-        {/* Right-click context menu for files */}
         <ContextMenuContent>
           <ContextMenuItem onClick={() => onStartRename(node.id)}>Rename</ContextMenuItem>
           <ContextMenuItem onClick={() => onDelete(node.id)}>Delete</ContextMenuItem>
@@ -143,7 +149,6 @@ const FileTreeComponent = ({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div>
-          {/* Collapsible component handles expand/collapse functionality */}
           <Collapsible open={isOpen} onOpenChange={() => onToggleFolder(node.id)}>
             <CollapsibleTrigger
               className={`hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
@@ -155,16 +160,13 @@ const FileTreeComponent = ({
                 onSelect(node.id);
               }}
             >
-              {/* Chevron icon shows expand/collapse state */}
               {isOpen ? <ChevronDownIcon className="h-4 w-4 shrink-0" /> : <ChevronRightIcon className="h-4 w-4 shrink-0" />}
-              {/* Folder icon changes based on open/closed state */}
               {isOpen ? (
                 <FolderOpenIcon className="text-muted-foreground h-4 w-4 shrink-0" />
               ) : (
                 <FolderIcon className="text-muted-foreground h-4 w-4 shrink-0" />
               )}
               {isRenaming ? (
-                // Show input field when renaming
                 <Input
                   ref={inputRef}
                   defaultValue={node.name}
@@ -174,12 +176,10 @@ const FileTreeComponent = ({
                   onClick={e => e.stopPropagation()}
                 />
               ) : (
-                // Show folder name normally
                 <span className="text-sm font-medium">{node.name}</span>
               )}
             </CollapsibleTrigger>
             <CollapsibleContent>
-              {/* Show input for new file/folder if this is the parent being edited */}
               {editingNode && editingNode.parentId === node.id && (
                 <NewNodeInputComponent
                   key={editingNode.tempId}
@@ -189,37 +189,17 @@ const FileTreeComponent = ({
                   onCancel={onCancelEditing}
                 />
               )}
-              {/* Recursively render all child nodes */}
               {node.children?.map(child => (
-                <FileTreeComponent
-                  key={child.id}
-                  node={child}
-                  depth={depth + 1}
-                  selectedId={selectedId}
-                  onSelect={onSelect}
-                  onAddFile={onAddFile}
-                  onAddFolder={onAddFolder}
-                  onDelete={onDelete}
-                  onRename={onRename}
-                  openFolderIds={openFolderIds}
-                  onToggleFolder={onToggleFolder}
-                  editingNode={editingNode}
-                  onFinishEditing={onFinishEditing}
-                  onCancelEditing={onCancelEditing}
-                  renamingId={renamingId}
-                  onStartRename={onStartRename}
-                />
+                <FileTreeComponent key={child.id} node={child} depth={depth + 1} />
               ))}
             </CollapsibleContent>
           </Collapsible>
         </div>
       </ContextMenuTrigger>
-      {/* Right-click context menu for folders */}
       <ContextMenuContent>
         <ContextMenuItem onClick={() => onAddFile(node.id)}>New File</ContextMenuItem>
         <ContextMenuItem onClick={() => onAddFolder(node.id)}>New Folder</ContextMenuItem>
         <ContextMenuItem onClick={() => onStartRename(node.id)}>Rename</ContextMenuItem>
-        {/* Root folder cannot be deleted */}
         {!isRoot && <ContextMenuItem onClick={() => onDelete(node.id)}>Delete</ContextMenuItem>}
       </ContextMenuContent>
     </ContextMenu>
