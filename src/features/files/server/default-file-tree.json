@@ -1,0 +1,48 @@
+{
+  "id": "root",
+  "name": "workspaces",
+  "type": "folder",
+  "children": [
+    {
+      "id": "uc1",
+      "name": "Use Case 1",
+      "type": "folder",
+      "children": [
+        {
+          "id": "jd",
+          "name": "John Doe",
+          "type": "folder",
+          "children": [
+            { "id": "ws1", "name": "WS1.ws", "type": "file", "metadata": { "workspaceId": "ws1-content" } },
+            { "id": "ws2", "name": "WS2.ws", "type": "file", "metadata": { "workspaceId": "ws2-content" } },
+            { "id": "txt1", "name": "TXT1.txt", "type": "file", "metadata": { "textId": "txt1-content" } }
+          ]
+        },
+        {
+          "id": "janed",
+          "name": "Jane Doe",
+          "type": "folder",
+          "children": [
+            { "id": "ws3", "name": "WS3.ws", "type": "file", "metadata": { "workspaceId": "ws3-content" } },
+            { "id": "txt2", "name": "TXT2.txt", "type": "file", "metadata": { "textId": "txt2-content" } },
+            { "id": "ws4", "name": "WS4.ws", "type": "file", "metadata": { "workspaceId": "ws4-content" } }
+          ]
+        },
+        { "id": "jsx1", "name": "JSX1.jsx", "type": "file", "metadata": { "jsxId": "jsx1-content" } },
+        { "id": "js1", "name": "JS1.js", "type": "file", "metadata": { "jsId": "js1-content" } }
+      ]
+    },
+    {
+      "id": "uc2",
+      "name": "Use Case 2",
+      "type": "folder",
+      "children": [
+        { "id": "ws5", "name": "WS5.ws", "type": "file", "metadata": { "workspaceId": "ws5-content" } },
+        { "id": "ws6", "name": "WS6.ws", "type": "file", "metadata": { "workspaceId": "ws6-content" } }
+      ]
+    },
+    { "id": "ws7", "name": "WS7.ws", "type": "file", "metadata": { "workspaceId": "ws7-content" } },
+    { "id": "ws8", "name": "WS8.ws", "type": "file", "metadata": { "workspaceId": "ws8-content" } },
+    { "id": "txt3", "name": "TXT3.txt", "type": "file", "metadata": { "textId": "txt3-content" } }
+  ]
+}
