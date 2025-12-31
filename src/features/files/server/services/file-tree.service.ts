@@ -162,8 +162,9 @@ export async function renameNode(sid: string, nodeId: string, newName: string): 
 
 /**
  * Move a node to a new parent
+ * @param force - If true, replace existing node with same name in destination
  */
-export async function moveNode(sid: string, nodeId: string, newParentId: string): Promise<FolderNode> {
+export async function moveNode(sid: string, nodeId: string, newParentId: string, force = false): Promise<FolderNode> {
   const currentTree = await getFileTree(sid);
 
   if (currentTree.id === nodeId) {
@@ -178,6 +179,19 @@ export async function moveNode(sid: string, nodeId: string, newParentId: string)
   const newParent = findNode(currentTree, newParentId);
   if (!newParent || newParent.type !== 'folder') {
     throw new ORPCError('BAD_REQUEST', { message: 'New parent folder not found' });
+  }
+
+  // Check for duplicate name in destination folder
+  const existingNode = newParent.children.find(child => child.name === node.name && child.id !== nodeId);
+  if (existingNode) {
+    if (!force) {
+      throw new ORPCError('CONFLICT', { message: `A file named '${node.name}' already exists in the destination folder.` });
+    }
+    // Remove the existing node when force is true
+    const treeWithoutExisting = removeNodeFromTree(currentTree, existingNode.id);
+    const treeWithoutNode = removeNodeFromTree(treeWithoutExisting, nodeId);
+    const newTree = addNodeToTree(treeWithoutNode, newParentId, node);
+    return saveTree(sid, newTree);
   }
 
   // Remove from current location, add to new parent

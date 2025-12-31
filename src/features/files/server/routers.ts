@@ -92,12 +92,13 @@ export const filesRouter = appProcedure.router({
     .input(
       z.object({
         nodeId: z.string(),
-        newParentId: z.string()
+        newParentId: z.string(),
+        force: z.boolean().optional()
       })
     )
     .output(folderNodeOutputSchema)
     .handler(async ({ input, context }) => {
-      return fileTreeService.moveNode(context.sid, input.nodeId, input.newParentId);
+      return fileTreeService.moveNode(context.sid, input.nodeId, input.newParentId, input.force);
     }),
 
   reset: appProcedure
