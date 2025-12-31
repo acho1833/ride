@@ -44,8 +44,11 @@ interface FileTreeContextValue {
   onSelect: (id: string) => void;
   /** Toggle folder expand/collapse */
   onToggleFolder: (folderId: string) => void;
-  /** Track which node was right-clicked for context menu */
-  onContextMenu: (node: TreeNode | null) => void;
+  /** Context menu actions */
+  onAddFile: (parentId: string) => void;
+  onAddFolder: (parentId: string) => void;
+  onRename: (node: TreeNode) => void;
+  onDelete: (node: TreeNode) => void;
 }
 
 const FileTreeContext = createContext<FileTreeContextValue | null>(null);

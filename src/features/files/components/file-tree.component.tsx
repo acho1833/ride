@@ -24,6 +24,7 @@
 import type { TreeNode } from '@/models/user-file-tree.model';
 import { ChevronDownIcon, ChevronRightIcon, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
 import { FILE_TREE_MIME_TYPE } from '@/features/editor/const';
 import { useFileTreeContext } from '@/features/files/components/file-tree-context';
@@ -52,10 +53,13 @@ interface Props {
   depth?: number;
   /** True if this is the root folder. Root cannot be deleted. */
   isRoot?: boolean;
+  /** Parent folder ID for creating new files/folders at sibling level */
+  parentId?: string;
 }
 
-const FileTreeComponent = ({ node, depth = 0, isRoot = false }: Props) => {
-  const { selectedId, openFolderIds, openFileIds, onSelect, onToggleFolder, onContextMenu } = useFileTreeContext();
+const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props) => {
+  const { selectedId, openFolderIds, openFileIds, onSelect, onToggleFolder, onAddFile, onAddFolder, onRename, onDelete } =
+    useFileTreeContext();
 
   const isOpen = openFolderIds.includes(node.id);
   const isFileOpen = node.type === 'file' && openFileIds.has(node.id);
@@ -72,53 +76,82 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false }: Props) => {
 
   // Render a file node (leaf in the tree)
   if (node.type === 'file') {
+    // For files, new file/folder creates at parent level
+    const newNodeParentId = parentId ?? node.id;
+
     return (
-      <div
-        className={`hover:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
-          selectedId === node.id ? 'bg-accent' : ''
-        }`}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        draggable
-        onDragStart={handleDragStart}
-        onDoubleClick={() => openFile(node.id, node.name)}
-        onClick={() => onSelect(node.id)}
-        onContextMenu={() => onContextMenu(node)}
-      >
-        <FileIcon className={`h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
-        <span className="text-sm">{node.name}</span>
-      </div>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className={`hover:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
+              selectedId === node.id ? 'bg-accent' : ''
+            }`}
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+            draggable
+            onDragStart={handleDragStart}
+            onDoubleClick={() => openFile(node.id, node.name)}
+            onClick={() => onSelect(node.id)}
+            onContextMenu={() => onSelect(node.id)}
+          >
+            <FileIcon className={`h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
+            <span className="text-sm">{node.name}</span>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={() => onAddFile(newNodeParentId)}>New File</ContextMenuItem>
+          <ContextMenuItem onClick={() => onAddFolder(newNodeParentId)}>New Folder</ContextMenuItem>
+          <ContextMenuItem onClick={() => onRename(node)}>Rename</ContextMenuItem>
+          <ContextMenuItem onClick={() => onDelete(node)}>Delete</ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   }
 
   // For root folder, render children directly without showing the root itself
   if (isRoot && node.type === 'folder') {
-    return <>{node.children && sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={0} />)}</>;
+    return (
+      <>
+        {node.children &&
+          sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={0} parentId={node.id} />)}
+      </>
+    );
   }
 
   // Render a folder node
   return (
     <Collapsible open={isOpen} onOpenChange={() => onToggleFolder(node.id)}>
-      <CollapsibleTrigger
-        className={`hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
-          selectedId === node.id ? 'bg-accent' : ''
-        }`}
-        style={{ paddingLeft: `${depth * 10}px` }}
-        onClick={e => {
-          e.stopPropagation();
-          onSelect(node.id);
-        }}
-        onContextMenu={() => onContextMenu(node)}
-      >
-        {isOpen ? <ChevronDownIcon className="h-4 w-4 shrink-0" /> : <ChevronRightIcon className="h-4 w-4 shrink-0" />}
-        {isOpen ? (
-          <FolderOpenIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-        ) : (
-          <FolderIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-        )}
-        <span className="text-sm font-medium">{node.name}</span>
-      </CollapsibleTrigger>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <CollapsibleTrigger
+            className={`hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
+              selectedId === node.id ? 'bg-accent' : ''
+            }`}
+            style={{ paddingLeft: `${depth * 10}px` }}
+            onClick={e => {
+              e.stopPropagation();
+              onSelect(node.id);
+            }}
+            onContextMenu={() => onSelect(node.id)}
+          >
+            {isOpen ? <ChevronDownIcon className="h-4 w-4 shrink-0" /> : <ChevronRightIcon className="h-4 w-4 shrink-0" />}
+            {isOpen ? (
+              <FolderOpenIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+            ) : (
+              <FolderIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+            )}
+            <span className="text-sm font-medium">{node.name}</span>
+          </CollapsibleTrigger>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={() => onAddFile(node.id)}>New File</ContextMenuItem>
+          <ContextMenuItem onClick={() => onAddFolder(node.id)}>New Folder</ContextMenuItem>
+          <ContextMenuItem onClick={() => onRename(node)}>Rename</ContextMenuItem>
+          <ContextMenuItem onClick={() => onDelete(node)}>Delete</ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       <CollapsibleContent>
-        {node.children && sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={depth + 1} />)}
+        {node.children &&
+          sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={depth + 1} parentId={node.id} />)}
       </CollapsibleContent>
     </Collapsible>
   );

@@ -76,9 +76,6 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     prevSelectOpenedFiles.current = selectOpenedFiles;
   }, [selectOpenedFiles, activeFileId, revealFile]);
 
-  // Track which node was right-clicked for context menu
-  const [rightClickedNode, setRightClickedNode] = useState<TreeNode | null>(null);
-
   // Dialog state for creating new file/folder
   const [newNodeDialog, setNewNodeDialog] = useState<{ open: boolean; parentId: string; type: FileType }>({
     open: false,
@@ -178,7 +175,10 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     openFileIds,
     onSelect: setSelectedFileId,
     onToggleFolder: toggleFolder,
-    onContextMenu: setRightClickedNode
+    onAddFile: handleAddFile,
+    onAddFolder: handleAddFolder,
+    onRename: handleStartRename,
+    onDelete: handleStartDelete
   };
 
   // Toolbar buttons that appear at the top of the file tree
@@ -205,28 +205,20 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     </>
   );
 
-  // Determine context menu target - use right-clicked node or root for empty space
-  const contextMenuTargetId = rightClickedNode?.id ?? fileStructure.id;
-  const isTargetFolder = !rightClickedNode || rightClickedNode.type === 'folder';
-  const isTargetRoot = !rightClickedNode || rightClickedNode.id === fileStructure.id;
-
   /**
-   * Handle context menu on the file tree container.
-   * Only reset rightClickedNode if clicking directly on empty space (not on a node).
+   * Handle context menu on empty space - deselect any selected node
    */
-  const handleTreeContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only reset if the click target is the container itself (empty space)
-    if (e.target === e.currentTarget) {
-      setRightClickedNode(null);
-    }
+  const handleEmptySpaceContextMenu = () => {
+    setSelectedFileId(null);
   };
 
   return (
     <MainPanelsComponent title="Files" pos={pos} tools={toolbarButtons}>
+      {/* Root-level context menu for empty space - only shows New File/Folder */}
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <ScrollArea className="flex-1 overflow-y-auto">
-            <div className="min-h-full" onContextMenu={handleTreeContextMenu}>
+          <ScrollArea className="flex-1 overflow-y-auto" onContextMenu={handleEmptySpaceContextMenu}>
+            <div className="min-h-full">
               <FileTreeProvider value={fileTreeContextValue}>
                 <FileTreeComponent node={fileStructure} isRoot={true} />
               </FileTreeProvider>
@@ -234,20 +226,8 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
           </ScrollArea>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          {/* Show New File/Folder for folders and empty space */}
-          {isTargetFolder && (
-            <>
-              <ContextMenuItem onClick={() => handleAddFile(contextMenuTargetId)}>New File</ContextMenuItem>
-              <ContextMenuItem onClick={() => handleAddFolder(contextMenuTargetId)}>New Folder</ContextMenuItem>
-            </>
-          )}
-          {/* Show Rename/Delete for non-root nodes */}
-          {rightClickedNode && !isTargetRoot && (
-            <>
-              <ContextMenuItem onClick={() => handleStartRename(rightClickedNode)}>Rename</ContextMenuItem>
-              <ContextMenuItem onClick={() => handleStartDelete(rightClickedNode)}>Delete</ContextMenuItem>
-            </>
-          )}
+          <ContextMenuItem onClick={() => handleAddFile(fileStructure.id)}>New File</ContextMenuItem>
+          <ContextMenuItem onClick={() => handleAddFolder(fileStructure.id)}>New Folder</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
 
