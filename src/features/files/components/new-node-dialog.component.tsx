@@ -68,8 +68,12 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
         const insertIndex = activeIndex !== -1 ? activeIndex + 1 : lastFocusedGroup.files.length;
         openFile(createdNode.id, createdNode.name, lastFocusedGroupId ?? undefined, insertIndex);
       }
-    } finally {
+
       onClose();
+    } catch (error) {
+      // Set form error to display in the form field with red border
+      const message = error instanceof Error ? error.message : 'Failed to add file';
+      form.setError('name', { type: 'manual', message });
     }
   };
 

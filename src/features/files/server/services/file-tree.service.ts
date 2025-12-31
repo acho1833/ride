@@ -109,6 +109,12 @@ export async function addNode(sid: string, parentId: string, name: string, type:
     throw new ORPCError('BAD_REQUEST', { message: 'Parent folder not found' });
   }
 
+  // Check for duplicate name in the same folder
+  const isDuplicate = parent.children.some(child => child.name === name);
+  if (isDuplicate) {
+    throw new ORPCError('BAD_REQUEST', { message: `A file with the name '${name}' already exists.` });
+  }
+
   const node: TreeNode =
     type === 'file'
       ? { id: crypto.randomUUID(), name, type: 'file', metadata: {} }

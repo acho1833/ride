@@ -16,7 +16,8 @@ export const useFileAddMutation = () => {
         toast.success('File added successfully', { id: context?.toastId });
       },
       onError: (_error, _variables, context) => {
-        toast.error('Failed to add file', { id: context?.toastId });
+        // Dismiss loading toast - error is displayed in form
+        toast.dismiss(context?.toastId);
       }
     })
   );
