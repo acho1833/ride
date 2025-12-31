@@ -12,12 +12,14 @@ import { useFileAddMutation } from '@/features/files/hooks/useFileAddMutation';
 import { useOpenFilesActions, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
 import { useFileActions } from '@/stores/files/files.selector';
 
-// Schema for new file/folder name
+// Form type and schema for new file/folder name
+interface NewNodeForm {
+  name: string;
+}
+
 const newNodeSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long')
 });
-
-type NewNodeForm = z.infer<typeof newNodeSchema>;
 
 interface Props {
   open: boolean;

@@ -9,12 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useFileRenameMutation } from '@/features/files/hooks/useFileRenameMutation';
 
-// Schema for rename - requires at least 1 character
+// Form type and schema for rename
+interface RenameForm {
+  name: string;
+}
+
 const renameSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long')
 });
-
-type RenameForm = z.infer<typeof renameSchema>;
 
 interface Props {
   open: boolean;

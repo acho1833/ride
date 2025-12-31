@@ -351,7 +351,7 @@ Key rules:
 - Always use `react-hook-form` with `zodResolver` for validation
 - Use Shadcn Form components: `Form`, `FormField`, `FormControl`, `FormItem`, `FormMessage`
 - Define form schema with Zod (inline or from models)
-- Infer TypeScript type from schema: `type FormType = z.infer<typeof schema>`
+- Define form type as explicit interface (NEVER use `z.infer`)
 - Disable submit button while mutation is pending
 - Never use uncontrolled forms or raw `<form>` elements
 
@@ -888,7 +888,7 @@ export default UserCard;
 
 ### TypeScript & Zod Best Practices
 
-**Avoid `z.infer` - it slows down IDE autocomplete.**
+**NEVER use `z.infer` - it slows down IDE autocomplete.**
 
 ```typescript
 // BAD - z.infer slows IDE
@@ -907,7 +907,7 @@ export const todoSchema = z.object({
 });
 ```
 
-- Define TypeScript interfaces/types explicitly in model files
+- NEVER use `z.infer` anywhere in the codebase - always define interfaces/types explicitly
 - Zod schemas are for API validation in routers, not for type generation
 - Keep model files simple: interfaces + Zod schemas (no `z.infer`)
 
