@@ -49,6 +49,12 @@ interface FileTreeContextValue {
   onAddFolder: (parentId: string) => void;
   onRename: (node: TreeNode) => void;
   onDelete: (node: TreeNode) => void;
+
+  // Drag state
+  /** ID of the node currently being dragged (null if not dragging) */
+  draggedNodeId: string | null;
+  /** ID of the folder currently being hovered as drop target (null if none) */
+  dropTargetFolderId: string | null;
 }
 
 const FileTreeContext = createContext<FileTreeContextValue | null>(null);
