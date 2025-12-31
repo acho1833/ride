@@ -101,7 +101,12 @@ async function saveTree(sid: string, structure: FolderNode): Promise<FolderNode>
 /**
  * Add a new node (file or folder)
  */
-export async function addNode(sid: string, parentId: string, node: TreeNode): Promise<FolderNode> {
+export async function addNode(
+  sid: string,
+  parentId: string,
+  name: string,
+  type: 'file' | 'folder'
+): Promise<TreeNode> {
   const currentTree = await getFileTree(sid);
   const parent = findNode(currentTree, parentId);
 
@@ -109,8 +114,15 @@ export async function addNode(sid: string, parentId: string, node: TreeNode): Pr
     throw new ORPCError('BAD_REQUEST', { message: 'Parent folder not found' });
   }
 
+  const node: TreeNode =
+    type === 'file'
+      ? { id: crypto.randomUUID(), name, type: 'file', metadata: {} }
+      : { id: crypto.randomUUID(), name, type: 'folder', children: [] };
+
   const newTree = addNodeToTree(currentTree, parentId, node);
-  return saveTree(sid, newTree);
+  await saveTree(sid, newTree);
+
+  return node;
 }
 
 /**

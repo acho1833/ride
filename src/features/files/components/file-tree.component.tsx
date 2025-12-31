@@ -91,7 +91,10 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
             onDragStart={handleDragStart}
             onDoubleClick={() => openFile(node.id, node.name)}
             onClick={() => onSelect(node.id)}
-            onContextMenu={() => onSelect(node.id)}
+            onContextMenu={e => {
+              e.stopPropagation();
+              onSelect(node.id);
+            }}
           >
             <FileIcon className={`h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
             <span className="text-sm">{node.name}</span>
@@ -131,7 +134,10 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
               e.stopPropagation();
               onSelect(node.id);
             }}
-            onContextMenu={() => onSelect(node.id)}
+            onContextMenu={e => {
+              e.stopPropagation();
+              onSelect(node.id);
+            }}
           >
             {isOpen ? <ChevronDownIcon className="h-4 w-4 shrink-0" /> : <ChevronRightIcon className="h-4 w-4 shrink-0" />}
             {isOpen ? (

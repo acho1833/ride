@@ -42,12 +42,13 @@ export const filesRouter = appProcedure.router({
     .input(
       z.object({
         parentId: z.string(),
-        node: treeNodeSchema
+        name: z.string(),
+        type: z.enum(['file', 'folder'])
       })
     )
-    .output(folderNodeOutputSchema)
+    .output(treeNodeSchema)
     .handler(async ({ input, context }) => {
-      return fileTreeService.addNode(context.sid, input.parentId, input.node);
+      return fileTreeService.addNode(context.sid, input.parentId, input.name, input.type);
     }),
 
   deleteNode: appProcedure

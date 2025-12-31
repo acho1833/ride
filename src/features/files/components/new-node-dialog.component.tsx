@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import type { FileType } from '@/features/files/components/file-tree-context';
-import type { TreeNode } from '@/models/user-file-tree.model';
 import { useFileAddMutation } from '@/features/files/hooks/useFileAddMutation';
+import { useOpenFilesActions, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
 
 // Schema for new file/folder name
 const newNodeSchema = z.object({
@@ -30,7 +30,10 @@ interface Props {
  * Handles mutation internally - parent just manages open/close state.
  */
 const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
-  const { mutate: addNode } = useFileAddMutation();
+  const { mutateAsync: addNodeAsync } = useFileAddMutation();
+  const { openFile } = useOpenFilesActions();
+  const lastFocusedGroupId = useLastFocusedGroupId();
+  const lastFocusedGroup = useEditorGroup(lastFocusedGroupId ?? '');
 
   const form = useForm<NewNodeForm>({
     resolver: zodResolver(newNodeSchema),
@@ -48,14 +51,21 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
     }
   }, [open, form]);
 
-  const handleSubmit = (data: NewNodeForm) => {
+  const handleSubmit = async (data: NewNodeForm) => {
     const name = data.name.trim();
-    const newNode: TreeNode =
-      type === 'file'
-        ? { id: crypto.randomUUID(), name, type: 'file', metadata: {} }
-        : { id: crypto.randomUUID(), name, type: 'folder', children: [] };
-    addNode({ parentId, node: newNode });
-    onClose();
+
+    try {
+      const createdNode = await addNodeAsync({ parentId, name, type });
+
+      // For files, open in editor right after the currently active tab
+      if (type === 'file' && lastFocusedGroup) {
+        const activeIndex = lastFocusedGroup.files.findIndex(f => f.id === lastFocusedGroup.activeFileId);
+        const insertIndex = activeIndex !== -1 ? activeIndex + 1 : lastFocusedGroup.files.length;
+        openFile(createdNode.id, createdNode.name, lastFocusedGroupId ?? undefined, insertIndex);
+      }
+    } finally {
+      onClose();
+    }
   };
 
   const placeholder = type === 'file' ? 'filename.ext' : 'folder name';
