@@ -33,11 +33,14 @@ import { useOpenFileIds, useLastFocusedGroupId, useEditorGroup } from '@/stores/
 import { useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
 import FileTreeComponent from '@/features/files/components/file-tree.component';
 import { FileTreeProvider, FileType } from '@/features/files/components/file-tree-context';
+import FileTreeDndContextComponent from '@/features/files/components/file-tree-dnd-context.component';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import NewNodeDialogComponent from '@/features/files/components/new-node-dialog.component';
 import RenameNodeDialogComponent from '@/features/files/components/rename-node-dialog.component';
 import DeleteNodeDialogComponent from '@/features/files/components/delete-node-dialog.component';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useDroppable } from '@dnd-kit/core';
+import type { FileDropData } from '@/features/files/components/file-tree-dnd-context.component';
 
 interface Props {
   /** Position of this panel in the layout (for MainPanelsComponent) */
@@ -168,6 +171,9 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     handleAddFile(fileStructure.id);
   };
 
+  // Viewport ref for programmatic scrolling during drag
+  const viewportRef = useRef<HTMLDivElement>(null);
+
   // Drag state - will be updated by FileTreeDndContextComponent via callback
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
@@ -179,6 +185,13 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     setDraggedNodeId(draggedId);
     setDropTargetFolderId(dropTargetId);
   };
+
+  // Empty space drop zone for dropping to root
+  const dropData: FileDropData = { folderId: fileStructure.id };
+  const { setNodeRef: setEmptyDropRef } = useDroppable({
+    id: 'drop-empty-space',
+    data: dropData
+  });
 
   // Context value for FileTreeProvider - React Compiler handles memoization
   const fileTreeContextValue = {
@@ -228,24 +241,32 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
 
   return (
     <MainPanelsComponent title="Files" pos={pos} tools={toolbarButtons}>
-      {/* Root-level context menu for empty space - only shows New File/Folder */}
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <ScrollArea className="h-full" type="hover">
-              <div className="min-h-full" onContextMenu={handleEmptySpaceContextMenu}>
-                <FileTreeProvider value={fileTreeContextValue}>
-                  <FileTreeComponent node={fileStructure} isRoot={true} />
-                </FileTreeProvider>
-              </div>
-            </ScrollArea>
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={() => handleAddFile(fileStructure.id)}>New File</ContextMenuItem>
-          <ContextMenuItem onClick={() => handleAddFolder(fileStructure.id)}>New Folder</ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+      <FileTreeDndContextComponent
+        fileStructure={fileStructure}
+        openFolderIds={openFolderIds}
+        onToggleFolder={toggleFolder}
+        viewportRef={viewportRef}
+        onDragStateChange={handleDragStateChange}
+      >
+        {/* Root-level context menu for empty space - only shows New File/Folder */}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ScrollArea className="h-full" type="hover" viewportRef={viewportRef}>
+                <div ref={setEmptyDropRef} className="min-h-full" onContextMenu={handleEmptySpaceContextMenu}>
+                  <FileTreeProvider value={fileTreeContextValue}>
+                    <FileTreeComponent node={fileStructure} isRoot={true} />
+                  </FileTreeProvider>
+                </div>
+              </ScrollArea>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onClick={() => handleAddFile(fileStructure.id)}>New File</ContextMenuItem>
+            <ContextMenuItem onClick={() => handleAddFolder(fileStructure.id)}>New Folder</ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      </FileTreeDndContextComponent>
 
       {/* Dialog for creating new file/folder */}
       <NewNodeDialogComponent
