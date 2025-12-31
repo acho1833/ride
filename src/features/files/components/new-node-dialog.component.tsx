@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '@/component
 import type { FileType } from '@/features/files/components/file-tree-context';
 import { useFileAddMutation } from '@/features/files/hooks/useFileAddMutation';
 import { useOpenFilesActions, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
+import { useFileActions } from '@/stores/files/files.selector';
 
 // Schema for new file/folder name
 const newNodeSchema = z.object({
@@ -32,6 +33,7 @@ interface Props {
 const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
   const { mutateAsync: addNodeAsync } = useFileAddMutation();
   const { openFile } = useOpenFilesActions();
+  const { setSelectedFileId } = useFileActions();
   const lastFocusedGroupId = useLastFocusedGroupId();
   const lastFocusedGroup = useEditorGroup(lastFocusedGroupId ?? '');
 
@@ -56,6 +58,9 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
 
     try {
       const createdNode = await addNodeAsync({ parentId, name, type });
+
+      // Select the newly created node in the file tree
+      setSelectedFileId(createdNode.id);
 
       // For files, open in editor right after the currently active tab
       if (type === 'file' && lastFocusedGroup) {
