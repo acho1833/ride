@@ -168,6 +168,18 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     handleAddFile(fileStructure.id);
   };
 
+  // Drag state - will be updated by FileTreeDndContextComponent via callback
+  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
+  const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
+
+  /**
+   * Callback for FileTreeDndContextComponent to update drag state
+   */
+  const handleDragStateChange = (draggedId: string | null, dropTargetId: string | null) => {
+    setDraggedNodeId(draggedId);
+    setDropTargetFolderId(dropTargetId);
+  };
+
   // Context value for FileTreeProvider - React Compiler handles memoization
   const fileTreeContextValue = {
     selectedId,
@@ -178,7 +190,9 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     onAddFile: handleAddFile,
     onAddFolder: handleAddFolder,
     onRename: handleStartRename,
-    onDelete: handleStartDelete
+    onDelete: handleStartDelete,
+    draggedNodeId,
+    dropTargetFolderId
   };
 
   // Toolbar buttons that appear at the top of the file tree

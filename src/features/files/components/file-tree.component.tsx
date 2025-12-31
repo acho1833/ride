@@ -28,6 +28,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
 import { FILE_TREE_MIME_TYPE } from '@/features/editor/const';
 import { useFileTreeContext } from '@/features/files/components/file-tree-context';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import type { FileDragData, FileDropData } from '@/features/files/components/file-tree-dnd-context.component';
 
 // Re-export types from context for backwards compatibility
 export type { FileType } from '@/features/files/components/file-tree-context';
@@ -58,12 +60,70 @@ interface Props {
 }
 
 const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props) => {
-  const { selectedId, openFolderIds, openFileIds, onSelect, onToggleFolder, onAddFile, onAddFolder, onRename, onDelete } =
-    useFileTreeContext();
+  const {
+    selectedId,
+    openFolderIds,
+    openFileIds,
+    onSelect,
+    onToggleFolder,
+    onAddFile,
+    onAddFolder,
+    onRename,
+    onDelete,
+    draggedNodeId,
+    dropTargetFolderId
+  } = useFileTreeContext();
 
   const isOpen = openFolderIds.includes(node.id);
   const isFileOpen = node.type === 'file' && openFileIds.has(node.id);
   const { openFile } = useOpenFilesActions();
+
+  // Check if this node or any ancestor is the drop target (for highlighting)
+  const isDropTarget = dropTargetFolderId === node.id;
+  const isWithinDropTarget = dropTargetFolderId === parentId;
+  const shouldHighlight = isDropTarget || isWithinDropTarget;
+
+  // Check if this is the dragged node
+  const isDragging = draggedNodeId === node.id;
+
+  // dnd-kit draggable setup
+  const dragData: FileDragData = {
+    nodeId: node.id,
+    nodeName: node.name,
+    nodeType: node.type
+  };
+
+  const {
+    attributes: dragAttributes,
+    listeners: dragListeners,
+    setNodeRef: setDragRef,
+    isDragging: isDndKitDragging
+  } = useDraggable({
+    id: `drag-${node.id}`,
+    data: dragData,
+    disabled: isRoot
+  });
+
+  // dnd-kit droppable setup (folders only)
+  const dropData: FileDropData = { folderId: node.id };
+
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: `drop-${node.id}`,
+    data: dropData,
+    disabled: node.type !== 'folder'
+  });
+
+  // Combined ref setter for folders (both draggable and droppable)
+  const setRefs = (el: HTMLElement | null) => {
+    setDragRef(el);
+    if (node.type === 'folder') {
+      setDropRef(el);
+    }
+  };
+
+  // Styling classes for drag state
+  const highlightClass = shouldHighlight && !isDragging ? 'bg-accent/50' : '';
+  const draggingClass = isDndKitDragging ? 'opacity-50' : '';
 
   /**
    * Initiate HTML5 drag with file data in custom MIME type.
@@ -83,9 +143,10 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className={`hover:bg-accent flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
+            ref={setDragRef}
+            className={`hover:bg-accent flex cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
               selectedId === node.id ? 'bg-accent' : ''
-            }`}
+            } ${highlightClass} ${draggingClass}`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             draggable
             onDragStart={handleDragStart}
@@ -95,6 +156,8 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
               e.stopPropagation();
               onSelect(node.id);
             }}
+            {...dragAttributes}
+            {...dragListeners}
           >
             <FileIcon className={`h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
             <span className="text-sm">{node.name}</span>
@@ -111,55 +174,61 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
   }
 
   // For root folder, render children directly without showing the root itself
+  // Root is droppable so files can be moved to the root level
   if (isRoot && node.type === 'folder') {
     return (
-      <>
+      <div ref={setDropRef} className={highlightClass}>
         {node.children &&
           sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={0} parentId={node.id} />)}
-      </>
+      </div>
     );
   }
 
   // Render a folder node
   return (
-    <Collapsible open={isOpen} onOpenChange={() => onToggleFolder(node.id)}>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <CollapsibleTrigger
-            className={`hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
-              selectedId === node.id ? 'bg-accent' : ''
-            }`}
-            style={{ paddingLeft: `${depth * 10}px` }}
-            onClick={e => {
-              e.stopPropagation();
-              onSelect(node.id);
-            }}
-            onContextMenu={e => {
-              e.stopPropagation();
-              onSelect(node.id);
-            }}
-          >
-            {isOpen ? <ChevronDownIcon className="h-4 w-4 shrink-0" /> : <ChevronRightIcon className="h-4 w-4 shrink-0" />}
-            {isOpen ? (
-              <FolderOpenIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-            ) : (
-              <FolderIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-            )}
-            <span className="text-sm font-medium">{node.name}</span>
-          </CollapsibleTrigger>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={() => onAddFile(node.id)}>New File</ContextMenuItem>
-          <ContextMenuItem onClick={() => onAddFolder(node.id)}>New Folder</ContextMenuItem>
-          <ContextMenuItem onClick={() => onRename(node)}>Rename</ContextMenuItem>
-          <ContextMenuItem onClick={() => onDelete(node)}>Delete</ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-      <CollapsibleContent>
-        {node.children &&
-          sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={depth + 1} parentId={node.id} />)}
-      </CollapsibleContent>
-    </Collapsible>
+    <div className={highlightClass}>
+      <Collapsible open={isOpen} onOpenChange={() => onToggleFolder(node.id)}>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <CollapsibleTrigger
+              ref={setRefs}
+              className={`hover:bg-accent flex w-full cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
+                selectedId === node.id ? 'bg-accent' : ''
+              } ${draggingClass}`}
+              style={{ paddingLeft: `${depth * 10}px` }}
+              onClick={e => {
+                e.stopPropagation();
+                onSelect(node.id);
+              }}
+              onContextMenu={e => {
+                e.stopPropagation();
+                onSelect(node.id);
+              }}
+              {...dragAttributes}
+              {...dragListeners}
+            >
+              {isOpen ? <ChevronDownIcon className="h-4 w-4 shrink-0" /> : <ChevronRightIcon className="h-4 w-4 shrink-0" />}
+              {isOpen ? (
+                <FolderOpenIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+              ) : (
+                <FolderIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+              )}
+              <span className="text-sm font-medium">{node.name}</span>
+            </CollapsibleTrigger>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onClick={() => onAddFile(node.id)}>New File</ContextMenuItem>
+            <ContextMenuItem onClick={() => onAddFolder(node.id)}>New Folder</ContextMenuItem>
+            <ContextMenuItem onClick={() => onRename(node)}>Rename</ContextMenuItem>
+            <ContextMenuItem onClick={() => onDelete(node)}>Delete</ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+        <CollapsibleContent>
+          {node.children &&
+            sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={depth + 1} parentId={node.id} />)}
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 };
 

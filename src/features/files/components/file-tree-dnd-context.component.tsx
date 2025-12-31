@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -65,14 +65,21 @@ const FileTreeDndContextComponent = ({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   const autoExpandTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastHoveredFolderRef = useRef<string | null>(null);
 
   const { mutate: moveFile } = useFileMoveMutation();
 
+  // SSR Guard: dnd-kit generates unique IDs that differ between server and client,
+  // causing hydration mismatches. We defer DnD setup until after first client render.
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Cleanup auto-expand timer on unmount
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (autoExpandTimerRef.current) clearTimeout(autoExpandTimerRef.current);
     };
@@ -237,6 +244,11 @@ const FileTreeDndContextComponent = ({
   const handleCancelMove = useCallback(() => {
     setPendingMove(null);
   }, []);
+
+  // Render children without DnD context during SSR to avoid hydration mismatch
+  if (!isMounted) {
+    return <>{children}</>;
+  }
 
   return (
     <DndContext
