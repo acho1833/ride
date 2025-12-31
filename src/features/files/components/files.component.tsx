@@ -217,13 +217,15 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
       {/* Root-level context menu for empty space - only shows New File/Folder */}
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <ScrollArea className="flex-1 overflow-y-auto" onContextMenu={handleEmptySpaceContextMenu}>
-            <div className="min-h-full">
-              <FileTreeProvider value={fileTreeContextValue}>
-                <FileTreeComponent node={fileStructure} isRoot={true} />
-              </FileTreeProvider>
-            </div>
-          </ScrollArea>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <ScrollArea className="h-full" type="hover">
+              <div className="min-h-full" onContextMenu={handleEmptySpaceContextMenu}>
+                <FileTreeProvider value={fileTreeContextValue}>
+                  <FileTreeComponent node={fileStructure} isRoot={true} />
+                </FileTreeProvider>
+              </div>
+            </ScrollArea>
+          </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem onClick={() => handleAddFile(fileStructure.id)}>New File</ContextMenuItem>

@@ -101,12 +101,7 @@ async function saveTree(sid: string, structure: FolderNode): Promise<FolderNode>
 /**
  * Add a new node (file or folder)
  */
-export async function addNode(
-  sid: string,
-  parentId: string,
-  name: string,
-  type: 'file' | 'folder'
-): Promise<TreeNode> {
+export async function addNode(sid: string, parentId: string, name: string, type: 'file' | 'folder'): Promise<TreeNode> {
   const currentTree = await getFileTree(sid);
   const parent = findNode(currentTree, parentId);
 
