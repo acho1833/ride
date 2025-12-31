@@ -15,7 +15,6 @@
  * - `selectedId` - Currently highlighted item in the tree
  * - `openFolderIds` - Which folders are expanded
  * - `openFileIds` - Which files are open in the editor (for visual indicator)
- * - `editingNode` - Tracks in-progress file/folder creation
  * - `renamingId` - Which node is being renamed inline
  *
  * @see FileTreeComponent - Consumes this context
@@ -25,22 +24,10 @@
 'use client';
 
 import React, { createContext, useContext } from 'react';
+import type { TreeNode } from '@/models/user-file-tree.model';
 
 /** Type for file vs folder distinction */
 export type FileType = 'file' | 'folder';
-
-/**
- * Type for tracking which node is currently being created.
- * Used to show inline input field at the correct location.
- */
-export type EditingNode = {
-  /** ID of the parent folder where the new node will be created */
-  parentId: string;
-  /** Whether creating a file or folder */
-  type: FileType;
-  /** Temporary ID for React key (replaced with real ID after creation) */
-  tempId: string;
-};
 
 /**
  * Context value shape for file tree operations.
@@ -53,28 +40,12 @@ interface FileTreeContextValue {
   openFolderIds: string[];
   /** Set of file IDs currently open in editor (for visual distinction) */
   openFileIds: Set<string>;
-  /** Node being created (shows inline input), null if not creating */
-  editingNode: EditingNode | null;
-  /** ID of node being renamed, null if not renaming */
-  renamingId: string | null;
   /** Select a node (highlight it) */
   onSelect: (id: string) => void;
-  /** Start creating a new file in the given parent folder */
-  onAddFile: (parentId: string) => void;
-  /** Start creating a new folder in the given parent folder */
-  onAddFolder: (parentId: string) => void;
-  /** Delete a node by ID */
-  onDelete: (nodeId: string) => void;
-  /** Rename a node */
-  onRename: (nodeId: string, newName: string) => void;
   /** Toggle folder expand/collapse */
   onToggleFolder: (folderId: string) => void;
-  /** Complete file/folder creation with the given name */
-  onFinishEditing: (name: string) => void;
-  /** Cancel file/folder creation */
-  onCancelEditing: () => void;
-  /** Start inline rename mode for a node */
-  onStartRename: (id: string) => void;
+  /** Track which node was right-clicked for context menu */
+  onContextMenu: (node: TreeNode | null) => void;
 }
 
 const FileTreeContext = createContext<FileTreeContextValue | null>(null);

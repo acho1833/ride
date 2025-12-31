@@ -32,12 +32,12 @@ import { useFileActions, useFileStructure, useOpenFolderIds, useSelectedFileId }
 import { useOpenFileIds, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
 import { useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
 import FileTreeComponent from '@/features/files/components/file-tree.component';
-import { EditingNode, FileTreeProvider } from '@/features/files/components/file-tree-context';
+import { FileTreeProvider, FileType } from '@/features/files/components/file-tree-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import NewNodeDialogComponent from '@/features/files/components/new-node-dialog.component';
+import RenameNodeDialogComponent from '@/features/files/components/rename-node-dialog.component';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { useFileAddMutation } from '@/features/files/hooks/useFileAddMutation';
 import { useFileDeleteMutation } from '@/features/files/hooks/useFileDeleteMutation';
-import { useFileRenameMutation } from '@/features/files/hooks/useFileRenameMutation';
 
 interface Props {
   /** Position of this panel in the layout (for MainPanelsComponent) */
@@ -55,9 +55,7 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   const { setSelectedFileId, toggleFolder, expandAllFolders, collapseAllFolders, revealFile } = useFileActions();
 
   // Server mutations
-  const { mutate: addNode } = useFileAddMutation();
   const { mutate: deleteNode } = useFileDeleteMutation();
-  const { mutate: renameNode } = useFileRenameMutation();
 
   // Get UI state and actions
   const selectOpenedFiles = useSelectOpenedFiles();
@@ -81,75 +79,50 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     prevSelectOpenedFiles.current = selectOpenedFiles;
   }, [selectOpenedFiles, activeFileId, revealFile]);
 
-  // Local state for tracking editing and renaming
-  const [editingNode, setEditingNode] = useState<EditingNode | null>(null);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  // Track which node was right-clicked for context menu
+  const [rightClickedNode, setRightClickedNode] = useState<TreeNode | null>(null);
+
+  // Dialog state for creating new file/folder
+  const [newNodeDialog, setNewNodeDialog] = useState<{ open: boolean; parentId: string; type: FileType }>({
+    open: false,
+    parentId: '',
+    type: 'file'
+  });
+
+  // Dialog state for renaming
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; nodeId: string; currentName: string }>({
+    open: false,
+    nodeId: '',
+    currentName: ''
+  });
 
   /**
-   * Initiates the process of adding a new file or folder
+   * Opens dialog to add a new file
    */
   const handleAddFile = (parentId: string): void => {
     // Ensure the parent folder is open so the user can see the new file
     if (!openFolderIds.includes(parentId)) {
       toggleFolder(parentId);
     }
-    setEditingNode({
-      parentId,
-      type: 'file',
-      tempId: `temp-${Date.now()}` // Temporary unique ID
-    });
+    setNewNodeDialog({ open: true, parentId, type: 'file' });
   };
 
   /**
-   * Initiates the process of adding a new folder
+   * Opens dialog to add a new folder
    */
   const handleAddFolder = (parentId: string): void => {
     // Ensure the parent folder is open so the user can see the new folder
     if (!openFolderIds.includes(parentId)) {
       toggleFolder(parentId);
     }
-    setEditingNode({
-      parentId,
-      type: 'folder',
-      tempId: `temp-${Date.now()}`
-    });
+    setNewNodeDialog({ open: true, parentId, type: 'folder' });
   };
 
   /**
-   * Completes the process of creating a new file or folder
+   * Closes the new node dialog
    */
-  const handleFinishEditing = (name: string): void => {
-    if (!editingNode || !name.trim()) {
-      setEditingNode(null);
-      return;
-    }
-
-    // Create the new node with a unique ID
-    const newNode: TreeNode =
-      editingNode.type === 'file'
-        ? {
-            id: crypto.randomUUID(),
-            name: name.trim(),
-            type: 'file',
-            metadata: {}
-          }
-        : {
-            id: crypto.randomUUID(),
-            name: name.trim(),
-            type: 'folder',
-            children: []
-          };
-
-    // Add the node via server mutation
-    addNode({ parentId: editingNode.parentId, node: newNode });
-    setEditingNode(null);
-  };
-
-  /**
-   * Cancels the process of creating a new file or folder
-   */
-  const handleCancelEditing = (): void => {
-    setEditingNode(null);
+  const handleNewNodeDialogClose = (): void => {
+    setNewNodeDialog(prev => ({ ...prev, open: false }));
   };
 
   /**
@@ -161,18 +134,17 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   };
 
   /**
-   * Renames a node in the tree
+   * Opens the rename dialog for a node
    */
-  const handleRename = (nodeId: string, newName: string): void => {
-    renameNode({ nodeId, newName });
-    setRenamingId(null); // Clear the renaming state
+  const handleStartRename = (node: TreeNode): void => {
+    setRenameDialog({ open: true, nodeId: node.id, currentName: node.name });
   };
 
   /**
-   * Initiates the rename process for a node
+   * Closes the rename dialog
    */
-  const handleStartRename = (nodeId: string): void => {
-    setRenamingId(nodeId);
+  const handleRenameDialogClose = (): void => {
+    setRenameDialog(prev => ({ ...prev, open: false }));
   };
 
   /**
@@ -187,17 +159,9 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     selectedId,
     openFolderIds,
     openFileIds,
-    editingNode,
-    renamingId,
     onSelect: setSelectedFileId,
-    onAddFile: handleAddFile,
-    onAddFolder: handleAddFolder,
-    onDelete: handleDelete,
-    onRename: handleRename,
     onToggleFolder: toggleFolder,
-    onFinishEditing: handleFinishEditing,
-    onCancelEditing: handleCancelEditing,
-    onStartRename: handleStartRename
+    onContextMenu: setRightClickedNode
   };
 
   // Toolbar buttons that appear at the top of the file tree
@@ -224,21 +188,67 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     </>
   );
 
+  // Determine context menu target - use right-clicked node or root for empty space
+  const contextMenuTargetId = rightClickedNode?.id ?? fileStructure.id;
+  const isTargetFolder = !rightClickedNode || rightClickedNode.type === 'folder';
+  const isTargetRoot = !rightClickedNode || rightClickedNode.id === fileStructure.id;
+
+  /**
+   * Handle context menu on the file tree container.
+   * Only reset rightClickedNode if clicking directly on empty space (not on a node).
+   */
+  const handleTreeContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only reset if the click target is the container itself (empty space)
+    if (e.target === e.currentTarget) {
+      setRightClickedNode(null);
+    }
+  };
+
   return (
     <MainPanelsComponent title="Files" pos={pos} tools={toolbarButtons}>
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <ScrollArea className="flex-1 overflow-y-auto">
-            <FileTreeProvider value={fileTreeContextValue}>
-              <FileTreeComponent node={fileStructure} isRoot={true} />
-            </FileTreeProvider>
+            <div className="min-h-full" onContextMenu={handleTreeContextMenu}>
+              <FileTreeProvider value={fileTreeContextValue}>
+                <FileTreeComponent node={fileStructure} isRoot={true} />
+              </FileTreeProvider>
+            </div>
           </ScrollArea>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onClick={handleAddFileToRoot}>New File</ContextMenuItem>
-          <ContextMenuItem onClick={() => handleAddFolder(fileStructure.id)}>New Folder</ContextMenuItem>
+          {/* Show New File/Folder for folders and empty space */}
+          {isTargetFolder && (
+            <>
+              <ContextMenuItem onClick={() => handleAddFile(contextMenuTargetId)}>New File</ContextMenuItem>
+              <ContextMenuItem onClick={() => handleAddFolder(contextMenuTargetId)}>New Folder</ContextMenuItem>
+            </>
+          )}
+          {/* Show Rename/Delete for non-root nodes */}
+          {rightClickedNode && !isTargetRoot && (
+            <>
+              <ContextMenuItem onClick={() => handleStartRename(rightClickedNode)}>Rename</ContextMenuItem>
+              <ContextMenuItem onClick={() => handleDelete(rightClickedNode.id)}>Delete</ContextMenuItem>
+            </>
+          )}
         </ContextMenuContent>
       </ContextMenu>
+
+      {/* Dialog for creating new file/folder */}
+      <NewNodeDialogComponent
+        open={newNodeDialog.open}
+        type={newNodeDialog.type}
+        parentId={newNodeDialog.parentId}
+        onClose={handleNewNodeDialogClose}
+      />
+
+      {/* Dialog for renaming file/folder */}
+      <RenameNodeDialogComponent
+        open={renameDialog.open}
+        nodeId={renameDialog.nodeId}
+        currentName={renameDialog.currentName}
+        onClose={handleRenameDialogClose}
+      />
     </MainPanelsComponent>
   );
 };
