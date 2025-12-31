@@ -54,14 +54,7 @@ interface Props {
   onDragStateChange: (draggedId: string | null, dropTargetId: string | null) => void;
 }
 
-const FileTreeDndContextComponent = ({
-  children,
-  fileStructure,
-  openFolderIds,
-  onToggleFolder,
-  viewportRef,
-  onDragStateChange
-}: Props) => {
+const FileTreeDndContextComponent = ({ children, fileStructure, openFolderIds, onToggleFolder, viewportRef, onDragStateChange }: Props) => {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
@@ -130,17 +123,11 @@ const FileTreeDndContextComponent = ({
 
         if (mouseY < topZone) {
           const distance = topZone - mouseY;
-          const speed = Math.min(
-            FILE_DND_CONFIG.SCROLL_SPEED_MAX,
-            FILE_DND_CONFIG.SCROLL_SPEED_MIN + distance * 0.3
-          );
+          const speed = Math.min(FILE_DND_CONFIG.SCROLL_SPEED_MAX, FILE_DND_CONFIG.SCROLL_SPEED_MIN + distance * 0.3);
           viewport.scrollTop -= speed;
         } else if (mouseY > bottomZone) {
           const distance = mouseY - bottomZone;
-          const speed = Math.min(
-            FILE_DND_CONFIG.SCROLL_SPEED_MAX,
-            FILE_DND_CONFIG.SCROLL_SPEED_MIN + distance * 0.3
-          );
+          const speed = Math.min(FILE_DND_CONFIG.SCROLL_SPEED_MAX, FILE_DND_CONFIG.SCROLL_SPEED_MIN + distance * 0.3);
           viewport.scrollTop += speed;
         }
       }
@@ -177,16 +164,7 @@ const FileTreeDndContextComponent = ({
         lastHoveredFolderRef.current = null;
       }
     },
-    [
-      dragState,
-      dropTargetId,
-      fileStructure,
-      openFolderIds,
-      onToggleFolder,
-      viewportRef,
-      onDragStateChange,
-      clearAutoExpandTimer
-    ]
+    [dragState, dropTargetId, fileStructure, openFolderIds, onToggleFolder, viewportRef, onDragStateChange, clearAutoExpandTimer]
   );
 
   const handleDragEnd = useCallback(
@@ -198,11 +176,7 @@ const FileTreeDndContextComponent = ({
       const overData = over?.data.current as FileDropData | undefined;
       const targetFolderId = overData?.folderId;
 
-      if (
-        dragState &&
-        targetFolderId &&
-        isValidDropTarget(fileStructure, dragState.nodeId, targetFolderId)
-      ) {
+      if (dragState && targetFolderId && isValidDropTarget(fileStructure, dragState.nodeId, targetFolderId)) {
         // Check for name conflict
         if (hasChildWithName(fileStructure, targetFolderId, dragState.nodeName)) {
           setPendingMove({

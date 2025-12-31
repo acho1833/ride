@@ -11,5 +11,5 @@ export const FILE_DND_CONFIG = {
   /** Maximum scroll speed (px per frame) */
   SCROLL_SPEED_MAX: 15,
   /** Minimum distance to activate drag (px) */
-  DRAG_ACTIVATION_DISTANCE: 8,
+  DRAG_ACTIVATION_DISTANCE: 8
 } as const;

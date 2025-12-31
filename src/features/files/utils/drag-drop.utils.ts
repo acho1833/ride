@@ -59,11 +59,7 @@ function isInSubtree(folder: FolderNode, nodeId: string): boolean {
  * Check if a drop target is valid
  * Returns false for: self, descendants, current parent, files
  */
-export function isValidDropTarget(
-  tree: FolderNode,
-  draggedId: string,
-  targetId: string
-): boolean {
+export function isValidDropTarget(tree: FolderNode, draggedId: string, targetId: string): boolean {
   // Cannot drop on self
   if (draggedId === targetId) return false;
 

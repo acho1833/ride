@@ -225,7 +225,9 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
         </ContextMenu>
         <CollapsibleContent>
           {node.children &&
-            sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={depth + 1} parentId={node.id} />)}
+            sortChildren(node.children).map(child => (
+              <FileTreeComponent key={child.id} node={child} depth={depth + 1} parentId={node.id} />
+            ))}
         </CollapsibleContent>
       </Collapsible>
     </div>
