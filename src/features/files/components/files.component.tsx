@@ -36,8 +36,8 @@ import { FileTreeProvider, FileType } from '@/features/files/components/file-tre
 import { ScrollArea } from '@/components/ui/scroll-area';
 import NewNodeDialogComponent from '@/features/files/components/new-node-dialog.component';
 import RenameNodeDialogComponent from '@/features/files/components/rename-node-dialog.component';
+import DeleteNodeDialogComponent from '@/features/files/components/delete-node-dialog.component';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { useFileDeleteMutation } from '@/features/files/hooks/useFileDeleteMutation';
 
 interface Props {
   /** Position of this panel in the layout (for MainPanelsComponent) */
@@ -53,9 +53,6 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
 
   // Get actions from file store
   const { setSelectedFileId, toggleFolder, expandAllFolders, collapseAllFolders, revealFile } = useFileActions();
-
-  // Server mutations
-  const { mutate: deleteNode } = useFileDeleteMutation();
 
   // Get UI state and actions
   const selectOpenedFiles = useSelectOpenedFiles();
@@ -96,6 +93,19 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     currentName: ''
   });
 
+  // Dialog state for delete confirmation
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    nodeId: string;
+    nodeName: string;
+    nodeType: 'file' | 'folder';
+  }>({
+    open: false,
+    nodeId: '',
+    nodeName: '',
+    nodeType: 'file'
+  });
+
   /**
    * Opens dialog to add a new file
    */
@@ -126,11 +136,18 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   };
 
   /**
-   * Deletes a node from the tree
+   * Opens the delete confirmation dialog for a node
    */
-  const handleDelete = (nodeId: string): void => {
-    if (nodeId === fileStructure.id) return; // Can't delete root folder
-    deleteNode({ nodeId });
+  const handleStartDelete = (node: TreeNode): void => {
+    if (node.id === fileStructure.id) return; // Can't delete root folder
+    setDeleteDialog({ open: true, nodeId: node.id, nodeName: node.name, nodeType: node.type });
+  };
+
+  /**
+   * Closes the delete dialog
+   */
+  const handleDeleteDialogClose = (): void => {
+    setDeleteDialog(prev => ({ ...prev, open: false }));
   };
 
   /**
@@ -228,7 +245,7 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
           {rightClickedNode && !isTargetRoot && (
             <>
               <ContextMenuItem onClick={() => handleStartRename(rightClickedNode)}>Rename</ContextMenuItem>
-              <ContextMenuItem onClick={() => handleDelete(rightClickedNode.id)}>Delete</ContextMenuItem>
+              <ContextMenuItem onClick={() => handleStartDelete(rightClickedNode)}>Delete</ContextMenuItem>
             </>
           )}
         </ContextMenuContent>
@@ -248,6 +265,15 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
         nodeId={renameDialog.nodeId}
         currentName={renameDialog.currentName}
         onClose={handleRenameDialogClose}
+      />
+
+      {/* Dialog for delete confirmation */}
+      <DeleteNodeDialogComponent
+        open={deleteDialog.open}
+        nodeId={deleteDialog.nodeId}
+        nodeName={deleteDialog.nodeName}
+        nodeType={deleteDialog.nodeType}
+        onClose={handleDeleteDialogClose}
       />
     </MainPanelsComponent>
   );
