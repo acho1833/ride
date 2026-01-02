@@ -4,6 +4,15 @@ import { API_PREFIX } from '@/const';
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/ide',
+        permanent: false
+      }
+    ];
+  },
   async headers() {
     return [
       {
