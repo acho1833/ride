@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../app.store';
 import { OpenFilesSlice, EditorGroup, GroupId } from './open-files.store';
+import { EDITOR_CONFIG } from '@/features/editor/const';
 
 // ============================================================================
 // State Selectors
@@ -148,6 +149,14 @@ export const useCanMoveInDirection = (
       const row = rows[rowIndex];
       const hasMultipleFiles = group.files.length >= 2;
 
+      // Count total groups across all rows (for up/down split logic)
+      const totalGroups = rows.reduce((sum, r) => sum + r.groups.length, 0);
+      const hasMultipleGroups = totalGroups >= 2;
+
+      // Check if we're at max row limit (can't create new rows)
+      const { yGroupLimit } = EDITOR_CONFIG;
+      const atMaxRows = yGroupLimit !== -1 && rows.length >= yGroupLimit;
+
       switch (direction) {
         case 'left': {
           const isNewGroup = groupIndex === 0;
@@ -165,17 +174,27 @@ export const useCanMoveInDirection = (
           };
         }
         case 'up': {
-          const isNewGroup = rowIndex === 0 || rows.length < 2;
+          const hasRowAbove = rowIndex > 0;
+          if (hasRowAbove) {
+            // Move to existing row above
+            return { canMove: true, isNewGroup: false };
+          }
+          // Would create new row - check if allowed
           return {
-            canMove: isNewGroup ? hasMultipleFiles : true,
-            isNewGroup
+            canMove: !atMaxRows && hasMultipleGroups,
+            isNewGroup: true
           };
         }
         case 'down': {
-          const isNewGroup = rowIndex === rows.length - 1 || rows.length < 2;
+          const hasRowBelow = rowIndex < rows.length - 1;
+          if (hasRowBelow) {
+            // Move to existing row below
+            return { canMove: true, isNewGroup: false };
+          }
+          // Would create new row - check if allowed
           return {
-            canMove: isNewGroup ? hasMultipleFiles : true,
-            isNewGroup
+            canMove: !atMaxRows && hasMultipleGroups,
+            isNewGroup: true
           };
         }
         default:
