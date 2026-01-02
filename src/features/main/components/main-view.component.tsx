@@ -22,7 +22,8 @@ const MainView = () => {
   const { toggleToolbar } = useUiActions();
 
   // Check if any features are enabled for each position
-  const showLeftPanel = VIEW_SETTINGS_CONFIG.some(s => s.position === 'left' && viewSettings[s.key]);
+  // Left panel always visible (FILES has no view setting and is always available)
+  const showLeftPanel = true;
   const showRightPanel = VIEW_SETTINGS_CONFIG.some(s => s.position === 'right' && viewSettings[s.key]);
   const showBottomPanel = VIEW_SETTINGS_CONFIG.some(s => s.position === 'bottom' && viewSettings[s.key]);
 

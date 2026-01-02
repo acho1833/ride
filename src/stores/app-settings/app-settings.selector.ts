@@ -7,14 +7,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/stores/app.store';
 import { AppSettingsSlice } from './app-settings.store';
-import { ToolType } from '@/features/toolbars/types';
-import {
-  ViewSettingKey,
-  DEFAULT_VIEW_SETTINGS,
-  ToolbarPosition,
-  VIEW_SETTINGS_CONFIG,
-  TOOL_TYPE_TO_VIEW_SETTING
-} from '@/models/view-settings.model';
+import { ViewSettingKey, DEFAULT_VIEW_SETTINGS } from '@/models/view-settings.model';
 
 // ============================================================================
 // State Selectors
@@ -32,21 +25,6 @@ export const useViewSettings = () => useAppStore((state: AppSettingsSlice) => st
 /** Get a specific view setting value with default fallback */
 export const useViewSetting = (key: ViewSettingKey): boolean =>
   useAppStore((state: AppSettingsSlice): boolean => state.appSettings.data?.view[key] ?? DEFAULT_VIEW_SETTINGS[key]);
-
-/** Check if a specific tool type is enabled (tools without settings return true) */
-export const useIsToolEnabled = (toolType: ToolType): boolean =>
-  useAppStore((state: AppSettingsSlice): boolean => {
-    const settingKey = TOOL_TYPE_TO_VIEW_SETTING[toolType];
-    if (!settingKey) return true; // No setting = always enabled (e.g., FILES)
-    return state.appSettings.data?.view[settingKey] ?? DEFAULT_VIEW_SETTINGS[settingKey];
-  });
-
-/** Check if any tool in a position is enabled (for panel visibility) */
-export const useIsPositionVisible = (position: ToolbarPosition): boolean =>
-  useAppStore((state: AppSettingsSlice): boolean => {
-    const positionSettings = VIEW_SETTINGS_CONFIG.filter(s => s.position === position);
-    return positionSettings.some(s => state.appSettings.data?.view[s.key] ?? DEFAULT_VIEW_SETTINGS[s.key]);
-  });
 
 // ============================================================================
 // Action Selector
