@@ -61,3 +61,5 @@ tasks/
 
 # Sync script temp files
 .upstream-commit-msg
+
+bun.lock

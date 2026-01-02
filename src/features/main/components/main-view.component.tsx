@@ -58,11 +58,7 @@ const MainView = () => {
               <ResizablePanelGroup direction="horizontal">
                 {showLeftPanel && (
                   <>
-                    <ResizablePanel
-                      defaultSize={15}
-                      className={cn('min-w-[100px]', !toolbarMode.left && 'hidden')}
-                      collapsible
-                    >
+                    <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.left && 'hidden')} collapsible>
                       <div className="h-full">
                         <ShowToolbarComponent toolType={toolbarMode.left} pos="left" />
                       </div>

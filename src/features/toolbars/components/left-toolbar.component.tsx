@@ -53,9 +53,7 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
   );
 
   // Filter tools - FILES always visible, others based on view settings
-  const enabledTopTools = topTools.filter(
-    tool => tool.type === 'FILES' || enabledLeftToolTypes.includes(tool.type)
-  );
+  const enabledTopTools = topTools.filter(tool => tool.type === 'FILES' || enabledLeftToolTypes.includes(tool.type));
   const enabledBottomTools = bottomTools.filter(tool => enabledBottomToolTypes.includes(tool.type));
 
   const showBottomSection = enabledBottomTools.length > 0;
