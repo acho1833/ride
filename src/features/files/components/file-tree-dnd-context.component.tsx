@@ -234,7 +234,7 @@ const FileTreeDndContextComponent = ({ children, fileStructure, openFolderIds, o
       onDragCancel={handleDragCancel}
     >
       {children}
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {dragState && (
           <div className="bg-secondary border-border flex items-center gap-2 rounded border px-3 py-1.5 text-sm shadow-lg">
             {dragState.nodeType === 'folder' ? (
