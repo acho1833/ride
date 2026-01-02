@@ -49,7 +49,7 @@ const EditorRowComponent = ({ row }: Props) => {
     <ResizablePanelGroup direction="horizontal" className="h-full w-full">
       {groups.flatMap((group, index) => {
         const panel = (
-          <ResizablePanel key={group.id} defaultSize={defaultSize} minSize={15}>
+          <ResizablePanel key={group.id} id={group.id} order={index} defaultSize={defaultSize} minSize={15}>
             <EditorGroupComponent groupId={group.id} />
           </ResizablePanel>
         );
