@@ -5,6 +5,7 @@ import { BotIcon, ChartCandlestickIcon, FolderIcon, SearchIcon } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUiActions } from '@/stores/ui/ui.selector';
+import SettingsMenuComponent from '@/features/user-settings/components/settings-menu.component';
 
 const topTools: ToolTypeOption[] = [
   {
@@ -80,6 +81,7 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
             </div>
           );
         })}
+        <SettingsMenuComponent />
       </div>
     </div>
   );

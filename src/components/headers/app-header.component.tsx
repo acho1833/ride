@@ -1,6 +1,5 @@
 'use client';
 
-import ThemeToggleButtonComponent from '@/components/buttons/theme-toggle-button.component';
 import { useUser } from '@/stores/app-config/app-config.selector';
 import { ApertureIcon } from 'lucide-react';
 
@@ -13,10 +12,7 @@ const AppHeaderComponent = () => {
         <ApertureIcon className="size-4" />
         <div className="text-[15px] font-bold">KX</div>
       </div>
-      <div className="flex items-center gap-x-2">
-        <span className="text-muted-foreground text-sm">{user?.sid}</span>
-        <ThemeToggleButtonComponent />
-      </div>
+      <span className="text-muted-foreground text-sm">{user?.sid}</span>
     </div>
   );
 };
