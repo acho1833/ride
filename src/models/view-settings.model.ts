@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ToolType } from '@/features/toolbars/types';
 
 /** Valid view setting keys - add/remove features here */
 export type ViewSettingKey = 'entitySearch' | 'notification' | 'aiPrompt' | 'charts';
@@ -16,6 +17,9 @@ export const DEFAULT_VIEW_SETTINGS: Record<ViewSettingKey, boolean> = {
 
 /** Toolbar position type */
 export type ToolbarPosition = 'left' | 'right' | 'bottom';
+
+/** Array of all toolbar positions for iteration */
+export const TOOLBAR_POSITIONS: ToolbarPosition[] = ['left', 'right', 'bottom'];
 
 /** View setting metadata for UI display */
 export interface ViewSettingMeta {
@@ -52,3 +56,20 @@ export const viewSettingsSchema = z.object({
   view: z.record(z.string(), z.boolean()),
   updatedAt: z.date()
 });
+
+/** Map ViewSettingKey to ToolType */
+export const VIEW_SETTING_TO_TOOL_TYPE: Record<ViewSettingKey, ToolType> = {
+  entitySearch: 'ENTITY_SEARCH',
+  notification: 'ALERT',
+  aiPrompt: 'PROMPT',
+  charts: 'CHARTS'
+};
+
+/** Reverse mapping: ToolType to ViewSettingKey (for tools that have settings) */
+export const TOOL_TYPE_TO_VIEW_SETTING: Partial<Record<ToolType, ViewSettingKey>> = {
+  ENTITY_SEARCH: 'entitySearch',
+  ALERT: 'notification',
+  PROMPT: 'aiPrompt',
+  CHARTS: 'charts'
+  // FILES has no view setting - always visible
+};

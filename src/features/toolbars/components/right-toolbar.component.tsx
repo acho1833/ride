@@ -5,6 +5,8 @@ import { BellIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUiActions } from '@/stores/ui/ui.selector';
+import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
+import { VIEW_SETTINGS_CONFIG, VIEW_SETTING_TO_TOOL_TYPE } from '@/models/view-settings.model';
 
 const tools: ToolTypeOption[] = [
   {
@@ -20,6 +22,17 @@ interface Props {
 
 const RightToolbarComponent = ({ activeToolType }: Props) => {
   const { toggleToolbar } = useUiActions();
+  const viewSettings = useViewSettings()!;
+
+  // Get enabled tool types for right position from config
+  const enabledRightToolTypes = VIEW_SETTINGS_CONFIG.filter(s => s.position === 'right' && viewSettings[s.key]).map(
+    s => VIEW_SETTING_TO_TOOL_TYPE[s.key]
+  );
+
+  // Hide entire toolbar if no right-position features are enabled
+  if (enabledRightToolTypes.length === 0) return null;
+
+  const enabledTools = tools.filter(tool => enabledRightToolTypes.includes(tool.type));
 
   const toggleRightToolbar = (toolType: ToolType) => {
     toggleToolbar('right', toolType);
@@ -27,7 +40,7 @@ const RightToolbarComponent = ({ activeToolType }: Props) => {
 
   return (
     <div className="flex flex-col items-center gap-y-2">
-      {tools.map(tool => {
+      {enabledTools.map(tool => {
         return (
           <div key={tool.type}>
             <Button

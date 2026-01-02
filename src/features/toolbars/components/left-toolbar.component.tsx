@@ -5,6 +5,8 @@ import { BotIcon, ChartCandlestickIcon, FolderIcon, SearchIcon } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUiActions } from '@/stores/ui/ui.selector';
+import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
+import { VIEW_SETTINGS_CONFIG, VIEW_SETTING_TO_TOOL_TYPE } from '@/models/view-settings.model';
 import SettingsMenuComponent from '@/features/user-settings/components/settings-menu.component';
 import AppSettingsMenuComponent from '@/features/app-settings/components/app-settings-menu.component';
 
@@ -40,6 +42,23 @@ interface Props {
 
 const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
   const { toggleToolbar } = useUiActions();
+  const viewSettings = useViewSettings()!;
+
+  // Get enabled tool types for each position from config
+  const enabledLeftToolTypes = VIEW_SETTINGS_CONFIG.filter(s => s.position === 'left' && viewSettings[s.key]).map(
+    s => VIEW_SETTING_TO_TOOL_TYPE[s.key]
+  );
+  const enabledBottomToolTypes = VIEW_SETTINGS_CONFIG.filter(s => s.position === 'bottom' && viewSettings[s.key]).map(
+    s => VIEW_SETTING_TO_TOOL_TYPE[s.key]
+  );
+
+  // Filter tools - FILES always visible, others based on view settings
+  const enabledTopTools = topTools.filter(
+    tool => tool.type === 'FILES' || enabledLeftToolTypes.includes(tool.type)
+  );
+  const enabledBottomTools = bottomTools.filter(tool => enabledBottomToolTypes.includes(tool.type));
+
+  const showBottomSection = enabledBottomTools.length > 0;
 
   const toggleLeftToolbar = (toolType: ToolType) => {
     toggleToolbar('left', toolType);
@@ -53,7 +72,7 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
     <div className="flex h-full flex-col items-center justify-between">
       <div className="flex flex-col items-center gap-y-2">
         <AppSettingsMenuComponent />
-        {topTools.map(tool => {
+        {enabledTopTools.map(tool => {
           return (
             <div key={tool.type}>
               <Button
@@ -69,20 +88,21 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
         })}
       </div>
       <div className="mb-1 flex flex-col items-center gap-y-2">
-        {bottomTools.map(tool => {
-          return (
-            <div key={tool.type}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => toggleBottomToolbar(tool.type)}
-                className={cn(activeToolTypes.includes(tool.type) && 'bg-input dark:hover:bg-input/50')}
-              >
-                <tool.icon className="size-5" />
-              </Button>
-            </div>
-          );
-        })}
+        {showBottomSection &&
+          enabledBottomTools.map(tool => {
+            return (
+              <div key={tool.type}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleBottomToolbar(tool.type)}
+                  className={cn(activeToolTypes.includes(tool.type) && 'bg-input dark:hover:bg-input/50')}
+                >
+                  <tool.icon className="size-5" />
+                </Button>
+              </div>
+            );
+          })}
         <SettingsMenuComponent />
       </div>
     </div>
