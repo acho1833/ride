@@ -202,6 +202,25 @@ All API requests go through a single catch-all route at `src/app/api/[[...rest]]
 2. Register in `src/lib/orpc/router.ts`
 3. Client uses auto-generated types via `@orpc/tanstack-query` hooks
 
+#### User Identification (sid)
+
+The current user's ID (`sid`) is available in ORPC handlers via `context.sid`. It's extracted from the client certificate DN header (or `DEV_USER` env var in development).
+
+```typescript
+// In router handlers - access sid from context
+.handler(async ({ context }) => {
+  const userId = context.sid;  // Current user's ID
+  return myService.getData(userId);
+})
+
+// In services - pass sid as parameter
+export async function getData(sid: string): Promise<Data> {
+  return DataCollection.findOne({ sid });
+}
+```
+
+The context is created in `src/lib/orpc/context.ts` and provides `{ req, sid }` to all handlers.
+
 ### Data Fetching Hooks Pattern (CRITICAL)
 
 **ALL API calls MUST use hooks with `@orpc/tanstack-query`. Never call APIs directly.**
@@ -918,10 +937,12 @@ export const todoSchema = z.object({
 2. If a needed Shadcn component is missing, you MUST:
    - Install it using: `npx shadcn@latest add <component-name>`
    - Then use the installed component — DO NOT reimplement it manually.
+   - **IMPORTANT**: If shadcn CLI fails with `spawn bun ENOENT`, delete `bun.lock` file first (this project uses npm, not bun).
 3. DO NOT:
    - Create custom buttons, inputs, dialogs, dropdowns, or form controls if a Shadcn equivalent exists.
    - Use raw HTML (`<button>`, `<input>`, etc.) for UI unless there is no Shadcn alternative.
    - Introduce another UI library (MUI, Ant, Radix directly, etc.).
+   - **NEVER manually create or regenerate Shadcn component files** - always use `npx shadcn@latest add <component-name>` to install them.
 
 ### Theming & CSS Variables (CRITICAL)
 

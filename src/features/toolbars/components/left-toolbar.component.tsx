@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useUiActions } from '@/stores/ui/ui.selector';
 import SettingsMenuComponent from '@/features/user-settings/components/settings-menu.component';
+import AppSettingsMenuComponent from '@/features/app-settings/components/app-settings-menu.component';
 
 const topTools: ToolTypeOption[] = [
   {
@@ -51,6 +52,7 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
   return (
     <div className="flex h-full flex-col items-center justify-between">
       <div className="flex flex-col items-center gap-y-2">
+        <AppSettingsMenuComponent />
         {topTools.map(tool => {
           return (
             <div key={tool.type}>

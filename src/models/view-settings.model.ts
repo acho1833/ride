@@ -1,0 +1,54 @@
+import { z } from 'zod';
+
+/** Valid view setting keys - add/remove features here */
+export type ViewSettingKey = 'entitySearch' | 'notification' | 'aiPrompt' | 'charts';
+
+/** Array of all view setting keys for iteration */
+export const VIEW_SETTING_KEYS: ViewSettingKey[] = ['entitySearch', 'notification', 'aiPrompt', 'charts'];
+
+/** Default values for new users - all views enabled */
+export const DEFAULT_VIEW_SETTINGS: Record<ViewSettingKey, boolean> = {
+  entitySearch: true,
+  notification: true,
+  aiPrompt: true,
+  charts: true
+};
+
+/** Toolbar position type */
+export type ToolbarPosition = 'left' | 'right' | 'bottom';
+
+/** View setting metadata for UI display */
+export interface ViewSettingMeta {
+  key: ViewSettingKey;
+  label: string;
+  position: ToolbarPosition;
+}
+
+/** View settings grouped by toolbar position for menu display */
+export const VIEW_SETTINGS_CONFIG: ViewSettingMeta[] = [
+  { key: 'entitySearch', label: 'Entity Search', position: 'left' },
+  { key: 'notification', label: 'Notification', position: 'right' },
+  { key: 'aiPrompt', label: 'AI Prompt', position: 'bottom' },
+  { key: 'charts', label: 'Charts', position: 'bottom' }
+];
+
+/** View settings grouped by position for menu rendering */
+export const VIEW_SETTINGS_BY_POSITION: ViewSettingMeta[][] = [
+  VIEW_SETTINGS_CONFIG.filter(s => s.position === 'left'),
+  VIEW_SETTINGS_CONFIG.filter(s => s.position === 'right'),
+  VIEW_SETTINGS_CONFIG.filter(s => s.position === 'bottom')
+];
+
+export interface ViewSettings {
+  id: string;
+  sid: string;
+  view: Record<ViewSettingKey, boolean>;
+  updatedAt: Date;
+}
+
+export const viewSettingsSchema = z.object({
+  id: z.string(),
+  sid: z.string(),
+  view: z.record(z.string(), z.boolean()),
+  updatedAt: z.date()
+});
