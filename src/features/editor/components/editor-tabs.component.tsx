@@ -89,7 +89,7 @@ const EditorTabsComponent = ({ groupId }: Props) => {
     }
   });
 
-  // Check for fully hidden tabs using ResizeObserver (catches both window and panel resizes)
+  // Keep active tab visible and check for hidden tabs using ResizeObserver
   React.useEffect(() => {
     const container = tabsContainerRef.current;
     if (!container) return;
@@ -97,8 +97,18 @@ const EditorTabsComponent = ({ groupId }: Props) => {
     const checkHiddenTabs = () => {
       const containerRect = container.getBoundingClientRect();
       const tabs = container.querySelectorAll('[data-tab-index]');
-      let hasHidden = false;
 
+      // Keep active tab visible during resize
+      if (activeFileId) {
+        const activeIndex = files.findIndex(f => f.id === activeFileId);
+        const activeTab = tabs[activeIndex] as HTMLElement | undefined;
+        if (activeTab) {
+          activeTab.scrollIntoView({ behavior: 'instant', inline: 'nearest', block: 'nearest' });
+        }
+      }
+
+      // Check for fully hidden tabs
+      let hasHidden = false;
       tabs.forEach(tab => {
         const tabRect = tab.getBoundingClientRect();
         // Tab is fully hidden if completely outside container bounds
@@ -114,7 +124,7 @@ const EditorTabsComponent = ({ groupId }: Props) => {
     const resizeObserver = new ResizeObserver(checkHiddenTabs);
     resizeObserver.observe(container);
     return () => resizeObserver.disconnect();
-  }, [files]);
+  }, [files, activeFileId]);
 
   const handleCloseAll = () => {
     closeAllFilesInGroup(groupId);
