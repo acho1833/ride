@@ -99,7 +99,7 @@ const QuickOpenComponent = () => {
     setSearchQuery('');
   }, [setIsOpen]);
 
-  // Handle click outside to close
+  // Handle click outside and ESC key to close
   useEffect(() => {
     if (!isOpen) return;
 
@@ -109,14 +109,23 @@ const QuickOpenComponent = () => {
       }
     };
 
-    // Delay adding listener to avoid immediate close
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeDialog();
+      }
+    };
+
+    // Delay adding click listener to avoid immediate close
     const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
     }, 0);
 
+    document.addEventListener('keydown', handleKeyDown);
+
     return () => {
       clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, closeDialog]);
 
