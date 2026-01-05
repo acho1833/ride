@@ -64,7 +64,7 @@ const MainView = () => {
                         <ShowToolbarComponent toolType={toolbarMode.left} pos="left" />
                       </div>
                     </ResizablePanel>
-                    <ResizableHandle />
+                    <ResizableHandle className="bg-transparent" />
                   </>
                 )}
                 <ResizablePanel defaultSize={70} className="min-w-[100px]">
@@ -72,7 +72,7 @@ const MainView = () => {
                 </ResizablePanel>
                 {showRightPanel && (
                   <>
-                    <ResizableHandle />
+                    <ResizableHandle className="bg-transparent" />
                     <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.right && 'hidden')}>
                       <ShowToolbarComponent toolType={toolbarMode.right} pos="right" />
                     </ResizablePanel>
@@ -82,7 +82,7 @@ const MainView = () => {
             </ResizablePanel>
             {showBottomPanel && (
               <>
-                <ResizableHandle />
+                <ResizableHandle className="bg-transparent" />
                 <ResizablePanel defaultSize={30} className={cn('min-h-[100px]', !toolbarMode.bottom && 'hidden')}>
                   <ShowToolbarComponent toolType={toolbarMode.bottom} pos="bottom" />
                 </ResizablePanel>
