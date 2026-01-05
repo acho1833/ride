@@ -6,6 +6,7 @@ import RightToolbarComponent from '@/features/toolbars/components/right-toolbar.
 import { cn } from '@/lib/utils';
 import ShowToolbarComponent from '@/features/main/components/show-toolbar.component';
 import Workspaces from '@/features/workspaces/components/workspaces.component';
+import QuickOpenComponent from '@/features/quick-open/components/quick-open.component';
 import { useToolbarMode, useUiActions } from '@/stores/ui/ui.selector';
 import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
 import {
@@ -48,7 +49,9 @@ const MainView = () => {
   }, [viewSettings, toolbarMode, toggleToolbar]);
 
   return (
-    <div className="flex flex-1 space-x-1">
+    <>
+      <QuickOpenComponent />
+      <div className="flex flex-1 space-x-1">
       <div className="mx-auto w-[45px]">
         <LeftToolbarComponent activeToolTypes={[toolbarMode.left, toolbarMode.bottom]} />
       </div>
@@ -95,6 +98,7 @@ const MainView = () => {
         <RightToolbarComponent activeToolType={toolbarMode.right} />
       </div>
     </div>
+    </>
   );
 };
 
