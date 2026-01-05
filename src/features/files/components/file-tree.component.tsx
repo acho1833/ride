@@ -173,18 +173,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
     );
   }
 
-  // For root folder, render children directly without showing the root itself
-  // Root is droppable so files can be moved to the root level
-  if (isRoot && node.type === 'folder') {
-    return (
-      <div ref={setDropRef} className={highlightClass}>
-        {node.children &&
-          sortChildren(node.children).map(child => <FileTreeComponent key={child.id} node={child} depth={0} parentId={node.id} />)}
-      </div>
-    );
-  }
-
-  // Render a folder node
+  // Render a folder node (including root)
   return (
     <div className={highlightClass}>
       <Collapsible open={isOpen} onOpenChange={() => onToggleFolder(node.id)}>
@@ -221,8 +210,8 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
           <ContextMenuContent>
             <ContextMenuItem onClick={() => onAddFile(node.id)}>New File</ContextMenuItem>
             <ContextMenuItem onClick={() => onAddFolder(node.id)}>New Folder</ContextMenuItem>
-            <ContextMenuItem onClick={() => onRename(node)}>Rename</ContextMenuItem>
-            <ContextMenuItem onClick={() => onDelete(node)}>Delete</ContextMenuItem>
+            {!isRoot && <ContextMenuItem onClick={() => onRename(node)}>Rename</ContextMenuItem>}
+            {!isRoot && <ContextMenuItem onClick={() => onDelete(node)}>Delete</ContextMenuItem>}
           </ContextMenuContent>
         </ContextMenu>
         <CollapsibleContent>

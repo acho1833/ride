@@ -41,6 +41,7 @@ import DeleteNodeDialogComponent from '@/features/files/components/delete-node-d
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useDroppable } from '@dnd-kit/core';
 import type { FileDropData } from '@/features/files/components/file-tree-dnd-context.component';
+import { findNodeById, findParentFolder } from '@/features/files/utils/drag-drop.utils';
 
 interface Props {
   /** Position of this panel in the layout (for MainPanelsComponent) */
@@ -165,10 +166,31 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   };
 
   /**
-   * Adds a new file to the root folder
+   * Adds a new file based on current selection:
+   * - If a folder is selected: create inside that folder
+   * - If a file is selected: create at the same level (parent folder)
+   * - If nothing selected: create at root
    */
-  const handleAddFileToRoot = (): void => {
-    handleAddFile(fileStructure.id);
+  const handleToolbarAddFile = (): void => {
+    if (!selectedId) {
+      handleAddFile(fileStructure.id);
+      return;
+    }
+
+    const selectedNode = findNodeById(fileStructure, selectedId);
+    if (!selectedNode) {
+      handleAddFile(fileStructure.id);
+      return;
+    }
+
+    if (selectedNode.type === 'folder') {
+      // Selected a folder - create inside it
+      handleAddFile(selectedId);
+    } else {
+      // Selected a file - create at same level (parent folder)
+      const parent = findParentFolder(fileStructure, selectedId);
+      handleAddFile(parent?.id ?? fileStructure.id);
+    }
   };
 
   // Viewport ref for programmatic scrolling during drag
@@ -211,7 +233,7 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   // Toolbar buttons that appear at the top of the file tree
   const toolbarButtons = (
     <>
-      <Button variant="ghost" size="xs" onClick={handleAddFileToRoot} title="New File">
+      <Button variant="ghost" size="xs" onClick={handleToolbarAddFile} title="New File">
         <FilePlus className="h-4 w-4" />
       </Button>
       <Button

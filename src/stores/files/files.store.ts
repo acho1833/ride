@@ -105,14 +105,17 @@ export const createFileTreeSlice: StateCreator<FileTreeSlice, [], [], FileTreeSl
         files: {
           ...state.files,
           structure,
-          openFolderIds: cleanedOpenIds.length > 0 ? cleanedOpenIds : [structure.id]
+          openFolderIds: cleanedOpenIds.length > 0 ? cleanedOpenIds : [structure.id],
+          // Default selection to root folder if nothing is selected
+          selectedId: state.files.selectedId ?? structure.id
         }
       };
     }),
 
   setSelectedFileId: (selectedId: string | null) =>
     set(state => ({
-      files: { ...state.files, selectedId }
+      // Always keep something selected - fall back to root folder if null
+      files: { ...state.files, selectedId: selectedId ?? state.files.structure?.id ?? null }
     })),
 
   setOpenFolderIds: (openFolderIds: string[]) =>
