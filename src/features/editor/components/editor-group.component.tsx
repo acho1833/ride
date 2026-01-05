@@ -26,6 +26,7 @@ import { useEditorGroup, useOpenFilesActions } from '@/stores/open-files/open-fi
 import { GroupId } from '@/stores/open-files/open-files.store';
 import EditorTabsComponent from '@/features/editor/components/editor-tabs.component';
 import EditorContentComponent from '@/features/editor/components/editor-content.component';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Props {
   groupId: GroupId;
@@ -54,14 +55,16 @@ const EditorGroupComponent = ({ groupId }: Props) => {
     <div className="flex h-full flex-col" onFocus={handleFocus} onMouseDown={handleFocus}>
       <EditorTabsComponent groupId={groupId} />
 
-      <div className="flex-1 overflow-auto">
-        {activeFile ? (
-          <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} />
-        ) : (
-          <div className="text-muted-foreground flex h-full items-center justify-center">
-            <p>No file selected</p>
-          </div>
-        )}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <ScrollArea className="h-full" type="hover">
+          {activeFile ? (
+            <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} />
+          ) : (
+            <div className="text-muted-foreground flex h-full items-center justify-center">
+              <p>No file selected</p>
+            </div>
+          )}
+        </ScrollArea>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import TypeTabContent from './type-tab-content.component';
 import { useChartActiveTab } from '@/stores/type-tabs/type-tabs.selector';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Props {
   pos: ToolbarPositions;
@@ -28,17 +29,19 @@ const TypeTabContainer = ({ pos }: Props) => {
         <TypeTabBar />
 
         {/* Tab content */}
-        <div className="flex-1 overflow-auto">
-          {activeTab ? (
-            <TypeTabContent tab={activeTab} />
-          ) : (
-            <div className="bg-background flex h-full items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-muted-foreground text-lg font-medium">No Chart Open</h2>
-                <p className="text-muted-foreground mt-2 text-sm">Open a chart tab to get started</p>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ScrollArea className="h-full" type="hover">
+            {activeTab ? (
+              <TypeTabContent tab={activeTab} />
+            ) : (
+              <div className="bg-background flex h-full items-center justify-center">
+                <div className="text-center">
+                  <h2 className="text-muted-foreground text-lg font-medium">No Chart Open</h2>
+                  <p className="text-muted-foreground mt-2 text-sm">Open a chart tab to get started</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </ScrollArea>
         </div>
       </div>
     </MainPanelsComponent>
