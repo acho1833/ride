@@ -16,6 +16,7 @@ import { createQueryClient } from '@/lib/query/client';
 import { ThemeProvider } from 'next-themes';
 import ToasterProvider from '@/components/providers/toaster.provider';
 import AppConfigProviderComponent from '@/components/providers/app-config-provider.component';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 /**
  * Root provider component that wraps the entire application
@@ -28,7 +29,9 @@ export default function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
-        <AppConfigProviderComponent>{children}</AppConfigProviderComponent>
+        <TooltipProvider>
+          <AppConfigProviderComponent>{children}</AppConfigProviderComponent>
+        </TooltipProvider>
         {/* DevTools for debugging queries (bottom-right corner) */}
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
       </QueryClientProvider>

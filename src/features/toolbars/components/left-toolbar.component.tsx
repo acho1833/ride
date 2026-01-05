@@ -3,6 +3,7 @@
 import { ToolType, ToolTypeOption } from '@/features/toolbars/types';
 import { BotIcon, ChartCandlestickIcon, FolderIcon, SearchIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useUiActions } from '@/stores/ui/ui.selector';
 import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
@@ -70,9 +71,9 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
     <div className="flex h-full flex-col items-center justify-between">
       <div className="flex flex-col items-center gap-y-2">
         <AppSettingsMenuComponent />
-        {enabledTopTools.map(tool => {
-          return (
-            <div key={tool.type}>
+        {enabledTopTools.map(tool => (
+          <Tooltip key={tool.type}>
+            <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
@@ -81,15 +82,16 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
               >
                 <tool.icon className="size-5" />
               </Button>
-            </div>
-          );
-        })}
+            </TooltipTrigger>
+            <TooltipContent side="right">{tool.description}</TooltipContent>
+          </Tooltip>
+        ))}
       </div>
       <div className="mb-1 flex flex-col items-center gap-y-2">
         {showBottomSection &&
-          enabledBottomTools.map(tool => {
-            return (
-              <div key={tool.type}>
+          enabledBottomTools.map(tool => (
+            <Tooltip key={tool.type}>
+              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -98,9 +100,10 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
                 >
                   <tool.icon className="size-5" />
                 </Button>
-              </div>
-            );
-          })}
+              </TooltipTrigger>
+              <TooltipContent side="right">{tool.description}</TooltipContent>
+            </Tooltip>
+          ))}
         <SettingsMenuComponent />
       </div>
     </div>

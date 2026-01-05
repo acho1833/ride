@@ -3,6 +3,7 @@
 import { ToolType, ToolTypeOption } from '@/features/toolbars/types';
 import { BellIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useUiActions } from '@/stores/ui/ui.selector';
 import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
@@ -40,9 +41,9 @@ const RightToolbarComponent = ({ activeToolType }: Props) => {
 
   return (
     <div className="flex flex-col items-center gap-y-2">
-      {enabledTools.map(tool => {
-        return (
-          <div key={tool.type}>
+      {enabledTools.map(tool => (
+        <Tooltip key={tool.type}>
+          <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
@@ -51,9 +52,10 @@ const RightToolbarComponent = ({ activeToolType }: Props) => {
             >
               <tool.icon className="size-5" />
             </Button>
-          </div>
-        );
-      })}
+          </TooltipTrigger>
+          <TooltipContent side="left">{tool.description}</TooltipContent>
+        </Tooltip>
+      ))}
     </div>
   );
 };
