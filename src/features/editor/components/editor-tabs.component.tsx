@@ -312,7 +312,7 @@ const EditorTabsComponent = ({ groupId }: Props) => {
       onDrop={handleDrop}
     >
       {/* Tabs container with horizontal scroll */}
-      <div ref={tabsContainerRef} className="scrollbar-none flex flex-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      <div ref={tabsContainerRef} className="scrollbar-none flex flex-1 overflow-x-auto pl-0.5" style={{ scrollbarWidth: 'none' }}>
         <SortableContext items={sortableItems} strategy={horizontalListSortingStrategy}>
           {files.map((file, index) => (
             <EditorTabComponent
