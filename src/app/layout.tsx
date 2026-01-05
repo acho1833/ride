@@ -28,8 +28,11 @@ const geistMono = Geist_Mono({
 
 /** Page metadata for SEO */
 export const metadata: Metadata = {
-  title: 'KX',
-  description: 'KX'
+  title: 'Research IDE',
+  description: 'RIDE - Research IDE',
+  icons: {
+    icon: '/favicon.ico'
+  }
 };
 
 /**
