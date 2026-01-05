@@ -25,7 +25,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronDown, MoreVertical } from 'lucide-react';
+import { ChevronDown, MoreVertical, X } from 'lucide-react';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { useEditorGroup, useOpenFilesActions } from '@/stores/open-files/open-files.selector';
@@ -42,12 +42,14 @@ interface Props {
 
 const EditorTabsComponent = ({ groupId }: Props) => {
   const group = useEditorGroup(groupId);
-  const { setActiveFile, closeAllFilesInGroup, openFile } = useOpenFilesActions();
+  const { setActiveFile, closeFile, closeAllFilesInGroup, openFile } = useOpenFilesActions();
   const activeDragState = React.useContext(EditorDragContext);
 
   const tabsContainerRef = React.useRef<HTMLDivElement>(null);
-  const [hasOverflow, setHasOverflow] = React.useState(false);
+  const [hasHiddenTabs, setHasHiddenTabs] = React.useState(false);
   const [fileTreeDropIndex, setFileTreeDropIndex] = React.useState<number | null>(null);
+  const [hiddenFileIds, setHiddenFileIds] = React.useState<Set<string>>(new Set());
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
 
   const files = group?.files ?? [];
   const activeFileId = group?.activeFileId ?? null;
@@ -87,27 +89,104 @@ const EditorTabsComponent = ({ groupId }: Props) => {
     }
   });
 
-  // Check for overflow
+  // Check for fully hidden tabs using ResizeObserver (catches both window and panel resizes)
   React.useEffect(() => {
     const container = tabsContainerRef.current;
     if (!container) return;
 
-    const checkOverflow = () => {
-      const isOverflowing = container.scrollWidth > container.clientWidth;
-      setHasOverflow(isOverflowing);
+    const checkHiddenTabs = () => {
+      const containerRect = container.getBoundingClientRect();
+      const tabs = container.querySelectorAll('[data-tab-index]');
+      let hasHidden = false;
+
+      tabs.forEach(tab => {
+        const tabRect = tab.getBoundingClientRect();
+        // Tab is fully hidden if completely outside container bounds
+        if (tabRect.right <= containerRect.left || tabRect.left >= containerRect.right) {
+          hasHidden = true;
+        }
+      });
+
+      setHasHiddenTabs(hasHidden);
     };
 
-    checkOverflow();
-    window.addEventListener('resize', checkOverflow);
-    return () => window.removeEventListener('resize', checkOverflow);
+    checkHiddenTabs();
+    const resizeObserver = new ResizeObserver(checkHiddenTabs);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
   }, [files]);
-
-  const handleActivate = (fileId: string) => {
-    setActiveFile(fileId, groupId);
-  };
 
   const handleCloseAll = () => {
     closeAllFilesInGroup(groupId);
+  };
+
+  /**
+   * Calculate which tabs are hidden (outside visible bounds).
+   * Called when overflow dropdown opens to show only non-visible tabs.
+   */
+  const updateHiddenFiles = () => {
+    const container = tabsContainerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const tabs = container.querySelectorAll('[data-tab-index]');
+    const hidden = new Set<string>();
+
+    tabs.forEach((tab, index) => {
+      const tabRect = tab.getBoundingClientRect();
+      const file = files[index];
+      if (!file) return;
+
+      // Tab is hidden if it's fully outside the container bounds
+      const isHidden = tabRect.right <= containerRect.left || tabRect.left >= containerRect.right;
+      if (isHidden) {
+        hidden.add(file.id);
+      }
+    });
+
+    setHiddenFileIds(hidden);
+  };
+
+  /**
+   * Scroll tab into view and activate it.
+   * Called when selecting a file from the overflow dropdown.
+   * Closes the dropdown after selection.
+   */
+  const handleSelectHiddenFile = (fileId: string) => {
+    setActiveFile(fileId, groupId);
+    setIsDropdownOpen(false);
+
+    // Find and scroll to the tab element
+    const container = tabsContainerRef.current;
+    if (!container) return;
+
+    const tabs = container.querySelectorAll('[data-tab-index]');
+    const fileIndex = files.findIndex(f => f.id === fileId);
+    const tabElement = tabs[fileIndex] as HTMLElement | undefined;
+
+    if (tabElement) {
+      tabElement.scrollIntoView({ behavior: 'instant', inline: 'nearest', block: 'nearest' });
+    }
+  };
+
+  /**
+   * Close a file from the dropdown.
+   * Keeps dropdown open unless no hidden files remain.
+   */
+  const handleCloseFromDropdown = (e: React.MouseEvent, fileId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeFile(fileId, groupId);
+
+    // Update hidden files and close dropdown if none remain
+    setTimeout(() => {
+      updateHiddenFiles();
+      // Check if any hidden files remain (account for the one we just closed)
+      const remainingHidden = files.filter(f => f.id !== fileId && hiddenFileIds.has(f.id));
+      if (remainingHidden.length === 0) {
+        setIsDropdownOpen(false);
+      }
+    }, 0);
   };
 
   /**
@@ -245,21 +324,38 @@ const EditorTabsComponent = ({ groupId }: Props) => {
         </SortableContext>
       </div>
 
-      {/* Overflow dropdown - shows all files */}
-      {hasOverflow && (
-        <DropdownMenu>
+      {/* Overflow dropdown - shows only hidden files */}
+      {hasHiddenTabs && (
+        <DropdownMenu
+          open={isDropdownOpen}
+          onOpenChange={open => {
+            setIsDropdownOpen(open);
+            if (open) updateHiddenFiles();
+          }}
+        >
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="border-border h-9 w-9 rounded-none border-l">
               <ChevronDown className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {files.map(file => (
-              <DropdownMenuItem key={file.id} onClick={() => handleActivate(file.id)}>
-                {file.id === activeFileId && <span className="mr-2">●</span>}
-                {file.name}
-              </DropdownMenuItem>
-            ))}
+            {files
+              .filter(file => hiddenFileIds.has(file.id))
+              .map(file => (
+                <DropdownMenuItem
+                  key={file.id}
+                  className="flex items-center justify-between gap-4"
+                  onSelect={e => {
+                    e.preventDefault();
+                    handleSelectHiddenFile(file.id);
+                  }}
+                >
+                  <span>{file.name}</span>
+                  <button className="hover:bg-muted rounded p-0.5" onClick={e => handleCloseFromDropdown(e, file.id)}>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuItem>
+              ))}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
