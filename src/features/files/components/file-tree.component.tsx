@@ -190,7 +190,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
       <Collapsible open={isOpen} onOpenChange={() => onToggleFolder(node.id)}>
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <CollapsibleTrigger
+            <div
               ref={setRefs}
               className={`hover:bg-accent flex w-full cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
                 selectedId === node.id ? 'bg-accent' : ''
@@ -207,14 +207,16 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
               {...dragAttributes}
               {...dragListeners}
             >
-              {isOpen ? <ChevronDownIcon className="h-4 w-4 shrink-0" /> : <ChevronRightIcon className="h-4 w-4 shrink-0" />}
+              <CollapsibleTrigger onClick={e => e.stopPropagation()} className="flex shrink-0 items-center justify-center">
+                {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
+              </CollapsibleTrigger>
               {isOpen ? (
                 <FolderOpenIcon className="text-muted-foreground h-4 w-4 shrink-0" />
               ) : (
                 <FolderIcon className="text-muted-foreground h-4 w-4 shrink-0" />
               )}
               <span className="text-sm font-medium">{node.name}</span>
-            </CollapsibleTrigger>
+            </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onClick={() => onAddFile(node.id)}>New File</ContextMenuItem>
