@@ -144,6 +144,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
         <ContextMenuTrigger asChild>
           <div
             ref={setDragRef}
+            data-node-id={node.id}
             className={`hover:bg-accent flex cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
               selectedId === node.id ? 'bg-accent' : ''
             } ${highlightClass} ${draggingClass}`}
@@ -181,6 +182,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
           <ContextMenuTrigger asChild>
             <div
               ref={setRefs}
+              data-node-id={node.id}
               className={`hover:bg-accent flex w-full cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
                 selectedId === node.id ? 'bg-accent' : ''
               } ${draggingClass}`}

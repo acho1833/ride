@@ -80,6 +80,23 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     prevSelectOpenedFiles.current = selectOpenedFiles;
   }, [selectOpenedFiles, activeFileId, revealFile]);
 
+  /**
+   * Scroll to selected file when it changes (for "Select Opened Files" feature).
+   * Uses a small delay to ensure the DOM has updated after folder expansion.
+   */
+  useEffect(() => {
+    if (!selectOpenedFiles || !selectedId) return;
+
+    const timeoutId = setTimeout(() => {
+      const element = document.querySelector(`[data-node-id="${selectedId}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 50); // Small delay to allow folder expansion to complete
+
+    return () => clearTimeout(timeoutId);
+  }, [selectOpenedFiles, selectedId]);
+
   // Dialog state for creating new file/folder
   const [newNodeDialog, setNewNodeDialog] = useState<{ open: boolean; parentId: string; type: FileType }>({
     open: false,
