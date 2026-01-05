@@ -52,52 +52,52 @@ const MainView = () => {
     <>
       <QuickOpenComponent />
       <div className="flex flex-1 space-x-1">
-      <div className="mx-auto w-[45px]">
-        <LeftToolbarComponent activeToolTypes={[toolbarMode.left, toolbarMode.bottom]} />
-      </div>
-      <div className="flex-1">
-        <div className="h-full pb-1">
-          <ResizablePanelGroup direction="vertical">
-            <ResizablePanel defaultSize={70} className="min-h-[200px]">
-              <ResizablePanelGroup direction="horizontal">
-                {showLeftPanel && (
-                  <>
-                    <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.left && 'hidden')} collapsible>
-                      <div className="h-full">
-                        <ShowToolbarComponent toolType={toolbarMode.left} pos="left" />
-                      </div>
-                    </ResizablePanel>
-                    <ResizableHandle className="bg-transparent" />
-                  </>
-                )}
-                <ResizablePanel defaultSize={70} className="min-w-[100px]">
-                  <Workspaces />
-                </ResizablePanel>
-                {showRightPanel && (
-                  <>
-                    <ResizableHandle className="bg-transparent" />
-                    <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.right && 'hidden')}>
-                      <ShowToolbarComponent toolType={toolbarMode.right} pos="right" />
-                    </ResizablePanel>
-                  </>
-                )}
-              </ResizablePanelGroup>
-            </ResizablePanel>
-            {showBottomPanel && (
-              <>
-                <ResizableHandle className="bg-transparent" />
-                <ResizablePanel defaultSize={30} className={cn('min-h-[100px]', !toolbarMode.bottom && 'hidden')}>
-                  <ShowToolbarComponent toolType={toolbarMode.bottom} pos="bottom" />
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
+        <div className="mx-auto w-[45px]">
+          <LeftToolbarComponent activeToolTypes={[toolbarMode.left, toolbarMode.bottom]} />
+        </div>
+        <div className="flex-1">
+          <div className="h-full pb-1">
+            <ResizablePanelGroup direction="vertical">
+              <ResizablePanel defaultSize={70} className="min-h-[200px]">
+                <ResizablePanelGroup direction="horizontal">
+                  {showLeftPanel && (
+                    <>
+                      <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.left && 'hidden')} collapsible>
+                        <div className="h-full">
+                          <ShowToolbarComponent toolType={toolbarMode.left} pos="left" />
+                        </div>
+                      </ResizablePanel>
+                      <ResizableHandle className="bg-transparent" />
+                    </>
+                  )}
+                  <ResizablePanel defaultSize={70} className="min-w-[100px]">
+                    <Workspaces />
+                  </ResizablePanel>
+                  {showRightPanel && (
+                    <>
+                      <ResizableHandle className="bg-transparent" />
+                      <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.right && 'hidden')}>
+                        <ShowToolbarComponent toolType={toolbarMode.right} pos="right" />
+                      </ResizablePanel>
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </ResizablePanel>
+              {showBottomPanel && (
+                <>
+                  <ResizableHandle className="bg-transparent" />
+                  <ResizablePanel defaultSize={30} className={cn('min-h-[100px]', !toolbarMode.bottom && 'hidden')}>
+                    <ShowToolbarComponent toolType={toolbarMode.bottom} pos="bottom" />
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+          </div>
+        </div>
+        <div className="mx-auto w-[45px]">
+          <RightToolbarComponent activeToolType={toolbarMode.right} />
         </div>
       </div>
-      <div className="mx-auto w-[45px]">
-        <RightToolbarComponent activeToolType={toolbarMode.right} />
-      </div>
-    </div>
     </>
   );
 };

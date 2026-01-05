@@ -147,6 +147,7 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
           className={cn(
             'group border-border relative flex h-9 cursor-pointer items-center gap-2 border-r px-3 text-sm transition-colors',
             isActive ? 'bg-secondary text-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
+            isActive && isLastFocusedGroup ? 'border-t-primary border-t-4' : 'border-t-4 border-t-transparent',
             isDragging && 'z-50'
           )}
           onClick={handleActivate}
@@ -156,9 +157,6 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
         >
           {/* Drop indicator line - shows before this tab */}
           {showDropIndicator && <div className="bg-primary absolute top-1 bottom-1 -left-0.5 w-0.5 rounded-full" />}
-
-          {/* Active indicator - only show on last focused group */}
-          {isActive && isLastFocusedGroup && <div className="bg-primary absolute inset-x-0 top-0 h-0.5" />}
 
           {/* File name */}
           <span className="truncate">{file.name}</span>

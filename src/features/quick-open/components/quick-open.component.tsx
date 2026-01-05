@@ -26,7 +26,7 @@ const HighlightedText = ({ text, query }: { text: string; query: string }) => {
       {parts.map((part, i) => {
         const isMatch = segments.some(s => s.toLowerCase() === part.toLowerCase());
         return isMatch ? (
-          <span key={i} className="text-yellow-500 font-semibold">
+          <span key={i} className="font-semibold text-yellow-500">
             {part}
           </span>
         ) : (
@@ -133,12 +133,7 @@ const QuickOpenComponent = () => {
     <div className="fixed inset-x-0 top-3 z-50 flex justify-center">
       <div ref={containerRef} className="bg-popover border-border h-fit w-full max-w-lg rounded-lg border shadow-lg">
         <Command className="rounded-lg" shouldFilter={false}>
-          <CommandInput
-            placeholder="Search files... (use * as wildcard)"
-            autoFocus
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-          />
+          <CommandInput placeholder="Search files... (use * as wildcard)" autoFocus value={searchQuery} onValueChange={setSearchQuery} />
           <CommandList>
             <CommandEmpty>No files found.</CommandEmpty>
             <CommandGroup>
