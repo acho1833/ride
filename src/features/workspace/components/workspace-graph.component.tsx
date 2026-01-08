@@ -1,0 +1,297 @@
+'use client';
+
+/**
+ * Workspace Graph Component
+ *
+ * D3.js force-directed graph for .ws files.
+ * React renders the container once; D3 owns all dynamic updates.
+ */
+
+import { useEffect, useRef, useMemo, useState } from 'react';
+import * as d3 from 'd3';
+import { Button } from '@/components/ui/button';
+import { Plus, Minus, Maximize } from 'lucide-react';
+import { GRAPH_CONFIG, generateSampleData, getNodeColor } from '../const';
+import type { GraphNode, GraphLink, GraphData } from '../types';
+
+interface Props {
+  fileId: string;
+  fileName: string;
+}
+
+const WorkspaceGraphComponent = ({ fileId }: Props) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
+  const nodesRef = useRef<GraphNode[]>([]);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  // Generate sample data once per fileId
+  const data = useMemo<GraphData>(() => generateSampleData(), [fileId]);
+
+  // Observe container size
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setDimensions({ width, height });
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Initialize D3 graph when dimensions are available
+  useEffect(() => {
+    if (!svgRef.current || !dimensions) return;
+
+    const svg = d3.select(svgRef.current);
+    const { width, height } = dimensions;
+
+    // Clear previous content
+    svg.selectAll('*').remove();
+
+    // Create main group for zoom/pan transforms
+    const g = svg.append('g');
+
+    // Deep copy data to avoid mutation issues with D3
+    const nodes: GraphNode[] = data.nodes.map(n => ({ ...n }));
+    const links: GraphLink[] = data.links.map(l => ({ ...l }));
+
+    // Setup zoom behavior (only active when Ctrl key is held)
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent(GRAPH_CONFIG.zoomExtent)
+      .filter((event: Event) => {
+        // Allow programmatic zoom (no sourceEvent) or Ctrl+wheel/drag
+        if (!event) return true;
+        return (event as KeyboardEvent).ctrlKey || (event as MouseEvent).ctrlKey;
+      })
+      .wheelDelta((event: WheelEvent) => {
+        // Smaller zoom increment per wheel tick (matches button behavior)
+        const direction = event.deltaY > 0 ? -1 : 1;
+        return direction * Math.log(GRAPH_CONFIG.zoomStep);
+      })
+      .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+        g.attr('transform', event.transform.toString());
+      });
+
+    svg.call(zoom);
+    zoomRef.current = zoom;
+
+    // Build node-to-links map for fast lookup during drag
+    const nodeLinkMap = new Map<string, SVGLineElement[]>();
+    nodes.forEach(n => nodeLinkMap.set(n.id, []));
+
+    // Create links
+    const link = g
+      .append('g')
+      .attr('class', 'links')
+      .selectAll<SVGLineElement, GraphLink>('line')
+      .data(links)
+      .join('line')
+      .attr('stroke', 'white')
+      .attr('stroke-opacity', 0.6)
+      .attr('stroke-width', 2);
+
+    // Register link elements with nodes for fast lookup during drag
+    link.each(function (d) {
+      const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
+      const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+      nodeLinkMap.get(sourceId)?.push(this);
+      nodeLinkMap.get(targetId)?.push(this);
+    });
+
+    // Create node groups
+    const node = g.append('g').attr('class', 'nodes').selectAll<SVGGElement, GraphNode>('g').data(nodes).join('g').attr('cursor', 'grab');
+
+    // Add circles to nodes with colors based on name hash
+    node
+      .append('circle')
+      .attr('r', GRAPH_CONFIG.nodeRadius)
+      .attr('fill', d => getNodeColor(d.name))
+      .attr('stroke', 'white')
+      .attr('stroke-width', 2);
+
+    // Add labels to nodes (white text)
+    node
+      .append('text')
+      .text(d => d.name)
+      .attr('text-anchor', 'middle')
+      .attr('dy', GRAPH_CONFIG.nodeRadius + 14)
+      .attr('fill', 'white')
+      .attr('font-size', '12px')
+      .attr('pointer-events', 'none');
+
+    // Setup force simulation
+    const simulation = d3
+      .forceSimulation<GraphNode>(nodes)
+      .force(
+        'link',
+        d3
+          .forceLink<GraphNode, GraphLink>(links)
+          .id(d => d.id)
+          .distance(GRAPH_CONFIG.linkDistance)
+      )
+      .force('charge', d3.forceManyBody().strength(GRAPH_CONFIG.chargeStrength))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collision', d3.forceCollide().radius(GRAPH_CONFIG.nodeRadius + 10));
+
+    // Run simulation synchronously to calculate initial positions
+    simulation.stop();
+    for (let i = 0; i < 300; i++) {
+      simulation.tick();
+    }
+
+    simulationRef.current = simulation;
+    nodesRef.current = nodes;
+
+    // Calculate zoom-to-fit transform
+    const padding = GRAPH_CONFIG.fitPadding;
+    const xExtent = d3.extent(nodes, d => d.x) as [number, number];
+    const yExtent = d3.extent(nodes, d => d.y) as [number, number];
+
+    const graphWidth = xExtent[1] - xExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
+    const graphHeight = yExtent[1] - yExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
+    const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
+    const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
+
+    const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
+
+    const translateX = width / 2 - graphCenterX * scale;
+    const translateY = height / 2 - graphCenterY * scale;
+
+    // Apply zoom-to-fit transform immediately (no transition)
+    svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
+
+    // Set initial positions for links and nodes
+    link
+      .attr('x1', d => (d.source as GraphNode).x ?? 0)
+      .attr('y1', d => (d.source as GraphNode).y ?? 0)
+      .attr('x2', d => (d.target as GraphNode).x ?? 0)
+      .attr('y2', d => (d.target as GraphNode).y ?? 0);
+
+    node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+
+    // Update positions on each tick (for drag interactions)
+    simulation.on('tick', () => {
+      link
+        .attr('x1', d => (d.source as GraphNode).x ?? 0)
+        .attr('y1', d => (d.source as GraphNode).y ?? 0)
+        .attr('x2', d => (d.target as GraphNode).x ?? 0)
+        .attr('y2', d => (d.target as GraphNode).y ?? 0);
+
+      node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+    });
+
+    // Setup drag behavior - only moves the dragged node, no simulation restart
+    const drag = d3
+      .drag<SVGGElement, GraphNode>()
+      .on('start', function () {
+        // 'this' is the <g> element the drag is attached to
+        this.setAttribute('cursor', 'grabbing');
+      })
+      .on('drag', function (event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d) {
+        // Update node position directly
+        d.x = event.x;
+        d.y = event.y;
+
+        // Update the node's visual position (direct DOM manipulation)
+        // 'this' is the <g> element
+        this.setAttribute('transform', `translate(${d.x},${d.y})`);
+
+        // Update connected links using pre-computed map (direct DOM manipulation)
+        const connectedLinks = nodeLinkMap.get(d.id);
+        if (connectedLinks) {
+          for (const linkEl of connectedLinks) {
+            const linkData = d3.select<SVGLineElement, GraphLink>(linkEl).datum();
+            const source = linkData.source as GraphNode;
+            const target = linkData.target as GraphNode;
+            linkEl.setAttribute('x1', String(source.x ?? 0));
+            linkEl.setAttribute('y1', String(source.y ?? 0));
+            linkEl.setAttribute('x2', String(target.x ?? 0));
+            linkEl.setAttribute('y2', String(target.y ?? 0));
+          }
+        }
+      })
+      .on('end', function () {
+        this.setAttribute('cursor', 'grab');
+      });
+
+    node.call(drag);
+
+    // Cleanup
+    return () => {
+      simulation.stop();
+    };
+  }, [data, dimensions]);
+
+  // Zoom control handlers
+  const handleZoomIn = () => {
+    if (!svgRef.current || !zoomRef.current) return;
+    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, GRAPH_CONFIG.zoomStep);
+  };
+
+  const handleZoomOut = () => {
+    if (!svgRef.current || !zoomRef.current) return;
+    d3.select(svgRef.current)
+      .transition()
+      .duration(300)
+      .call(zoomRef.current.scaleBy, 1 / GRAPH_CONFIG.zoomStep);
+  };
+
+  const handleZoomToFit = () => {
+    if (!svgRef.current || !zoomRef.current || !dimensions) return;
+
+    const nodes = nodesRef.current;
+    if (nodes.length === 0) return;
+
+    const { width, height } = dimensions;
+    const padding = GRAPH_CONFIG.fitPadding;
+    const xExtent = d3.extent(nodes, d => d.x) as [number, number];
+    const yExtent = d3.extent(nodes, d => d.y) as [number, number];
+
+    const graphWidth = xExtent[1] - xExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
+    const graphHeight = yExtent[1] - yExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
+    const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
+    const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
+
+    const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
+
+    const translateX = width / 2 - graphCenterX * scale;
+    const translateY = height / 2 - graphCenterY * scale;
+
+    d3.select(svgRef.current)
+      .transition()
+      .duration(300)
+      .call(zoomRef.current.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
+  };
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+      <svg ref={svgRef} className="h-full w-full" />
+
+      {/* Control buttons - lower right */}
+      <div className="absolute right-4 bottom-4 flex flex-col gap-2">
+        <Button variant="outline" size="icon" onClick={handleZoomIn} title="Zoom In">
+          <Plus className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" onClick={handleZoomOut} title="Zoom Out">
+          <Minus className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" onClick={handleZoomToFit} title="Zoom to Fit">
+          <Maximize className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default WorkspaceGraphComponent;

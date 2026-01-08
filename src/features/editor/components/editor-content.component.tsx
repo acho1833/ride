@@ -6,6 +6,7 @@
 
 import React from 'react';
 import TextComponent from '@/features/text/components/text.component';
+import WorkspaceGraphComponent from '@/features/workspace/components/workspace-graph.component';
 
 interface Props {
   fileId: string;
@@ -30,7 +31,7 @@ const EditorContentComponent = ({ fileId, fileName }: Props) => {
   // Route to appropriate editor based on extension
   switch (extension) {
     case 'ws':
-      return <div>Workspace Content</div>;
+      return <WorkspaceGraphComponent fileId={fileId} fileName={fileName} />;
 
     case 'txt':
       return <TextComponent fileId={fileId} fileName={fileName} />;

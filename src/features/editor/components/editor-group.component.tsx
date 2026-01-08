@@ -44,6 +44,9 @@ const EditorGroupComponent = ({ groupId }: Props) => {
   const { files, activeFileId } = group;
   const activeFile = files.find(f => f.id === activeFileId);
 
+  // Check if file needs full height (no scroll wrapper)
+  const isFullHeight = activeFile?.name.endsWith('.ws');
+
   // Track which group user last interacted with.
   // Used by openFile() to determine default target when no group specified.
   const handleFocus = () => {
@@ -56,15 +59,21 @@ const EditorGroupComponent = ({ groupId }: Props) => {
       <EditorTabsComponent groupId={groupId} />
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        <ScrollArea className="h-full" type="hover">
-          {activeFile ? (
-            <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} />
-          ) : (
-            <div className="text-muted-foreground flex h-full items-center justify-center">
-              <p>No file selected</p>
+        {activeFile ? (
+          isFullHeight ? (
+            <div className="h-full">
+              <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} />
             </div>
-          )}
-        </ScrollArea>
+          ) : (
+            <ScrollArea className="h-full" type="hover">
+              <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} />
+            </ScrollArea>
+          )
+        ) : (
+          <div className="text-muted-foreground flex h-full items-center justify-center">
+            <p>No file selected</p>
+          </div>
+        )}
       </div>
     </div>
   );
