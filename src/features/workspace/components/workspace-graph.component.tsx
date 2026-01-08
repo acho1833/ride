@@ -7,10 +7,21 @@
  * React renders the container once; D3 owns all dynamic updates.
  */
 
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { Button } from '@/components/ui/button';
-import { Plus, Minus, Maximize } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger
+} from '@/components/ui/context-menu';
+import { Plus, Minus, Maximize, Copy, ClipboardPaste, Trash2, BarChart3, TrendingUp } from 'lucide-react';
+import { toast } from 'sonner';
 import { GRAPH_CONFIG, generateSampleData, getNodeColor } from '../const';
 import type { GraphNode, GraphLink, GraphData } from '../types';
 
@@ -26,6 +37,10 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const nodesRef = useRef<GraphNode[]>([]);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [contextMenuNode, setContextMenuNode] = useState<GraphNode | null>(null);
+  const contextMenuOpenRef = useRef(false);
+  const contextMenuTriggerRef = useRef<HTMLDivElement>(null);
+  const handleNodeContextMenuRef = useRef<(event: MouseEvent, node: GraphNode) => void>(() => {});
 
   // Generate sample data once per fileId
   const data = useMemo<GraphData>(() => generateSampleData(), [fileId]);
@@ -227,6 +242,11 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
 
     node.call(drag);
 
+    // Add right-click handler for context menu
+    node.on('contextmenu', function (event: MouseEvent, d: GraphNode) {
+      handleNodeContextMenuRef.current(event, d);
+    });
+
     // Cleanup
     return () => {
       simulation.stop();
@@ -274,9 +294,95 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
       .call(zoomRef.current.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
   };
 
+  // Context menu handlers
+  const handleCopy = useCallback(() => {
+    toast.info(`Copy: ${contextMenuNode?.name ?? 'Unknown'}`);
+  }, [contextMenuNode]);
+
+  const handlePaste = useCallback(() => {
+    toast.info(`Paste: ${contextMenuNode?.name ?? 'Unknown'}`);
+  }, [contextMenuNode]);
+
+  const handleDelete = useCallback(() => {
+    toast.info(`Delete: ${contextMenuNode?.name ?? 'Unknown'}`);
+  }, [contextMenuNode]);
+
+  const handleSpreadline = useCallback(() => {
+    toast.info(`Analytics > Spreadline: ${contextMenuNode?.name ?? 'Unknown'}`);
+  }, [contextMenuNode]);
+
+  // Handle right-click on nodes to open context menu
+  handleNodeContextMenuRef.current = (event: MouseEvent, node: GraphNode) => {
+    event.preventDefault();
+
+    const openMenu = () => {
+      setContextMenuNode(node);
+      if (contextMenuTriggerRef.current) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          // Position the invisible trigger at the mouse location
+          contextMenuTriggerRef.current.style.left = `${event.clientX - rect.left}px`;
+          contextMenuTriggerRef.current.style.top = `${event.clientY - rect.top}px`;
+          // Dispatch contextmenu event to open the Radix context menu
+          contextMenuTriggerRef.current.dispatchEvent(
+            new MouseEvent('contextmenu', {
+              bubbles: true,
+              clientX: event.clientX,
+              clientY: event.clientY
+            })
+          );
+        }
+      }
+    };
+
+    // If menu is already open, close it first then reopen at new position
+    if (contextMenuOpenRef.current) {
+      // Dispatch Escape to close the menu
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      setTimeout(openMenu, 150);
+    } else {
+      openMenu();
+    }
+  };
+
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
       <svg ref={svgRef} className="h-full w-full" />
+
+      {/* Context menu for nodes */}
+      <ContextMenu onOpenChange={open => (contextMenuOpenRef.current = open)}>
+        <ContextMenuTrigger asChild>
+          <div ref={contextMenuTriggerRef} className="pointer-events-none absolute h-1 w-1" />
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
+          <ContextMenuItem onClick={handleCopy}>
+            <Copy className="mr-2 h-4 w-4" />
+            Copy
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handlePaste}>
+            <ClipboardPaste className="mr-2 h-4 w-4" />
+            Paste
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={handleDelete}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Analytics
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-40">
+              <ContextMenuItem onClick={handleSpreadline}>
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Spreadline
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        </ContextMenuContent>
+      </ContextMenu>
 
       {/* Control buttons - lower right */}
       <div className="absolute right-4 bottom-4 flex flex-col gap-2">
