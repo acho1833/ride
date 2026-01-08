@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { ChevronDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import type { FileType } from '@/features/files/components/file-tree-context';
@@ -21,9 +21,48 @@ interface NewNodeForm {
   name: string;
 }
 
-const newNodeSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255, 'Name is too long')
-});
+// Characters not allowed in file names
+const INVALID_CHARS_REGEX = /[<>:"/\\|?*\s]/;
+
+/**
+ * Detects if the filename ends with a known extension.
+ * Returns the matching app ID or null if no match / invalid extension.
+ */
+function detectExtension(name: string): { appId: FileApplicationId; hasExtension: true } | { appId: null; hasExtension: boolean } {
+  const dotIndex = name.lastIndexOf('.');
+  if (dotIndex === -1 || dotIndex === name.length - 1) {
+    return { appId: null, hasExtension: false };
+  }
+  const extension = name.slice(dotIndex);
+  const matchingApp = FILE_APPLICATIONS.find(app => app.extension === extension);
+  if (matchingApp) {
+    return { appId: matchingApp.id, hasExtension: true };
+  }
+  return { appId: null, hasExtension: true };
+}
+
+/**
+ * Creates validation schema based on node type.
+ * Files have additional extension validation.
+ */
+function createNodeSchema(nodeType: FileType) {
+  return z.object({
+    name: z
+      .string()
+      .min(1, 'Name is required')
+      .max(255, 'Name is too long')
+      .refine(name => !INVALID_CHARS_REGEX.test(name), 'Invalid characters: spaces, < > : " / \\ | ? *')
+      .refine(
+        name => {
+          if (nodeType !== 'file') return true;
+          const { appId, hasExtension } = detectExtension(name);
+          // Valid if no extension typed, or if extension is valid
+          return !hasExtension || appId !== null;
+        },
+        { message: `Unsupported file type. Supported: ${FILE_APPLICATIONS.map(app => app.extension).join(', ')}` }
+      )
+  });
+}
 
 interface Props {
   open: boolean;
@@ -44,10 +83,11 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
   const lastFocusedGroup = useEditorGroup(lastFocusedGroupId ?? '');
 
   const [selectedAppId, setSelectedAppId] = useState<FileApplicationId>(DEFAULT_FILE_APPLICATION_ID);
+  const [hasTypedExtension, setHasTypedExtension] = useState(false);
   const [prevOpen, setPrevOpen] = useState(open);
 
   const form = useForm<NewNodeForm>({
-    resolver: zodResolver(newNodeSchema),
+    resolver: zodResolver(createNodeSchema(type)),
     defaultValues: { name: '' }
   });
 
@@ -55,10 +95,28 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
   if (open && !prevOpen) {
     form.reset({ name: '' });
     setSelectedAppId(DEFAULT_FILE_APPLICATION_ID);
+    setHasTypedExtension(false);
     setPrevOpen(true);
   } else if (!open && prevOpen) {
     setPrevOpen(false);
   }
+
+  // Watch name field for extension detection and auto-select (files only)
+  const nameValue = form.watch('name');
+  useEffect(() => {
+    if (type !== 'file') return;
+
+    const { appId, hasExtension } = detectExtension(nameValue);
+    setHasTypedExtension(hasExtension);
+
+    // Auto-select app when valid extension is typed
+    if (hasExtension && appId) {
+      setSelectedAppId(appId);
+    }
+
+    // Trigger validation to show/hide error state
+    form.trigger('name');
+  }, [nameValue, type, form]);
 
   // Focus input when dialog opens
   useEffect(() => {
@@ -115,12 +173,19 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
             <FormField
               control={form.control}
               name="name"
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <FormItem>
                   <FormControl>
-                    <Input placeholder={placeholder} {...field} />
+                    <div className="relative">
+                      <Input placeholder={placeholder} aria-invalid={!!fieldState.error} {...field} />
+                      {type === 'file' && !hasTypedExtension && field.value && (
+                        <span className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm">
+                          <span className="invisible">{field.value}</span>
+                          <span>{selectedApp.extension}</span>
+                        </span>
+                      )}
+                    </div>
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
