@@ -13,12 +13,7 @@ import { $createHeadingNode } from '@lexical/rich-text';
 import { $setBlocksType } from '@lexical/selection';
 import { Heading1, Heading2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const InsertMenuPlugin = () => {
   const [editor] = useLexicalComposerContext();
@@ -34,7 +29,7 @@ const InsertMenuPlugin = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-40">
+    <div className="fixed right-6 bottom-6 z-40">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button size="icon" className="size-12 rounded-full shadow-lg">

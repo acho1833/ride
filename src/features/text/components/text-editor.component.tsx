@@ -43,11 +43,7 @@ const TextEditorComponent = ({ fileId, fileName }: Props) => {
                 aria-label={`Text editor for ${fileName}`}
               />
             }
-            placeholder={
-              <div className="text-muted-foreground pointer-events-none absolute left-4 top-4">
-                {PLACEHOLDER_TEXT}
-              </div>
-            }
+            placeholder={<div className="text-muted-foreground pointer-events-none absolute top-4 left-4">{PLACEHOLDER_TEXT}</div>}
             ErrorBoundary={LexicalErrorBoundary}
           />
           <HistoryPlugin />
