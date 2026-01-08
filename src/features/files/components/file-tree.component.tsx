@@ -21,8 +21,10 @@
 
 'use client';
 
+import React from 'react';
 import type { TreeNode } from '@/models/user-file-tree.model';
-import { ChevronDownIcon, ChevronRightIcon, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon } from 'lucide-react';
+import { getFileIcon } from '@/const';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
@@ -160,7 +162,9 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
             {...dragAttributes}
             {...dragListeners}
           >
-            <FileIcon className={`h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
+            {React.createElement(getFileIcon(node.name), {
+              className: `h-4 w-4 shrink-0 ${isFileOpen ? 'text-primary' : 'text-muted-foreground'}`
+            })}
             <span className="text-sm">{node.name}</span>
           </div>
         </ContextMenuTrigger>

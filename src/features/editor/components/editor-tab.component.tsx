@@ -24,6 +24,7 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
+import { getFileIcon } from '@/const';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
@@ -157,6 +158,9 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
         >
           {/* Drop indicator line - shows before this tab */}
           {showDropIndicator && <div className="bg-primary absolute top-1 bottom-1 -left-0.5 w-0.5 rounded-full" />}
+
+          {/* File icon */}
+          {React.createElement(getFileIcon(file.name), { className: 'h-4 w-4 shrink-0' })}
 
           {/* File name */}
           <span className="truncate">{file.name}</span>
