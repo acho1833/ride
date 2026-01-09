@@ -179,7 +179,7 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
                     <div className="relative">
                       <Input placeholder={placeholder} aria-invalid={!!fieldState.error} {...field} />
                       {type === 'file' && !hasTypedExtension && field.value && (
-                        <span className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm">
+                        <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
                           <span className="invisible">{field.value}</span>
                           <span>{selectedApp.extension}</span>
                         </span>

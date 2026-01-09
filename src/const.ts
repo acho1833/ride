@@ -4,7 +4,7 @@
  * Centralized configuration values used throughout the application.
  */
 
-import { Share2, File } from 'lucide-react';
+import { Share2, File, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Base path prefix for all API routes */
@@ -19,6 +19,7 @@ export const IS_DEV = process.env.NODE_ENV === 'development';
  */
 export const FILE_APPLICATIONS = [
   { id: 'workspace', label: 'Workspace', extension: '.ws', iconName: 'Share2' },
+  { id: 'collaboration', label: 'Collaboration Graph', extension: '.gx', iconName: 'Users' },
   { id: 'text', label: 'Text Editor', extension: '.txt', iconName: 'File' }
 ] as const;
 
@@ -31,6 +32,7 @@ export const DEFAULT_FILE_APPLICATION_ID: FileApplicationId = 'workspace';
 /** Icon mapping for file applications */
 export const FILE_ICON_MAP: Record<string, LucideIcon> = {
   Share2,
+  Users,
   File
 };
 

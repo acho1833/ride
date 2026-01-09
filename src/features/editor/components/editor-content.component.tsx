@@ -7,6 +7,7 @@
 import React from 'react';
 import TextComponent from '@/features/text/components/text.component';
 import WorkspaceGraphComponent from '@/features/workspace/components/workspace-graph.component';
+import CollaborationGraphComponent from '@/features/collaboration-graph/components/collaboration-graph.component';
 
 interface Props {
   fileId: string;
@@ -32,6 +33,9 @@ const EditorContentComponent = ({ fileId, fileName }: Props) => {
   switch (extension) {
     case 'ws':
       return <WorkspaceGraphComponent fileId={fileId} fileName={fileName} />;
+
+    case 'gx':
+      return <CollaborationGraphComponent fileId={fileId} fileName={fileName} />;
 
     case 'txt':
       return <TextComponent fileId={fileId} fileName={fileName} />;
