@@ -85,6 +85,9 @@ export interface OpenFilesActions {
 
   // Focus
   setLastFocusedGroup: (groupId: GroupId) => void;
+
+  // Reset
+  resetOpenFilesState: () => void;
 }
 
 /** Combined open files store type */
@@ -666,6 +669,15 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       openFiles: {
         ...state.openFiles,
         lastFocusedGroupId: groupId
+      }
+    })),
+
+  // Reset to empty state (for project switching)
+  resetOpenFilesState: () =>
+    set(() => ({
+      openFiles: {
+        rows: [createRow()],
+        lastFocusedGroupId: null
       }
     }))
 });

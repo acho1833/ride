@@ -29,7 +29,7 @@ const InsertMenuPlugin = () => {
   };
 
   return (
-    <div className="fixed right-6 bottom-6 z-40">
+    <div className="fixed right-6 bottom-6 z-40 hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button size="icon" className="size-12 rounded-full shadow-lg">

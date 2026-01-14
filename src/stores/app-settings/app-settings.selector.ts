@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/stores/app.store';
 import { AppSettingsSlice } from './app-settings.store';
 import { ViewSettingKey, DEFAULT_VIEW_SETTINGS } from '@/models/view-settings.model';
+import { ProjectSlice } from '@/stores/projects/projects.store';
 
 // ============================================================================
 // State Selectors
@@ -19,12 +20,15 @@ export const useAppSettingsIsLoaded = (): boolean => useAppStore((state: AppSett
 /** Get the full app settings object */
 export const useAppSettingsData = () => useAppStore((state: AppSettingsSlice) => state.appSettings.data);
 
-/** Get the view settings record */
-export const useViewSettings = () => useAppStore((state: AppSettingsSlice) => state.appSettings.data?.view);
+/** Get the active project ID */
+export const useActiveProjectId = () => useAppStore((state: AppSettingsSlice) => state.appSettings.data?.activeProjectId ?? null);
+
+/** Get the view settings from current project (or defaults if no project) */
+export const useViewSettings = () => useAppStore((state: ProjectSlice) => state.project.currentProject?.view ?? DEFAULT_VIEW_SETTINGS);
 
 /** Get a specific view setting value with default fallback */
 export const useViewSetting = (key: ViewSettingKey): boolean =>
-  useAppStore((state: AppSettingsSlice): boolean => state.appSettings.data?.view[key] ?? DEFAULT_VIEW_SETTINGS[key]);
+  useAppStore((state: ProjectSlice): boolean => state.project.currentProject?.view[key] ?? DEFAULT_VIEW_SETTINGS[key]);
 
 // ============================================================================
 // Action Selector

@@ -8,9 +8,9 @@ const appSettingsSchema = new Schema<AppSettings>(
       required: true,
       unique: true
     },
-    view: {
-      type: Schema.Types.Mixed,
-      default: {}
+    activeProjectId: {
+      type: String,
+      default: null
     }
   },
   {

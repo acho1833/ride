@@ -24,12 +24,13 @@ export const filesRouter = appProcedure.router({
     .route({
       method: 'GET',
       path: API_FILES_PREFIX,
-      summary: 'Get user file tree',
+      summary: 'Get file tree for a project',
       tags
     })
+    .input(z.object({ projectId: z.string() }))
     .output(folderNodeOutputSchema)
-    .handler(async ({ context }) => {
-      return fileTreeService.getFileTree(context.sid);
+    .handler(async ({ context, input }) => {
+      return fileTreeService.getFileTree(context.sid, input.projectId);
     }),
 
   addNode: appProcedure
@@ -41,6 +42,7 @@ export const filesRouter = appProcedure.router({
     })
     .input(
       z.object({
+        projectId: z.string(),
         parentId: z.string(),
         name: z.string(),
         type: z.enum(['file', 'folder'])
@@ -48,7 +50,7 @@ export const filesRouter = appProcedure.router({
     )
     .output(treeNodeSchema)
     .handler(async ({ input, context }) => {
-      return fileTreeService.addNode(context.sid, input.parentId, input.name, input.type);
+      return fileTreeService.addNode(context.sid, input.projectId, input.parentId, input.name, input.type);
     }),
 
   deleteNode: appProcedure
@@ -58,10 +60,10 @@ export const filesRouter = appProcedure.router({
       summary: 'Delete a file or folder',
       tags
     })
-    .input(z.object({ nodeId: z.string() }))
+    .input(z.object({ projectId: z.string(), nodeId: z.string() }))
     .output(folderNodeOutputSchema)
     .handler(async ({ input, context }) => {
-      return fileTreeService.deleteNode(context.sid, input.nodeId);
+      return fileTreeService.deleteNode(context.sid, input.projectId, input.nodeId);
     }),
 
   renameNode: appProcedure
@@ -73,13 +75,14 @@ export const filesRouter = appProcedure.router({
     })
     .input(
       z.object({
+        projectId: z.string(),
         nodeId: z.string(),
         newName: z.string()
       })
     )
     .output(folderNodeOutputSchema)
     .handler(async ({ input, context }) => {
-      return fileTreeService.renameNode(context.sid, input.nodeId, input.newName);
+      return fileTreeService.renameNode(context.sid, input.projectId, input.nodeId, input.newName);
     }),
 
   moveNode: appProcedure
@@ -91,6 +94,7 @@ export const filesRouter = appProcedure.router({
     })
     .input(
       z.object({
+        projectId: z.string(),
         nodeId: z.string(),
         newParentId: z.string(),
         force: z.boolean().optional()
@@ -98,7 +102,7 @@ export const filesRouter = appProcedure.router({
     )
     .output(folderNodeOutputSchema)
     .handler(async ({ input, context }) => {
-      return fileTreeService.moveNode(context.sid, input.nodeId, input.newParentId, input.force);
+      return fileTreeService.moveNode(context.sid, input.projectId, input.nodeId, input.newParentId, input.force);
     }),
 
   reset: appProcedure
@@ -108,8 +112,9 @@ export const filesRouter = appProcedure.router({
       summary: 'Reset file tree to default (dev only)',
       tags
     })
+    .input(z.object({ projectId: z.string() }))
     .output(folderNodeOutputSchema)
-    .handler(async ({ context }) => {
-      return fileTreeService.resetFileTree(context.sid);
+    .handler(async ({ context, input }) => {
+      return fileTreeService.resetFileTree(context.sid, input.projectId);
     })
 });

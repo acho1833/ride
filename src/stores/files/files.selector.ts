@@ -44,6 +44,7 @@ export const useFileActions = () =>
       setFilesLoaded: state.setFilesLoaded,
       expandAllFolders: state.expandAllFolders,
       collapseAllFolders: state.collapseAllFolders,
-      revealFile: state.revealFile
+      revealFile: state.revealFile,
+      resetFileTreeState: state.resetFileTreeState
     }))
   );

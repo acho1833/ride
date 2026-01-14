@@ -36,6 +36,7 @@ export interface FileTreeActions {
   expandAllFolders: () => void;
   collapseAllFolders: () => void;
   revealFile: (fileId: string) => void;
+  resetFileTreeState: () => void;
 }
 
 /** Combined file tree store type */
@@ -180,5 +181,15 @@ export const createFileTreeSlice: StateCreator<FileTreeSlice, [], [], FileTreeSl
           openFolderIds: newOpenFolderIds
         }
       };
-    })
+    }),
+
+  resetFileTreeState: () =>
+    set(() => ({
+      files: {
+        structure: null,
+        selectedId: null,
+        openFolderIds: [],
+        isLoaded: false
+      }
+    }))
 });

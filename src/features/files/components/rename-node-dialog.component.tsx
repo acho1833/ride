@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useFileRenameMutation } from '@/features/files/hooks/useFileRenameMutation';
+import { useCurrentProject } from '@/stores/projects/projects.selector';
 
 // Form type and schema for rename
 interface RenameForm {
@@ -32,6 +33,7 @@ interface Props {
  */
 const RenameNodeDialogComponent = ({ open, nodeId, currentName, onClose }: Props) => {
   const { mutate: renameNode } = useFileRenameMutation();
+  const currentProject = useCurrentProject();
 
   const form = useForm<RenameForm>({
     resolver: zodResolver(renameSchema),
@@ -50,10 +52,11 @@ const RenameNodeDialogComponent = ({ open, nodeId, currentName, onClose }: Props
   }, [open, currentName, form]);
 
   const handleSubmit = (data: RenameForm) => {
+    if (!currentProject) return;
     const newName = data.name.trim();
     // Only call mutation if name changed
     if (newName !== currentName) {
-      renameNode({ nodeId, newName });
+      renameNode({ projectId: currentProject.id, nodeId, newName });
     }
     onClose();
   };

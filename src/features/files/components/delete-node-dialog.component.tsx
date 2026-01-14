@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useFileDeleteMutation } from '@/features/files/hooks/useFileDeleteMutation';
+import { useCurrentProject } from '@/stores/projects/projects.selector';
 
 interface Props {
   open: boolean;
@@ -18,9 +19,11 @@ interface Props {
  */
 const DeleteNodeDialogComponent = ({ open, nodeId, nodeName, nodeType, onClose }: Props) => {
   const { mutate: deleteNode } = useFileDeleteMutation();
+  const currentProject = useCurrentProject();
 
   const handleConfirm = () => {
-    deleteNode({ nodeId });
+    if (!currentProject) return;
+    deleteNode({ projectId: currentProject.id, nodeId });
     onClose();
   };
 

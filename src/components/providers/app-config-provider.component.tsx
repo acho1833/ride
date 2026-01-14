@@ -7,7 +7,8 @@ import { useAppConfigIsLoaded, useAppConfigActions } from '@/stores/app-config/a
 import { useAppSettingsQuery } from '@/features/app-settings/hooks/useAppSettingsQuery';
 import { useAppSettingsIsLoaded, useAppSettingsActions } from '@/stores/app-settings/app-settings.selector';
 import { useFileTreeQuery } from '@/features/files/hooks/useFileTreeQuery';
-import { useFilesIsLoaded, useFileActions } from '@/stores/files/files.selector';
+import { useFileActions } from '@/stores/files/files.selector';
+import { useCurrentProject } from '@/stores/projects/projects.selector';
 
 interface AppConfigProviderProps {
   children: ReactNode;
@@ -16,13 +17,14 @@ interface AppConfigProviderProps {
 const AppConfigProviderComponent = ({ children }: AppConfigProviderProps) => {
   const isAppConfigLoaded = useAppConfigIsLoaded();
   const isAppSettingsLoaded = useAppSettingsIsLoaded();
-  const isFilesLoaded = useFilesIsLoaded();
+  const currentProject = useCurrentProject();
   const { setAppConfig } = useAppConfigActions();
   const { setAppSettings } = useAppSettingsActions();
   const { setFileStructure, setFilesLoaded } = useFileActions();
 
   const { data: appConfigData, isSuccess: isAppConfigSuccess } = useAppConfigQuery();
   const { data: appSettingsData, isSuccess: isAppSettingsSuccess } = useAppSettingsQuery();
+  // File tree query is only enabled when a project is selected
   const { data: fileTreeData, isSuccess: isFileTreeSuccess } = useFileTreeQuery();
 
   useEffect(() => {
@@ -32,24 +34,19 @@ const AppConfigProviderComponent = ({ children }: AppConfigProviderProps) => {
     if (isAppSettingsSuccess && appSettingsData) {
       setAppSettings(appSettingsData);
     }
-    if (isFileTreeSuccess && fileTreeData) {
+  }, [isAppConfigSuccess, appConfigData, isAppSettingsSuccess, appSettingsData, setAppConfig, setAppSettings]);
+
+  // Load file tree when project is selected and data is available
+  useEffect(() => {
+    if (currentProject && isFileTreeSuccess && fileTreeData) {
       setFileStructure(fileTreeData);
       setFilesLoaded();
     }
-  }, [
-    isAppConfigSuccess,
-    appConfigData,
-    isAppSettingsSuccess,
-    appSettingsData,
-    isFileTreeSuccess,
-    fileTreeData,
-    setAppConfig,
-    setAppSettings,
-    setFileStructure,
-    setFilesLoaded
-  ]);
+  }, [currentProject, isFileTreeSuccess, fileTreeData, setFileStructure, setFilesLoaded]);
 
-  if (!isAppConfigLoaded || !isAppSettingsLoaded || !isFilesLoaded) {
+  // Only wait for app config and settings to load
+  // File tree loading depends on project selection (handled in main-view)
+  if (!isAppConfigLoaded || !isAppSettingsLoaded) {
     return (
       <div className="flex h-screen w-screen items-center justify-center">
         <div className="text-muted-foreground flex items-center gap-2">

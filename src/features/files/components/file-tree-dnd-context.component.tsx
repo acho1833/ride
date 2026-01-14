@@ -20,6 +20,7 @@ import { FILE_DND_CONFIG } from '@/features/files/const';
 import { isValidDropTarget, hasChildWithName } from '@/features/files/utils/drag-drop.utils';
 import { useFileMoveMutation } from '@/features/files/hooks/useFileMoveMutation';
 import MoveConfirmDialogComponent from '@/features/files/components/move-confirm-dialog.component';
+import { useCurrentProject } from '@/stores/projects/projects.selector';
 
 /** Data attached to draggable items */
 export interface FileDragData {
@@ -64,6 +65,7 @@ const FileTreeDndContextComponent = ({ children, fileStructure, openFolderIds, o
   const lastHoveredFolderRef = useRef<string | null>(null);
 
   const { mutate: moveFile } = useFileMoveMutation();
+  const currentProject = useCurrentProject();
 
   // SSR Guard: dnd-kit generates unique IDs that differ between server and client,
   // causing hydration mismatches. We defer DnD setup until after first client render.
@@ -176,7 +178,7 @@ const FileTreeDndContextComponent = ({ children, fileStructure, openFolderIds, o
       const overData = over?.data.current as FileDropData | undefined;
       const targetFolderId = overData?.folderId;
 
-      if (dragState && targetFolderId && isValidDropTarget(fileStructure, dragState.nodeId, targetFolderId)) {
+      if (dragState && targetFolderId && isValidDropTarget(fileStructure, dragState.nodeId, targetFolderId) && currentProject) {
         // Check for name conflict
         if (hasChildWithName(fileStructure, targetFolderId, dragState.nodeName)) {
           setPendingMove({
@@ -185,7 +187,7 @@ const FileTreeDndContextComponent = ({ children, fileStructure, openFolderIds, o
             targetFolderId
           });
         } else {
-          moveFile({ nodeId: dragState.nodeId, newParentId: targetFolderId });
+          moveFile({ projectId: currentProject.id, nodeId: dragState.nodeId, newParentId: targetFolderId });
         }
       }
 
@@ -193,7 +195,7 @@ const FileTreeDndContextComponent = ({ children, fileStructure, openFolderIds, o
       setDropTargetId(null);
       onDragStateChange(null, null);
     },
-    [dragState, fileStructure, moveFile, onDragStateChange, clearAutoExpandTimer]
+    [dragState, fileStructure, moveFile, onDragStateChange, clearAutoExpandTimer, currentProject]
   );
 
   const handleDragCancel = useCallback(() => {
@@ -205,15 +207,16 @@ const FileTreeDndContextComponent = ({ children, fileStructure, openFolderIds, o
   }, [onDragStateChange, clearAutoExpandTimer]);
 
   const handleConfirmMove = useCallback(() => {
-    if (pendingMove) {
+    if (pendingMove && currentProject) {
       moveFile({
+        projectId: currentProject.id,
         nodeId: pendingMove.nodeId,
         newParentId: pendingMove.targetFolderId,
         force: true
       });
       setPendingMove(null);
     }
-  }, [pendingMove, moveFile]);
+  }, [pendingMove, moveFile, currentProject]);
 
   const handleCancelMove = useCallback(() => {
     setPendingMove(null);

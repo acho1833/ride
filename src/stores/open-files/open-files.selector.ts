@@ -95,7 +95,8 @@ export const useOpenFilesActions = () =>
       moveFileToGroup: state.moveFileToGroup,
       moveFileToNewGroup: state.moveFileToNewGroup,
       reorderFile: state.reorderFile,
-      setLastFocusedGroup: state.setLastFocusedGroup
+      setLastFocusedGroup: state.setLastFocusedGroup,
+      resetOpenFilesState: state.resetOpenFilesState
     }))
   );
 

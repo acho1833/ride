@@ -20,6 +20,7 @@ export type TreeNode = FileNode | FolderNode;
 export interface UserFileTree {
   id: string;
   sid: string;
+  projectId: string;
   structure: FolderNode;
 }
 

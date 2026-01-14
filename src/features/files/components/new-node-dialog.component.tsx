@@ -14,6 +14,7 @@ import type { FileType } from '@/features/files/components/file-tree-context';
 import { useFileAddMutation } from '@/features/files/hooks/useFileAddMutation';
 import { useOpenFilesActions, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
 import { useFileActions } from '@/stores/files/files.selector';
+import { useCurrentProject } from '@/stores/projects/projects.selector';
 import { FILE_APPLICATIONS, FILE_ICON_MAP, DEFAULT_FILE_APPLICATION_ID, type FileApplicationId } from '@/const';
 
 // Form type and schema for new file/folder name
@@ -81,6 +82,7 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
   const { setSelectedFileId } = useFileActions();
   const lastFocusedGroupId = useLastFocusedGroupId();
   const lastFocusedGroup = useEditorGroup(lastFocusedGroupId ?? '');
+  const currentProject = useCurrentProject();
 
   const [selectedAppId, setSelectedAppId] = useState<FileApplicationId>(DEFAULT_FILE_APPLICATION_ID);
   const [hasTypedExtension, setHasTypedExtension] = useState(false);
@@ -139,8 +141,10 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
       name = `${name}${selectedApp.extension}`;
     }
 
+    if (!currentProject) return;
+
     try {
-      const createdNode = await addNodeAsync({ parentId, name, type });
+      const createdNode = await addNodeAsync({ projectId: currentProject.id, parentId, name, type });
 
       // Select the newly created node in the file tree
       setSelectedFileId(createdNode.id);

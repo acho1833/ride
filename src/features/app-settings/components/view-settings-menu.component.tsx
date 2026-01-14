@@ -4,16 +4,20 @@ import { DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, Dropdo
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
-import { useAppSettingsUpdateMutation } from '@/features/app-settings/hooks/useAppSettingsUpdateMutation';
+import { useProjectViewSettingsMutation } from '@/features/projects/hooks/useProjectViewSettingsMutation';
+import { useCurrentProject } from '@/stores/projects/projects.selector';
 import { ViewSettingKey, DEFAULT_VIEW_SETTINGS, VIEW_SETTINGS_BY_POSITION } from '@/models/view-settings.model';
 
 const ViewSettingsMenuComponent = () => {
   const viewSettings = useViewSettings();
-  const { mutate: updateSettings } = useAppSettingsUpdateMutation();
+  const currentProject = useCurrentProject();
+  const { mutate: updateProject } = useProjectViewSettingsMutation();
 
   const handleToggle = (key: ViewSettingKey, checked: boolean) => {
+    if (!currentProject) return;
     const currentView = viewSettings ?? DEFAULT_VIEW_SETTINGS;
-    updateSettings({
+    updateProject({
+      id: currentProject.id,
       view: {
         ...currentView,
         [key]: checked

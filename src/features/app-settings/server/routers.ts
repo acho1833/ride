@@ -31,6 +31,6 @@ export const appSettingsRouter = appProcedure.router({
     .output(appSettingsSchema)
     .handler(async ({ context, input }) => {
       const typedInput = input as AppSettingsUpdate;
-      return appSettingsService.updateAppSettings(context.sid, typedInput.view);
+      return appSettingsService.updateAppSettings(context.sid, typedInput);
     })
 });

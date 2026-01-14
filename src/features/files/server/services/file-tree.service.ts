@@ -3,19 +3,15 @@ import 'server-only';
 import { ORPCError } from '@orpc/server';
 import UserFileTreeCollection from '@/collections/user-file-tree.collection';
 import type { FolderNode, TreeNode } from '@/models/user-file-tree.model';
-import defaultFileTree from '@/features/files/server/default-file-tree.json';
 
 /**
- * Get user's file tree, creating default if none exists
+ * Get file tree for a project
  */
-export async function getFileTree(sid: string): Promise<FolderNode> {
-  let doc = await UserFileTreeCollection.findOne({ sid });
+export async function getFileTree(sid: string, projectId: string): Promise<FolderNode> {
+  const doc = await UserFileTreeCollection.findOne({ sid, projectId });
 
   if (!doc) {
-    doc = await UserFileTreeCollection.create({
-      sid,
-      structure: defaultFileTree as FolderNode
-    });
+    throw new ORPCError('NOT_FOUND', { message: 'File tree not found for this project' });
   }
 
   return doc.structure;
@@ -88,11 +84,11 @@ function renameNodeInTree(tree: FolderNode, nodeId: string, newName: string): Fo
 /**
  * Save updated tree to database
  */
-async function saveTree(sid: string, structure: FolderNode): Promise<FolderNode> {
-  const doc = await UserFileTreeCollection.findOneAndUpdate({ sid }, { $set: { structure } }, { new: true });
+async function saveTree(sid: string, projectId: string, structure: FolderNode): Promise<FolderNode> {
+  const doc = await UserFileTreeCollection.findOneAndUpdate({ sid, projectId }, { $set: { structure } }, { new: true });
 
   if (!doc) {
-    throw new ORPCError('BAD_REQUEST', { message: 'User file tree not found' });
+    throw new ORPCError('BAD_REQUEST', { message: 'File tree not found' });
   }
 
   return doc.structure;
@@ -101,8 +97,8 @@ async function saveTree(sid: string, structure: FolderNode): Promise<FolderNode>
 /**
  * Add a new node (file or folder)
  */
-export async function addNode(sid: string, parentId: string, name: string, type: 'file' | 'folder'): Promise<TreeNode> {
-  const currentTree = await getFileTree(sid);
+export async function addNode(sid: string, projectId: string, parentId: string, name: string, type: 'file' | 'folder'): Promise<TreeNode> {
+  const currentTree = await getFileTree(sid, projectId);
   const parent = findNode(currentTree, parentId);
 
   if (!parent || parent.type !== 'folder') {
@@ -121,7 +117,7 @@ export async function addNode(sid: string, parentId: string, name: string, type:
       : { id: crypto.randomUUID(), name, type: 'folder', children: [] };
 
   const newTree = addNodeToTree(currentTree, parentId, node);
-  await saveTree(sid, newTree);
+  await saveTree(sid, projectId, newTree);
 
   return node;
 }
@@ -129,8 +125,8 @@ export async function addNode(sid: string, parentId: string, name: string, type:
 /**
  * Delete a node
  */
-export async function deleteNode(sid: string, nodeId: string): Promise<FolderNode> {
-  const currentTree = await getFileTree(sid);
+export async function deleteNode(sid: string, projectId: string, nodeId: string): Promise<FolderNode> {
+  const currentTree = await getFileTree(sid, projectId);
 
   if (currentTree.id === nodeId) {
     throw new ORPCError('BAD_REQUEST', { message: 'Cannot delete root folder' });
@@ -142,14 +138,14 @@ export async function deleteNode(sid: string, nodeId: string): Promise<FolderNod
   }
 
   const newTree = removeNodeFromTree(currentTree, nodeId);
-  return saveTree(sid, newTree);
+  return saveTree(sid, projectId, newTree);
 }
 
 /**
  * Rename a node
  */
-export async function renameNode(sid: string, nodeId: string, newName: string): Promise<FolderNode> {
-  const currentTree = await getFileTree(sid);
+export async function renameNode(sid: string, projectId: string, nodeId: string, newName: string): Promise<FolderNode> {
+  const currentTree = await getFileTree(sid, projectId);
 
   const node = findNode(currentTree, nodeId);
   if (!node) {
@@ -157,15 +153,15 @@ export async function renameNode(sid: string, nodeId: string, newName: string): 
   }
 
   const newTree = renameNodeInTree(currentTree, nodeId, newName);
-  return saveTree(sid, newTree);
+  return saveTree(sid, projectId, newTree);
 }
 
 /**
  * Move a node to a new parent
  * @param force - If true, replace existing node with same name in destination
  */
-export async function moveNode(sid: string, nodeId: string, newParentId: string, force = false): Promise<FolderNode> {
-  const currentTree = await getFileTree(sid);
+export async function moveNode(sid: string, projectId: string, nodeId: string, newParentId: string, force = false): Promise<FolderNode> {
+  const currentTree = await getFileTree(sid, projectId);
 
   if (currentTree.id === nodeId) {
     throw new ORPCError('BAD_REQUEST', { message: 'Cannot move root folder' });
@@ -191,25 +187,31 @@ export async function moveNode(sid: string, nodeId: string, newParentId: string,
     const treeWithoutExisting = removeNodeFromTree(currentTree, existingNode.id);
     const treeWithoutNode = removeNodeFromTree(treeWithoutExisting, nodeId);
     const newTree = addNodeToTree(treeWithoutNode, newParentId, node);
-    return saveTree(sid, newTree);
+    return saveTree(sid, projectId, newTree);
   }
 
   // Remove from current location, add to new parent
   const treeWithoutNode = removeNodeFromTree(currentTree, nodeId);
   const newTree = addNodeToTree(treeWithoutNode, newParentId, node);
 
-  return saveTree(sid, newTree);
+  return saveTree(sid, projectId, newTree);
 }
 
 /**
- * Reset user's file tree to default (for dev tooling)
+ * Reset project's file tree to default (for dev tooling)
  */
-export async function resetFileTree(sid: string): Promise<FolderNode> {
+export async function resetFileTree(sid: string, projectId: string): Promise<FolderNode> {
+  const defaultFileTree = await import('@/features/files/server/default-file-tree.json');
+
   const doc = await UserFileTreeCollection.findOneAndUpdate(
-    { sid },
-    { structure: defaultFileTree as FolderNode },
-    { new: true, upsert: true }
+    { sid, projectId },
+    { structure: defaultFileTree.default as FolderNode },
+    { new: true }
   );
+
+  if (!doc) {
+    throw new ORPCError('NOT_FOUND', { message: 'File tree not found for this project' });
+  }
 
   return doc.structure;
 }
