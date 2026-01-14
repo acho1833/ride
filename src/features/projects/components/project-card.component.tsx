@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { getProjectColor } from '@/features/projects/const';
 import type { Project } from '@/models/project.model';
 
 interface Props {
@@ -19,26 +17,21 @@ interface Props {
 
 const ProjectCardComponent = ({ project, onOpen, onEdit, onDelete }: Props) => {
   const [isHovered, setIsHovered] = useState(false);
-  const initial = project.name.charAt(0).toUpperCase();
-  const colorClass = getProjectColor(project.name);
 
   return (
     <div
-      className={cn('flex cursor-pointer items-center gap-4 rounded-lg border p-4 transition-colors', 'hover:bg-accent/50')}
+      className={cn('flex cursor-pointer items-center gap-3 rounded-lg border p-2 transition-colors', 'hover:bg-accent/50')}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onOpen(project)}
     >
-      <Avatar className="size-10">
-        <AvatarFallback className={cn(colorClass, 'font-semibold text-white')}>{initial}</AvatarFallback>
-      </Avatar>
-
       <div className="min-w-0 flex-1">
         <div className="font-medium">{project.name}</div>
         {project.description && <div className="text-muted-foreground truncate text-sm">{project.description}</div>}
-        <div className="text-muted-foreground text-xs">
-          Opened {formatDistanceToNow(new Date(project.lastOpenedAt), { addSuffix: true })}
-        </div>
+      </div>
+
+      <div className="text-muted-foreground text-xs whitespace-nowrap">
+        {formatDistanceToNow(new Date(project.lastOpenedAt), { addSuffix: true })}
       </div>
 
       <DropdownMenu>

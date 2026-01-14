@@ -18,8 +18,9 @@ export const useProjectCreateMutation = () => {
         });
         toast.success('Project created', { id: context?.toastId });
       },
-      onError: (_error, _variables, context) => {
-        toast.error('Failed to create project', { id: context?.toastId });
+      onError: (error, _variables, context) => {
+        const message = error.message || 'Failed to create project';
+        toast.error(message, { id: context?.toastId });
       }
     })
   );

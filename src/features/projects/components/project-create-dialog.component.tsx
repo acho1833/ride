@@ -24,7 +24,7 @@ interface ProjectFormData {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: ProjectFormData) => void;
+  onSubmit: (data: ProjectFormData) => Promise<void>;
   editProject?: Project | null;
   isPending: boolean;
 }
@@ -50,8 +50,13 @@ const ProjectCreateDialogComponent = ({ open, onOpenChange, onSubmit, editProjec
     }
   }, [open, editProject, form]);
 
-  const handleSubmit = (data: ProjectFormData) => {
-    onSubmit(data);
+  const handleSubmit = async (data: ProjectFormData) => {
+    try {
+      await onSubmit(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An error occurred';
+      form.setError('name', { type: 'manual', message });
+    }
   };
 
   return (
@@ -69,11 +74,11 @@ const ProjectCreateDialogComponent = ({ open, onOpenChange, onSubmit, editProjec
             <FormField
               control={form.control}
               name="name"
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="My Project" {...field} />
+                    <Input placeholder="My Project" aria-invalid={!!fieldState.error} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

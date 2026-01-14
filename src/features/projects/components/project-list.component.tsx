@@ -10,6 +10,7 @@ import type { Project } from '@/models/project.model';
 
 interface Props {
   projects: Project[];
+  currentProjectId: string | null;
   isLoading: boolean;
   onOpenProject: (project: Project) => void;
   onEditProject: (project: Project) => void;
@@ -17,16 +18,28 @@ interface Props {
   onCreateProject: () => void;
 }
 
-const ProjectListComponent = ({ projects, isLoading, onOpenProject, onEditProject, onDeleteProject, onCreateProject }: Props) => {
+const ProjectListComponent = ({
+  projects,
+  currentProjectId,
+  isLoading,
+  onOpenProject,
+  onEditProject,
+  onDeleteProject,
+  onCreateProject
+}: Props) => {
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Filter out the current project and apply search
   const filteredProjects = useMemo(() => {
-    if (!searchQuery.trim()) return projects;
-    const query = searchQuery.toLowerCase();
-    return projects.filter(p => p.name.toLowerCase().includes(query) || p.description?.toLowerCase().includes(query));
-  }, [projects, searchQuery]);
+    let filtered = projects.filter(p => p.id !== currentProjectId);
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => p.name.toLowerCase().includes(query) || p.description?.toLowerCase().includes(query));
+    }
+    return filtered;
+  }, [projects, currentProjectId, searchQuery]);
 
-  const hasProjects = projects.length > 0;
+  const hasProjects = filteredProjects.length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -20,24 +20,20 @@ const ProjectMenuComponent = () => {
 
   // Create dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const { mutate: createProject, isPending: isCreating } = useProjectCreateMutation();
+  const { mutateAsync: createProjectAsync, isPending: isCreating } = useProjectCreateMutation();
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { mutate: deleteProject, isPending: isDeleting } = useProjectDeleteMutation();
 
-  const handleCreate = (data: { name: string; description: string }) => {
-    createProject(data, {
-      onSuccess: newProject => {
-        console.log('[ProjectMenu] Project created:', newProject.id);
-        setCreateDialogOpen(false);
-        // Set loading state (also resets file tree and open files state)
-        setProjectLoading(true);
-        // Set the new project directly - no need to call openProject
-        // since we already have the full project data
-        setCurrentProject(newProject);
-      }
-    });
+  const handleCreate = async (data: { name: string; description: string }) => {
+    const newProject = await createProjectAsync(data);
+    setCreateDialogOpen(false);
+    // Set loading state (also resets file tree and open files state)
+    setProjectLoading(true);
+    // Set the new project directly - no need to call openProject
+    // since we already have the full project data
+    setCurrentProject(newProject);
   };
 
   const handleOpen = () => {

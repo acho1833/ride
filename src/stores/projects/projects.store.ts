@@ -47,12 +47,10 @@ const initialProjectState: ProjectState['project'] = {
  * Uses the full store type to access file tree and open files slices
  * for automatic cleanup when project is cleared.
  */
-export const createProjectSlice: StateCreator<
-  ProjectSlice & FileTreeSlice & OpenFilesSlice & AppSettingsSlice,
-  [],
-  [],
-  ProjectSlice
-> = (set, get) => ({
+export const createProjectSlice: StateCreator<ProjectSlice & FileTreeSlice & OpenFilesSlice & AppSettingsSlice, [], [], ProjectSlice> = (
+  set,
+  get
+) => ({
   project: initialProjectState,
 
   setCurrentProject: (currentProject: Project | null) => {
