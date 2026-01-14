@@ -13,7 +13,8 @@
     "format-staged": "pretty-quick --staged",
     "test": "jest",
     "test:watch": "jest --watch",
-    "mongo-gui": "mongo-gui -p 3091 -u \"mongodb://root:password@localhost:27017/?authMechanism=DEFAULT\""
+    "mongo-gui": "mongo-gui -p 3091 -u \"mongodb://root:password@localhost:27017/?authMechanism=DEFAULT\"",
+    "db:reset": "tsx scripts/db-reset.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

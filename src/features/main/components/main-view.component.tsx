@@ -11,7 +11,8 @@ import QuickOpenComponent from '@/features/quick-open/components/quick-open.comp
 import ProjectSelectorViewComponent from '@/features/projects/views/project-selector-view.component';
 import { useToolbarMode, useUiActions } from '@/stores/ui/ui.selector';
 import { useViewSettings, useActiveProjectId } from '@/stores/app-settings/app-settings.selector';
-import { useProjectActions, useCurrentProject } from '@/stores/projects/projects.selector';
+import { useProjectActions, useCurrentProject, useProjectLoading } from '@/stores/projects/projects.selector';
+import { useFilesIsLoaded } from '@/stores/files/files.selector';
 import { useProjectsQuery } from '@/features/projects/hooks/useProjectsQuery';
 import { useProjectQuery } from '@/features/projects/hooks/useProjectQuery';
 import {
@@ -32,6 +33,27 @@ const MainView = () => {
   const { setProjectModalOpen, setCurrentProject } = useProjectActions();
   const { isLoading: isLoadingProjects } = useProjectsQuery();
   const { data: activeProject } = useProjectQuery(activeProjectId ?? '');
+
+  // Fetch projects list to validate current project still exists
+  const { data: projects = [] } = useProjectsQuery();
+
+  // Clear stale project if it no longer exists in the database
+  useEffect(() => {
+    if (isLoadingProjects) return;
+
+    // If we have a currentProject but it's not in the projects list, clear it
+    if (currentProject) {
+      const projectExists = projects.some(p => p.id === currentProject.id);
+      if (!projectExists) {
+        // Clear current project - use setTimeout to batch updates and avoid
+        // React update depth issues with Radix UI components
+        // Note: setCurrentProject(null) automatically resets file tree and open files state
+        setTimeout(() => {
+          setCurrentProject(null);
+        }, 0);
+      }
+    }
+  }, [currentProject, projects, isLoadingProjects, setCurrentProject]);
 
   // Show modal if no project is loaded
   useEffect(() => {
@@ -77,6 +99,32 @@ const MainView = () => {
       }
     });
   }, [viewSettings, toolbarMode, toggleToolbar]);
+
+  // Check if files are loaded
+  const isFilesLoaded = useFilesIsLoaded();
+  const isProjectLoading = useProjectLoading();
+
+  console.log('[MainView] state:', { currentProject: currentProject?.id, isFilesLoaded, isProjectLoading });
+
+  // Show blank screen only during explicit project switching
+  if (isProjectLoading) {
+    return null;
+  }
+
+  // Show project selector if no project is selected
+  if (!currentProject) {
+    return <ProjectSelectorViewComponent />;
+  }
+
+  // Wait for files to load before rendering IDE
+  // This prevents rendering the IDE with an empty file tree on page refresh
+  if (!isFilesLoaded) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="text-muted-foreground">Loading project...</div>
+      </div>
+    );
+  }
 
   return (
     <>

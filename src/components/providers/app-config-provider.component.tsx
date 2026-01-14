@@ -8,7 +8,6 @@ import { useAppSettingsQuery } from '@/features/app-settings/hooks/useAppSetting
 import { useAppSettingsIsLoaded, useAppSettingsActions } from '@/stores/app-settings/app-settings.selector';
 import { useFileTreeQuery } from '@/features/files/hooks/useFileTreeQuery';
 import { useFileActions } from '@/stores/files/files.selector';
-import { useCurrentProject } from '@/stores/projects/projects.selector';
 
 interface AppConfigProviderProps {
   children: ReactNode;
@@ -17,7 +16,6 @@ interface AppConfigProviderProps {
 const AppConfigProviderComponent = ({ children }: AppConfigProviderProps) => {
   const isAppConfigLoaded = useAppConfigIsLoaded();
   const isAppSettingsLoaded = useAppSettingsIsLoaded();
-  const currentProject = useCurrentProject();
   const { setAppConfig } = useAppConfigActions();
   const { setAppSettings } = useAppSettingsActions();
   const { setFileStructure, setFilesLoaded } = useFileActions();
@@ -25,7 +23,9 @@ const AppConfigProviderComponent = ({ children }: AppConfigProviderProps) => {
   const { data: appConfigData, isSuccess: isAppConfigSuccess } = useAppConfigQuery();
   const { data: appSettingsData, isSuccess: isAppSettingsSuccess } = useAppSettingsQuery();
   // File tree query is only enabled when a project is selected
-  const { data: fileTreeData, isSuccess: isFileTreeSuccess } = useFileTreeQuery();
+  const { data: fileTreeData, isSuccess: isFileTreeSuccess, isFetching, isLoading, status } = useFileTreeQuery();
+
+  console.log('[AppConfigProvider] fileTreeQuery:', { isFileTreeSuccess, isFetching, isLoading, status, hasData: !!fileTreeData });
 
   useEffect(() => {
     if (isAppConfigSuccess && appConfigData) {
@@ -38,11 +38,13 @@ const AppConfigProviderComponent = ({ children }: AppConfigProviderProps) => {
 
   // Load file tree when project is selected and data is available
   useEffect(() => {
-    if (currentProject && isFileTreeSuccess && fileTreeData) {
+    console.log('[AppConfigProvider] fileTree effect:', { isFileTreeSuccess, hasData: !!fileTreeData });
+    if (isFileTreeSuccess && fileTreeData) {
+      console.log('[AppConfigProvider] Setting file structure and marking loaded');
       setFileStructure(fileTreeData);
       setFilesLoaded();
     }
-  }, [currentProject, isFileTreeSuccess, fileTreeData, setFileStructure, setFilesLoaded]);
+  }, [isFileTreeSuccess, fileTreeData, setFileStructure, setFilesLoaded]);
 
   // Only wait for app config and settings to load
   // File tree loading depends on project selection (handled in main-view)

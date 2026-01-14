@@ -6,8 +6,11 @@ export const useFileTreeQuery = () => {
   const currentProject = useCurrentProject();
   const projectId = currentProject?.id ?? '';
 
+  console.log('[useFileTreeQuery] projectId:', projectId, 'enabled:', !!projectId);
+
   return useQuery({
     ...orpc.files.getTree.queryOptions({ input: { projectId } }),
-    enabled: !!projectId
+    enabled: !!projectId,
+    refetchOnMount: 'always'
   });
 };

@@ -21,15 +21,13 @@ interface Props {
 }
 
 const ProjectDeleteDialogComponent = ({ open, onOpenChange, project, onConfirm, isPending }: Props) => {
-  if (!project) return null;
-
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open && !!project} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Project</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete &quot;{project.name}&quot;? This will permanently delete the project and all its files. This
+            Are you sure you want to delete &quot;{project?.name}&quot;? This will permanently delete the project and all its files. This
             action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>

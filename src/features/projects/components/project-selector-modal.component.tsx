@@ -1,6 +1,6 @@
 'use client';
 
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useProjectsQuery } from '@/features/projects/hooks/useProjectsQuery';
 import { useProjectModalOpen, useProjectActions } from '@/stores/projects/projects.selector';
 
@@ -26,7 +26,9 @@ const ProjectSelectorModalComponent = ({ children }: Props) => {
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="h-[80vh] max-w-4xl gap-0 p-0"
+        aria-describedby={undefined}
+        className="h-[80vh] max-w-5xl gap-0 p-0 sm:max-w-5xl"
+        showCloseButton={hasProjects}
         onEscapeKeyDown={e => {
           if (!hasProjects) {
             e.preventDefault();
@@ -43,6 +45,7 @@ const ProjectSelectorModalComponent = ({ children }: Props) => {
           }
         }}
       >
+        <DialogTitle className="sr-only">Select Project</DialogTitle>
         {children}
       </DialogContent>
     </Dialog>

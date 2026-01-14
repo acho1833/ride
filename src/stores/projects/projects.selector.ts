@@ -21,6 +21,9 @@ export const useProjectModalOpen = () => useAppStore((state: ProjectSlice) => st
 /** Check if a project is loaded */
 export const useHasProject = () => useAppStore((state: ProjectSlice) => state.project.currentProject !== null);
 
+/** Check if project is loading (switching projects) */
+export const useProjectLoading = () => useAppStore((state: ProjectSlice) => state.project.isLoading);
+
 // ============================================================================
 // Action Selector
 // ============================================================================
@@ -31,6 +34,7 @@ export const useProjectActions = () =>
     useShallow((state: ProjectSlice) => ({
       setCurrentProject: state.setCurrentProject,
       setProjectModalOpen: state.setProjectModalOpen,
+      setProjectLoading: state.setProjectLoading,
       resetProjectState: state.resetProjectState
     }))
   );

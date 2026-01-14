@@ -13,9 +13,8 @@ export const useProjectDeleteMutation = () => {
         return { toastId: toast.loading('Deleting project...') };
       },
       onSuccess: async (_data, _variables, context) => {
-        await queryClient.invalidateQueries({
-          queryKey: orpc.project.getAll.key()
-        });
+        // Invalidate projects list to refresh it
+        await queryClient.invalidateQueries({ queryKey: orpc.project.getAll.key() });
         toast.success('Project deleted', { id: context?.toastId });
       },
       onError: (_error, _variables, context) => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,28 +35,27 @@ const ProjectCreateDialogComponent = ({ open, onOpenChange, onSubmit, editProjec
   const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectFormSchema),
     defaultValues: {
-      name: editProject?.name ?? '',
-      description: editProject?.description ?? ''
+      name: '',
+      description: ''
     }
   });
 
-  // Reset form when dialog opens/closes or editProject changes
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen) {
+  // Reset form when dialog opens or editProject changes
+  useEffect(() => {
+    if (open) {
       form.reset({
         name: editProject?.name ?? '',
         description: editProject?.description ?? ''
       });
     }
-    onOpenChange(newOpen);
-  };
+  }, [open, editProject, form]);
 
   const handleSubmit = (data: ProjectFormData) => {
     onSubmit(data);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Project' : 'Create New Project'}</DialogTitle>
@@ -95,7 +95,7 @@ const ProjectCreateDialogComponent = ({ open, onOpenChange, onSubmit, editProjec
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>

@@ -289,16 +289,7 @@ const EditorTabsComponent = ({ groupId }: Props) => {
   // Empty group shows a placeholder drop zone. This can happen briefly during cleanup
   // transitions or when all tabs are closed but the group hasn't been removed yet.
   if (files.length === 0) {
-    return (
-      <div
-        className={`bg-muted/30 flex h-9 items-center border-b ${fileTreeDropIndex !== null ? 'ring-primary ring-2 ring-inset' : ''}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <div className="text-muted-foreground flex flex-1 items-center justify-center text-xs">Drop files here</div>
-      </div>
-    );
+    return null;
   }
 
   // Check if file tree drop indicator should show at end

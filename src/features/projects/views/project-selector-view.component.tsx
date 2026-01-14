@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import ProjectSelectorModalComponent from '@/features/projects/components/project-selector-modal.component';
 import ProjectSelectorNavComponent from '@/features/projects/components/project-selector-nav.component';
 import ProjectListComponent from '@/features/projects/components/project-list.component';
@@ -12,14 +11,11 @@ import { useProjectCreateMutation } from '@/features/projects/hooks/useProjectCr
 import { useProjectUpdateMutation } from '@/features/projects/hooks/useProjectUpdateMutation';
 import { useProjectDeleteMutation } from '@/features/projects/hooks/useProjectDeleteMutation';
 import { useProjectOpenMutation } from '@/features/projects/hooks/useProjectOpenMutation';
-import { useProjectActions } from '@/stores/projects/projects.selector';
-import { useFileActions } from '@/stores/files/files.selector';
-import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
+import { useProjectActions, useCurrentProject } from '@/stores/projects/projects.selector';
 import type { Project } from '@/models/project.model';
 import type { ModalSection } from '@/features/projects/types';
 
 const ProjectSelectorViewComponent = () => {
-  const queryClient = useQueryClient();
   const [activeSection, setActiveSection] = useState<ModalSection>('projects');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
@@ -35,26 +31,17 @@ const ProjectSelectorViewComponent = () => {
   const { mutate: openProject } = useProjectOpenMutation();
 
   // Actions
-  const { setCurrentProject, setProjectModalOpen } = useProjectActions();
-  const { resetFileTreeState } = useFileActions();
-  const { resetOpenFilesState } = useOpenFilesActions();
+  const currentProject = useCurrentProject();
+  const { setCurrentProject, setProjectModalOpen, setProjectLoading } = useProjectActions();
 
   const handleOpenProject = (project: Project) => {
-    // Reset state before opening new project
-    resetFileTreeState();
-    resetOpenFilesState();
-    queryClient.clear();
-
-    // Open project and update state
-    openProject(
-      { id: project.id },
-      {
-        onSuccess: openedProject => {
-          setCurrentProject(openedProject);
-          setProjectModalOpen(false);
-        }
-      }
-    );
+    setProjectModalOpen(false);
+    // Set loading state (also resets file tree and open files state)
+    setProjectLoading(true);
+    // Set the project directly - we already have the full project data
+    setCurrentProject(project);
+    // Update lastOpenedAt on server (fire and forget)
+    openProject({ id: project.id });
   };
 
   const handleCreateProject = (data: { name: string; description: string }) => {
@@ -81,11 +68,17 @@ const ProjectSelectorViewComponent = () => {
 
   const handleDeleteProject = () => {
     if (!deleteProject) return;
+    const isDeletingCurrentProject = currentProject?.id === deleteProject.id;
+
     deleteProjectMutation(
       { id: deleteProject.id },
       {
         onSuccess: () => {
           setDeleteProject(null);
+          // If deleting the current project, clear state
+          if (isDeletingCurrentProject) {
+            setCurrentProject(null);
+          }
         }
       }
     );
@@ -94,7 +87,7 @@ const ProjectSelectorViewComponent = () => {
   return (
     <>
       <ProjectSelectorModalComponent>
-        <div className="flex h-full">
+        <div className="flex h-full min-h-0 overflow-hidden">
           <ProjectSelectorNavComponent activeSection={activeSection} onSectionChange={setActiveSection} />
 
           {activeSection === 'projects' && (

@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import ProjectMenuComponent from '@/features/projects/components/project-menu.component';
 import ViewSettingsMenuComponent from './view-settings-menu.component';
 
 const AppSettingsMenuComponent = () => {
@@ -22,6 +23,7 @@ const AppSettingsMenuComponent = () => {
         </TooltipContent>
       </Tooltip>
       <DropdownMenuContent side="right" align="start">
+        <ProjectMenuComponent />
         <ViewSettingsMenuComponent />
       </DropdownMenuContent>
     </DropdownMenu>

@@ -29,7 +29,7 @@ const ProjectListComponent = ({ projects, isLoading, onOpenProject, onEditProjec
   const hasProjects = projects.length > 0;
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Header with search and create button */}
       <div className="flex items-center gap-4 border-b p-4">
         <div className="relative flex-1">
@@ -43,7 +43,7 @@ const ProjectListComponent = ({ projects, isLoading, onOpenProject, onEditProjec
       </div>
 
       {/* Project list or empty state */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-4">
           {isLoading ? (
             <div className="text-muted-foreground py-8 text-center">Loading projects...</div>
