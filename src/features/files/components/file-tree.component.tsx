@@ -28,6 +28,7 @@ import { getFileIcon } from '@/const';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
+import { useCurrentProject } from '@/stores/projects/projects.selector';
 import { FILE_TREE_MIME_TYPE } from '@/features/editor/const';
 import { useFileTreeContext } from '@/features/files/components/file-tree-context';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -75,6 +76,9 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
     draggedNodeId,
     dropTargetFolderId
   } = useFileTreeContext();
+
+  // Get project name for root folder display
+  const currentProject = useCurrentProject();
 
   const isOpen = openFolderIds.includes(node.id);
   const isFileOpen = node.type === 'file' && openFileIds.has(node.id);
@@ -210,7 +214,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
               ) : (
                 <FolderIcon className="text-muted-foreground h-4 w-4 shrink-0" />
               )}
-              <span className="text-sm font-medium">{node.name}</span>
+              <span className="text-sm font-medium">{isRoot && currentProject ? currentProject.name : node.name}</span>
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
