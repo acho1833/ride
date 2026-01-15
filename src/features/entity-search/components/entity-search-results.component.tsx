@@ -26,8 +26,8 @@ const EntitySearchResultsComponent = ({ entities, isLoading }: Props) => {
 
   // Results list
   return (
-    <ScrollArea className="flex-1">
-      <div className="flex flex-col gap-y-1 pr-2">
+    <ScrollArea className="min-h-0 flex-1">
+      <div className="flex flex-col gap-y-2 pr-2">
         {entities.map(entity => (
           <EntityCardComponent key={entity.id} entity={entity} />
         ))}

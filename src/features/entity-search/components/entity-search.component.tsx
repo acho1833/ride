@@ -83,7 +83,7 @@ const EntitySearchComponent = ({ pos }: Props) => {
 
         {/* Results section (only shown after first search) */}
         {search.hasSearched && (
-          <>
+          <div className="flex min-h-0 flex-1 flex-col gap-y-2">
             {/* Toolbar with pagination and sort (always visible on top of results) */}
             <EntitySearchToolbarComponent
               pageNumber={data?.pageNumber ?? 1}
@@ -96,7 +96,7 @@ const EntitySearchComponent = ({ pos }: Props) => {
 
             {/* Results list */}
             <EntitySearchResultsComponent entities={data?.entities ?? []} isLoading={isPending} />
-          </>
+          </div>
         )}
       </div>
     </MainPanelsComponent>
