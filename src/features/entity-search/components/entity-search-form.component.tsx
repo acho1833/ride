@@ -50,6 +50,7 @@ const EntitySearchFormComponent = ({ onSearch }: Props) => {
   });
 
   // Watch types for reactive UI updates
+  // eslint-disable-next-line react-hooks/incompatible-library -- watch() is required for reactive form state; no memoization-safe alternative exists
   const selectedTypes = form.watch('types');
 
   // Handle form submission

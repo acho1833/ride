@@ -104,6 +104,7 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
   }
 
   // Watch name field for extension detection and auto-select (files only)
+  // eslint-disable-next-line react-hooks/incompatible-library -- watch() is required for reactive form state; no memoization-safe alternative exists
   const nameValue = form.watch('name');
   useEffect(() => {
     if (type !== 'file') return;
