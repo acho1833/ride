@@ -8,6 +8,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import 'remixicon/fonts/remixicon.css';
 import { ReactNode } from 'react';
 import Providers from '@/components/providers/providers';
 
