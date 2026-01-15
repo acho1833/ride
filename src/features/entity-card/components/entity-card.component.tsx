@@ -22,11 +22,11 @@ const EntityCardComponent = ({ entity, className, onClick }: Props) => {
   const iconClass = getEntityIconClass(entity.type);
 
   return (
-    <Card className={cn('hover:bg-accent cursor-pointer p-2', className)} onClick={() => onClick?.(entity)}>
+    <Card className={cn('hover:bg-accent cursor-pointer overflow-hidden p-2', className)} onClick={() => onClick?.(entity)}>
       {/* Header: icon + name */}
-      <div className="flex items-center gap-x-2 border-b pb-1">
+      <div className="flex min-w-0 items-center gap-x-2 border-b pb-1">
         <i className={cn('text-muted-foreground flex-shrink-0 text-base', iconClass)} />
-        <span className="truncate font-medium">{entity.labelNormalized}</span>
+        <span className="min-w-0 truncate font-medium">{entity.labelNormalized}</span>
       </div>
 
       {/* Content area (for future details) */}

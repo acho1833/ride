@@ -21,7 +21,7 @@ const MainPanelsComponent = ({ children, title, pos, tools }: Props) => {
   };
 
   return (
-    <div className="bg-background group flex h-full w-full flex-col rounded-xl p-1">
+    <div className="bg-background group flex h-full w-full flex-col overflow-hidden rounded-xl p-1">
       {title && pos && (
         <div className="flex flex-col gap-y-1">
           <div className="flex justify-between gap-y-1">

@@ -1,23 +1,27 @@
 import 'server-only';
 
+import { faker } from '@faker-js/faker';
 import { EntityResponse } from '@/models/entity-response.model';
 import { EntitySearchParams, EntitySearchMockResponse } from '../../types';
+
+/** Random seed for deterministic fake data generation */
+const FAKER_SEED = 12345;
 
 /** Mock entity types - in production this would come from external API */
 const MOCK_ENTITY_TYPES = ['Person', 'Organization'];
 
 /**
- * Generates deterministic mock entity data.
- * Creates entities with predictable names like "Person 1", "Organization 1".
- * This ensures the same data is returned on every call (no randomness).
+ * Generates deterministic mock entity data using faker.
+ * Uses a fixed seed so the same data is returned on every call.
  */
 function generateMockEntities(personCount: number, orgCount: number): EntityResponse[] {
+  faker.seed(FAKER_SEED);
   const entities: EntityResponse[] = [];
 
   for (let i = 1; i <= personCount; i++) {
     entities.push({
       id: `person-${i}`,
-      labelNormalized: `Person ${i}`,
+      labelNormalized: faker.person.fullName(),
       type: 'Person'
     });
   }
@@ -25,7 +29,7 @@ function generateMockEntities(personCount: number, orgCount: number): EntityResp
   for (let i = 1; i <= orgCount; i++) {
     entities.push({
       id: `org-${i}`,
-      labelNormalized: `Organization ${i}`,
+      labelNormalized: faker.company.name(),
       type: 'Organization'
     });
   }
@@ -33,8 +37,8 @@ function generateMockEntities(personCount: number, orgCount: number): EntityResp
   return entities;
 }
 
-/** In-memory mock data: 75 Person + 75 Organization = 150 total entities */
-const MOCK_ENTITIES = generateMockEntities(75, 75);
+/** In-memory mock data: 300 Person + 300 Organization = 600 total entities */
+const MOCK_ENTITIES = generateMockEntities(300, 300);
 
 /**
  * Checks if entity label matches the search pattern.
