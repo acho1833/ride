@@ -46,10 +46,7 @@ const MOCK_ENTITIES = generateMockEntities(75, 75);
 export async function searchEntities(params: EntitySearchParams): Promise<EntitySearchMockResponse> {
   let filtered = [...MOCK_ENTITIES];
 
-  // Filter by name (case-sensitive contains match) - name is required
-  if (params.name.trim() === '') {
-    throw new Error('Name parameter is required and cannot be empty');
-  }
+  // Filter by name (case-sensitive contains match)
   filtered = filtered.filter((e) => e.labelNormalized.includes(params.name));
 
   // Filter by types (empty array = show all)
