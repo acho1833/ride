@@ -19,14 +19,7 @@ interface Props {
  * Layout: [Result count] [Prev/Next] [Sort toggle]
  * Displayed at the top of search results (always visible).
  */
-const EntitySearchToolbarComponent = ({
-  pageNumber,
-  pageSize,
-  totalCount,
-  sortDirection,
-  onPageChange,
-  onSortChange
-}: Props) => {
+const EntitySearchToolbarComponent = ({ pageNumber, pageSize, totalCount, sortDirection, onPageChange, onSortChange }: Props) => {
   // Calculate pagination info
   const totalPages = Math.ceil(totalCount / pageSize);
   const startItem = totalCount === 0 ? 0 : (pageNumber - 1) * pageSize + 1;
@@ -51,22 +44,10 @@ const EntitySearchToolbarComponent = ({
       {/* Navigation and sort buttons */}
       <div className="flex items-center gap-x-1">
         {/* Pagination buttons */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          disabled={!canGoPrev}
-          onClick={() => onPageChange(pageNumber - 1)}
-        >
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" disabled={!canGoPrev} onClick={() => onPageChange(pageNumber - 1)}>
           <ChevronLeftIcon className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          disabled={!canGoNext}
-          onClick={() => onPageChange(pageNumber + 1)}
-        >
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" disabled={!canGoNext} onClick={() => onPageChange(pageNumber + 1)}>
           <ChevronRightIcon className="h-4 w-4" />
         </Button>
 
@@ -78,11 +59,7 @@ const EntitySearchToolbarComponent = ({
           onClick={handleSortToggle}
           title={sortDirection === 'asc' ? 'Sort A-Z' : 'Sort Z-A'}
         >
-          {sortDirection === 'asc' ? (
-            <ArrowUpAZIcon className="h-4 w-4" />
-          ) : (
-            <ArrowDownZAIcon className="h-4 w-4" />
-          )}
+          {sortDirection === 'asc' ? <ArrowUpAZIcon className="h-4 w-4" /> : <ArrowDownZAIcon className="h-4 w-4" />}
         </Button>
       </div>
     </div>

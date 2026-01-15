@@ -54,7 +54,7 @@ const EntitySearchComponent = ({ pos }: Props) => {
 
   // Handle form submission - update search params and reset to page 1
   const handleSearch = (name: string, types: string[]) => {
-    setSearch((prev) => ({
+    setSearch(prev => ({
       ...prev,
       name,
       types,
@@ -65,12 +65,12 @@ const EntitySearchComponent = ({ pos }: Props) => {
 
   // Handle pagination - update page number (triggers refetch)
   const handlePageChange = (page: number) => {
-    setSearch((prev) => ({ ...prev, pageNumber: page }));
+    setSearch(prev => ({ ...prev, pageNumber: page }));
   };
 
   // Handle sort direction change - reset to page 1 when sorting changes
   const handleSortChange = (direction: 'asc' | 'desc') => {
-    setSearch((prev) => ({ ...prev, sortDirection: direction, pageNumber: 1 }));
+    setSearch(prev => ({ ...prev, sortDirection: direction, pageNumber: 1 }));
   };
 
   return (
@@ -95,10 +95,7 @@ const EntitySearchComponent = ({ pos }: Props) => {
             />
 
             {/* Results list */}
-            <EntitySearchResultsComponent
-              entities={data?.entities ?? []}
-              isLoading={isPending}
-            />
+            <EntitySearchResultsComponent entities={data?.entities ?? []} isLoading={isPending} />
           </>
         )}
       </div>

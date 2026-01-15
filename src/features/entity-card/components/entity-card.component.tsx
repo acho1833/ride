@@ -22,13 +22,7 @@ const EntityCardComponent = ({ entity, className, onClick }: Props) => {
   const iconClass = getEntityIconClass(entity.type);
 
   return (
-    <Card
-      className={cn(
-        'flex cursor-pointer items-center gap-x-2 p-2 hover:bg-accent',
-        className
-      )}
-      onClick={() => onClick?.(entity)}
-    >
+    <Card className={cn('hover:bg-accent flex cursor-pointer items-center gap-x-2 p-2', className)} onClick={() => onClick?.(entity)}>
       {/* Entity type icon (Remix Icon) */}
       <i className={cn('text-muted-foreground flex-shrink-0 text-base', iconClass)} />
 

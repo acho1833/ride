@@ -16,27 +16,19 @@ interface Props {
 const EntitySearchResultsComponent = ({ entities, isLoading }: Props) => {
   // Loading state
   if (isLoading) {
-    return (
-      <div className="text-muted-foreground flex items-center justify-center py-8 text-sm">
-        Loading...
-      </div>
-    );
+    return <div className="text-muted-foreground flex items-center justify-center py-8 text-sm">Loading...</div>;
   }
 
   // Empty state
   if (entities.length === 0) {
-    return (
-      <div className="text-muted-foreground flex items-center justify-center py-8 text-sm">
-        No results found
-      </div>
-    );
+    return <div className="text-muted-foreground flex items-center justify-center py-8 text-sm">No results found</div>;
   }
 
   // Results list
   return (
     <ScrollArea className="flex-1">
       <div className="flex flex-col gap-y-1 pr-2">
-        {entities.map((entity) => (
+        {entities.map(entity => (
           <EntityCardComponent key={entity.id} entity={entity} />
         ))}
       </div>

@@ -48,12 +48,12 @@ export async function searchEntities(params: EntitySearchParams): Promise<Entity
 
   // Filter by name (case-sensitive contains match)
   if (params.name && params.name.trim() !== '') {
-    filtered = filtered.filter((e) => e.labelNormalized.includes(params.name!));
+    filtered = filtered.filter(e => e.labelNormalized.includes(params.name!));
   }
 
   // Filter by types (empty array = show all)
   if (params.types && params.types.length > 0) {
-    filtered = filtered.filter((e) => params.types!.includes(e.type));
+    filtered = filtered.filter(e => params.types!.includes(e.type));
   }
 
   // Sort by labelNormalized (case-insensitive) based on sortDirection

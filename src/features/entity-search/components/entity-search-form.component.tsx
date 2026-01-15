@@ -61,9 +61,7 @@ const EntitySearchFormComponent = ({ onSearch }: Props) => {
   // Toggle a type in the multi-select
   const toggleType = (type: string) => {
     const current = form.getValues('types');
-    const updated = current.includes(type)
-      ? current.filter((t) => t !== type)
-      : [...current, type];
+    const updated = current.includes(type) ? current.filter(t => t !== type) : [...current, type];
     form.setValue('types', updated);
   };
 
@@ -83,12 +81,7 @@ const EntitySearchFormComponent = ({ onSearch }: Props) => {
             render={({ field }) => (
               <FormItem className="flex-1">
                 <FormControl>
-                  <Input
-                    type="text"
-                    placeholder="Search by name..."
-                    className="h-7 text-sm"
-                    {...field}
-                  />
+                  <Input type="text" placeholder="Search by name..." className="h-7 text-sm" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -104,23 +97,15 @@ const EntitySearchFormComponent = ({ onSearch }: Props) => {
           <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-7 justify-between text-xs">
-                {selectedTypes.length === 0
-                  ? 'All Types'
-                  : `${selectedTypes.length} selected`}
+                {selectedTypes.length === 0 ? 'All Types' : `${selectedTypes.length} selected`}
                 <ChevronDownIcon className="ml-1 h-3 w-3" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-48 p-2" align="start">
               <div className="flex flex-col gap-y-1">
-                {entityTypes.map((type) => (
-                  <label
-                    key={type}
-                    className="flex cursor-pointer items-center gap-x-2 rounded p-1 hover:bg-accent"
-                  >
-                    <Checkbox
-                      checked={selectedTypes.includes(type)}
-                      onCheckedChange={() => toggleType(type)}
-                    />
+                {entityTypes.map(type => (
+                  <label key={type} className="hover:bg-accent flex cursor-pointer items-center gap-x-2 rounded p-1">
+                    <Checkbox checked={selectedTypes.includes(type)} onCheckedChange={() => toggleType(type)} />
                     <span className="text-sm">{type}</span>
                   </label>
                 ))}
@@ -130,13 +115,7 @@ const EntitySearchFormComponent = ({ onSearch }: Props) => {
 
           {/* Clear button - only shown when types are selected */}
           {selectedTypes.length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={clearTypes}
-            >
+            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={clearTypes}>
               <XIcon className="h-3 w-3" />
             </Button>
           )}
@@ -145,7 +124,7 @@ const EntitySearchFormComponent = ({ onSearch }: Props) => {
         {/* Selected types badges */}
         {selectedTypes.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {selectedTypes.map((type) => (
+            {selectedTypes.map(type => (
               <Badge key={type} variant="secondary" className="text-xs">
                 {type}
               </Badge>
