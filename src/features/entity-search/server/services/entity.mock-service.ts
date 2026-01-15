@@ -37,8 +37,24 @@ function generateMockEntities(personCount: number, orgCount: number): EntityResp
 const MOCK_ENTITIES = generateMockEntities(75, 75);
 
 /**
+ * Checks if entity label matches the search pattern.
+ * Supports trailing wildcard (*) for prefix matching.
+ * - "Person*" matches "Person 1", "Person 2", etc.
+ * - "Person" matches any label containing "Person" (contains match)
+ */
+function matchesNamePattern(label: string, pattern: string): boolean {
+  if (pattern.endsWith('*')) {
+    // Wildcard: prefix match (case-insensitive)
+    const prefix = pattern.slice(0, -1).toLowerCase();
+    return label.toLowerCase().startsWith(prefix);
+  }
+  // Default: contains match (case-insensitive)
+  return label.toLowerCase().includes(pattern.toLowerCase());
+}
+
+/**
  * Simulates external API search endpoint.
- * - Filters by name using case-sensitive "contains" match
+ * - Filters by name: supports trailing wildcard (*) for prefix match, otherwise contains match
  * - Filters by types (empty array = no filter, returns all types)
  * - Sorts results by labelNormalized (case-insensitive) based on sortDirection
  * - Applies pagination
@@ -46,9 +62,10 @@ const MOCK_ENTITIES = generateMockEntities(75, 75);
 export async function searchEntities(params: EntitySearchParams): Promise<EntitySearchMockResponse> {
   let filtered = [...MOCK_ENTITIES];
 
-  // Filter by name (case-sensitive contains match)
+  // Filter by name (supports trailing wildcard for prefix match)
   if (params.name && params.name.trim() !== '') {
-    filtered = filtered.filter(e => e.labelNormalized.includes(params.name!));
+    const pattern = params.name.trim();
+    filtered = filtered.filter(e => matchesNamePattern(e.labelNormalized, pattern));
   }
 
   // Filter by types (empty array = show all)
