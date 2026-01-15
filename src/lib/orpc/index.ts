@@ -9,13 +9,8 @@
 import { os, ORPCError } from '@orpc/server';
 import type { Context } from './context';
 
-/**
- * Global error handling middleware.
- * - If error is already ORPCError, rethrow it as-is
- * - If error is any other type, wrap it in ORPCError with INTERNAL_SERVER_ERROR
- * This ensures consistent error structure for frontend toast parsing.
- */
-const errorMiddleware = os.$context<Context>().middleware(async ({ next }) => {
+/** Base procedure with app context - use this to define all API endpoints */
+export const appProcedure = os.$context<Context>().use(async ({ next }) => {
   try {
     return await next();
   } catch (error) {
@@ -29,6 +24,3 @@ const errorMiddleware = os.$context<Context>().middleware(async ({ next }) => {
     });
   }
 });
-
-/** Base procedure with app context and error handling - use this to define all API endpoints */
-export const appProcedure = errorMiddleware;
