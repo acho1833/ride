@@ -12,17 +12,17 @@ export async function getWorkspaceById(id: string): Promise<Workspace> {
 }
 
 /**
- * Add nodes to workspace.
+ * Add entities to workspace.
  */
-export async function addNodesToWorkspace(workspaceId: string, nodeIds: string[]): Promise<Workspace> {
-  const response = await mockService.addNodesToWorkspace(workspaceId, nodeIds);
+export async function addEntitiesToWorkspace(workspaceId: string, entityIds: string[]): Promise<Workspace> {
+  const response = await mockService.addEntitiesToWorkspace(workspaceId, entityIds);
   return toWorkspace(response);
 }
 
 /**
- * Remove nodes from workspace.
+ * Remove entities from workspace.
  */
-export async function removeNodesFromWorkspace(workspaceId: string, nodeIds: string[]): Promise<Workspace> {
-  const response = await mockService.removeNodesFromWorkspace(workspaceId, nodeIds);
+export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds: string[]): Promise<Workspace> {
+  const response = await mockService.removeEntitiesFromWorkspace(workspaceId, entityIds);
   return toWorkspace(response);
 }

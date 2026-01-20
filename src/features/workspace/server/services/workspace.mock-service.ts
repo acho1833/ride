@@ -102,15 +102,15 @@ function getWorkspaceState(workspaceId: string): WorkspaceState {
 }
 
 /**
- * Find relationships from global pool that connect the given node
- * to nodes already in the workspace.
+ * Find relationships from global pool that connect the given entity
+ * to entities already in the workspace.
  */
-function findConnectingRelationships(nodeId: string, existingNodeIds: Set<string>): RelationshipResponse[] {
+function findConnectingRelationships(entityId: string, existingEntityIds: Set<string>): RelationshipResponse[] {
   const { relationships } = getMockData();
   return relationships.filter(
     r =>
-      (r.sourceEntityId === nodeId && existingNodeIds.has(r.relatedEntityId)) ||
-      (r.relatedEntityId === nodeId && existingNodeIds.has(r.sourceEntityId))
+      (r.sourceEntityId === entityId && existingEntityIds.has(r.relatedEntityId)) ||
+      (r.relatedEntityId === entityId && existingEntityIds.has(r.sourceEntityId))
   );
 }
 
@@ -132,26 +132,26 @@ export async function getWorkspaceById(id: string): Promise<WorkspaceResponse> {
 }
 
 /**
- * Add nodes to workspace by IDs.
- * Automatically adds relationships that connect new nodes to existing nodes.
+ * Add entities to workspace by IDs.
+ * Automatically adds relationships that connect new entities to existing entities.
  */
-export async function addNodesToWorkspace(workspaceId: string, nodeIds: string[]): Promise<WorkspaceResponse> {
+export async function addEntitiesToWorkspace(workspaceId: string, entityIds: string[]): Promise<WorkspaceResponse> {
   const state = getWorkspaceState(workspaceId);
   const { entities } = getMockData();
 
-  const existingNodeIds = new Set(state.entityList.map(e => e.id));
+  const existingEntityIds = new Set(state.entityList.map(e => e.id));
   const existingRelationshipIds = new Set(state.relationshipList.map(r => r.relationshipId));
 
-  for (const nodeId of nodeIds) {
-    if (existingNodeIds.has(nodeId)) continue;
+  for (const entityId of entityIds) {
+    if (existingEntityIds.has(entityId)) continue;
 
-    const entity = entities.find(e => e.id === nodeId);
+    const entity = entities.find(e => e.id === entityId);
     if (!entity) continue;
 
     state.entityList.push(entity);
-    existingNodeIds.add(nodeId);
+    existingEntityIds.add(entityId);
 
-    const connectingRelationships = findConnectingRelationships(nodeId, existingNodeIds);
+    const connectingRelationships = findConnectingRelationships(entityId, existingEntityIds);
     for (const rel of connectingRelationships) {
       if (!existingRelationshipIds.has(rel.relationshipId)) {
         state.relationshipList.push(rel);
@@ -164,16 +164,19 @@ export async function addNodesToWorkspace(workspaceId: string, nodeIds: string[]
 }
 
 /**
- * Remove nodes from workspace by IDs.
+ * Remove entities from workspace by IDs.
  * Automatically removes relationships where either endpoint is removed.
  */
-export async function removeNodesFromWorkspace(workspaceId: string, nodeIds: string[]): Promise<WorkspaceResponse> {
+export async function removeEntitiesFromWorkspace(
+  workspaceId: string,
+  entityIds: string[]
+): Promise<WorkspaceResponse> {
   const state = getWorkspaceState(workspaceId);
-  const nodeIdsToRemove = new Set(nodeIds);
+  const entityIdsToRemove = new Set(entityIds);
 
-  state.entityList = state.entityList.filter(e => !nodeIdsToRemove.has(e.id));
+  state.entityList = state.entityList.filter(e => !entityIdsToRemove.has(e.id));
   state.relationshipList = state.relationshipList.filter(
-    r => !nodeIdsToRemove.has(r.sourceEntityId) && !nodeIdsToRemove.has(r.relatedEntityId)
+    r => !entityIdsToRemove.has(r.sourceEntityId) && !entityIdsToRemove.has(r.relatedEntityId)
   );
 
   return getWorkspaceById(workspaceId);

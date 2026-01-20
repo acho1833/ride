@@ -12,6 +12,7 @@ import { entityRouter } from '@/features/entity-search/server/routers';
 import { filesRouter } from '@/features/files/server/routers';
 import { projectRouter } from '@/features/projects/server/routers';
 import { todoRouter } from '@/features/todos/server/routers';
+import { workspaceRouter } from '@/features/workspace/server/routers';
 
 /** Main application router combining all feature routers */
 export const router = {
@@ -20,7 +21,8 @@ export const router = {
   entity: entityRouter,
   files: filesRouter,
   project: projectRouter,
-  todo: todoRouter
+  todo: todoRouter,
+  workspace: workspaceRouter
 };
 
 /** Type-safe client interface inferred from the router definition */
