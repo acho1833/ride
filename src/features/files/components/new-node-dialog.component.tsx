@@ -154,7 +154,7 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
       if (type === 'file' && lastFocusedGroup) {
         const activeIndex = lastFocusedGroup.files.findIndex(f => f.id === lastFocusedGroup.activeFileId);
         const insertIndex = activeIndex !== -1 ? activeIndex + 1 : lastFocusedGroup.files.length;
-        openFile(createdNode.id, createdNode.name, lastFocusedGroupId ?? undefined, insertIndex);
+        openFile(createdNode.id, lastFocusedGroupId ?? undefined, insertIndex);
       }
 
       onClose();

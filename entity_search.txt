@@ -1,0 +1,9 @@
+  
+  // Example of making a call to external api for the search
+  const searchResult = await api.post<EntitySearchResponse>(backendApiURI.searchEntity, {
+    sortDirection: searchParam.sortDirection,
+    names: searchParam.labels.values,
+    types: searchParam.types?.values ?? [],
+    pageSize: searchParam.pageSize,
+    pageNumber: searchParam.page ?? 1
+  });

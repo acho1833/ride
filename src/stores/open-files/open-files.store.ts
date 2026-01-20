@@ -29,6 +29,7 @@
 
 import { StateCreator } from 'zustand';
 import { EDITOR_CONFIG, MoveDirection } from '@/features/editor/const';
+import { findFileById, type FileTreeSlice } from '@/stores/files/files.store';
 
 // ============================================================================
 // Types
@@ -71,7 +72,7 @@ export interface OpenFilesState {
 /** Open files action methods */
 export interface OpenFilesActions {
   // File operations
-  openFile: (fileId: string, name: string, metadata?: Record<string, string>, groupId?: GroupId, insertIndex?: number) => void;
+  openFile: (fileId: string, groupId?: GroupId, insertIndex?: number) => void;
   closeFile: (fileId: string, groupId: GroupId) => void;
   setActiveFile: (fileId: string, groupId: GroupId) => void;
   closeAllFilesInGroup: (groupId: GroupId) => void;
@@ -93,6 +94,9 @@ export interface OpenFilesActions {
 
 /** Combined open files store type */
 export type OpenFilesSlice = OpenFilesState & OpenFilesActions;
+
+/** Combined store type for cross-slice access */
+type CombinedStore = OpenFilesSlice & FileTreeSlice;
 
 // ============================================================================
 // Helper Functions
@@ -214,12 +218,14 @@ const initialState: OpenFilesState['openFiles'] = {
 // Slice Creator
 // ============================================================================
 
-export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFilesSlice> = set => ({
+export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFilesSlice> = (set, get) => ({
   openFiles: initialState,
 
   // Open file in group (or last focused, or first available)
-  openFile: (fileId: string, name: string, metadata?: Record<string, string>, groupId?: GroupId, insertIndex?: number) =>
-    set(state => {
+  // Looks up file name and metadata from files store
+  openFile: (fileId: string, groupId?: GroupId, insertIndex?: number) =>
+    set(() => {
+      const state = get() as CombinedStore;
       const { rows, lastFocusedGroupId } = state.openFiles;
 
       // Check if file already exists anywhere
@@ -242,17 +248,26 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
         };
       }
 
+      // Look up file info from files store
+      const fileTree = state.files.structure;
+      if (!fileTree) return { openFiles: state.openFiles };
+
+      const fileInfo = findFileById(fileTree, fileId);
+      if (!fileInfo) return { openFiles: state.openFiles };
+
+      const { name, metadata } = fileInfo;
+
       // Determine target group
       const targetGroupId = groupId ?? lastFocusedGroupId ?? rows[0]?.groups[0]?.id;
-      if (!targetGroupId) return state;
+      if (!targetGroupId) return { openFiles: state.openFiles };
 
       const location = findGroupLocation(rows, targetGroupId);
-      if (!location) return state;
+      if (!location) return { openFiles: state.openFiles };
 
       // Add file at specified index or end of target group
       const newFiles = [...location.group.files];
       const idx = insertIndex ?? newFiles.length;
-      newFiles.splice(idx, 0, { id: fileId, name, metadata });
+      newFiles.splice(idx, 0, { id: fileId, name, metadata: metadata as Record<string, string> });
 
       const newRows = rows.map((row, ri) =>
         ri === location.rowIndex

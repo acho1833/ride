@@ -1,48 +1,48 @@
+'use client';
+
 /**
- * Workspace Editor Component
+ * Workspace Component
  *
- * Mock editor for .ws (workspace) files.
+ * Data fetching wrapper for workspace graph.
+ * Retrieves workspace data by workspaceId and passes to graph component.
  */
-import React from 'react';
+
+import { useWorkspaceQuery } from '../hooks/useWorkspaceQuery';
+import WorkspaceGraphComponent from './workspace-graph.component';
 
 interface Props {
-  fileId: string;
-  fileName: string;
-  workspace: any;
+  /** The workspaceId to fetch and display */
+  workspaceId: string;
 }
 
-const WorkspaceComponent = ({ fileId: _fieldId, fileName: _fileName, workspace: _workspace }: Props) => {
-  return (
-    <svg viewBox="0 0 400 200" className="bg-background h-full w-full rounded-lg border">
-      {/* Links */}
-      <line x1="100" y1="60" x2="200" y2="140" className="stroke-muted-foreground stroke-2" />
-      <line x1="300" y1="60" x2="200" y2="140" className="stroke-muted-foreground stroke-2" />
+const WorkspaceComponent = ({ workspaceId }: Props) => {
+  const { data: workspace, isPending, isError, error } = useWorkspaceQuery(workspaceId);
 
-      {/* Node A */}
-      <g className="cursor-pointer">
-        <circle cx="100" cy="60" r="18" className="fill-primary stroke-primary-foreground stroke-2" />
-        <text x="100" y="90" textAnchor="middle" className="fill-foreground text-xs">
-          Node A
-        </text>
-      </g>
+  if (isPending) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="text-muted-foreground">Loading workspace...</div>
+      </div>
+    );
+  }
 
-      {/* Node B */}
-      <g className="cursor-pointer">
-        <circle cx="300" cy="60" r="18" className="fill-primary stroke-primary-foreground stroke-2" />
-        <text x="300" y="90" textAnchor="middle" className="fill-foreground text-xs">
-          Node B
-        </text>
-      </g>
+  if (isError) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="text-destructive">Error loading workspace: {error?.message ?? 'Unknown error'}</div>
+      </div>
+    );
+  }
 
-      {/* Node C */}
-      <g className="cursor-pointer">
-        <circle cx="200" cy="140" r="18" className="fill-secondary stroke-secondary-foreground stroke-2" />
-        <text x="200" y="170" textAnchor="middle" className="fill-foreground text-xs">
-          Node C
-        </text>
-      </g>
-    </svg>
-  );
+  if (!workspace) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="text-muted-foreground">Workspace not found</div>
+      </div>
+    );
+  }
+
+  return <WorkspaceGraphComponent workspace={workspace} />;
 };
 
 export default WorkspaceComponent;

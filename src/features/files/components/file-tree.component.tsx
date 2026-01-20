@@ -136,7 +136,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
    * This allows dropping files onto editor tab bars.
    */
   const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData(FILE_TREE_MIME_TYPE, JSON.stringify({ fileId: node.id, fileName: node.name }));
+    e.dataTransfer.setData(FILE_TREE_MIME_TYPE, JSON.stringify({ fileId: node.id }));
     e.dataTransfer.effectAllowed = 'copy';
   };
 
@@ -157,7 +157,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             draggable
             onDragStart={handleDragStart}
-            onDoubleClick={() => openFile(node.id, node.name)}
+            onDoubleClick={() => openFile(node.id)}
             onClick={() => onSelect(node.id)}
             onContextMenu={e => {
               e.stopPropagation();

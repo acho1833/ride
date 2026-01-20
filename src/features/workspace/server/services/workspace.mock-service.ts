@@ -77,25 +77,37 @@ function hashString(str: string): number {
 
 /**
  * Get or initialize workspace state.
- * On first access, generates initial subset of entities.
+ * On first access, generates initial subset of entities with relationships.
  */
 function getWorkspaceState(workspaceId: string): WorkspaceState {
   if (!workspaceStateMap.has(workspaceId)) {
-    const { entities, relationships } = getMockData();
+    const { entities } = getMockData();
 
     // Use workspace ID as seed for consistent initial subset
     faker.seed(hashString(workspaceId));
     const entityCount = faker.number.int({ min: 5, max: 10 });
     const selectedEntities = faker.helpers.arrayElements(entities, entityCount);
-    const entityIds = new Set(selectedEntities.map(e => e.id));
 
-    const selectedRelationships = relationships.filter(
-      r => entityIds.has(r.sourceEntityId) && entityIds.has(r.relatedEntityId)
-    );
+    // Generate relationships between selected entities (~40% connectivity)
+    const generatedRelationships: RelationshipResponse[] = [];
+    const targetLinkCount = Math.floor(selectedEntities.length * 0.6);
+
+    for (let i = 0; i < targetLinkCount; i++) {
+      const source = faker.helpers.arrayElement(selectedEntities);
+      const target = faker.helpers.arrayElement(selectedEntities.filter(e => e.id !== source.id));
+      if (target) {
+        generatedRelationships.push({
+          relationshipId: faker.string.uuid(),
+          predicate: faker.helpers.arrayElement(RELATIONSHIP_PREDICATES),
+          sourceEntityId: source.id,
+          relatedEntityId: target.id
+        });
+      }
+    }
 
     workspaceStateMap.set(workspaceId, {
       entityList: [...selectedEntities],
-      relationshipList: [...selectedRelationships]
+      relationshipList: generatedRelationships
     });
   }
   return workspaceStateMap.get(workspaceId)!;

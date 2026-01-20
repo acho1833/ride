@@ -22,28 +22,28 @@ import {
 } from '@/components/ui/context-menu';
 import { Plus, Minus, Maximize, Copy, ClipboardPaste, Trash2, BarChart3, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG, generateSampleData, getNodeColor } from '../const';
-import type { GraphNode, GraphLink, GraphData } from '../types';
+import { GRAPH_CONFIG } from '../const';
+import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData } from '../types';
+import type { Workspace } from '@/models/workspace.model';
 
 interface Props {
-  fileId: string;
-  fileName: string;
+  workspace: Workspace;
 }
 
-const WorkspaceGraphComponent = ({ fileId }: Props) => {
+const WorkspaceGraphComponent = ({ workspace }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
-  const nodesRef = useRef<GraphNode[]>([]);
+  const simulationRef = useRef<d3.Simulation<WorkspaceGraphNode, WorkspaceGraphLink> | null>(null);
+  const nodesRef = useRef<WorkspaceGraphNode[]>([]);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [contextMenuNode, setContextMenuNode] = useState<GraphNode | null>(null);
+  const [contextMenuNode, setContextMenuNode] = useState<WorkspaceGraphNode | null>(null);
   const contextMenuOpenRef = useRef(false);
   const contextMenuTriggerRef = useRef<HTMLDivElement>(null);
-  const handleNodeContextMenuRef = useRef<(event: MouseEvent, node: GraphNode) => void>(() => {});
+  const handleNodeContextMenuRef = useRef<(event: MouseEvent, node: WorkspaceGraphNode) => void>(() => {});
 
-  // Generate sample data once per fileId
-  const data = useMemo<GraphData>(() => generateSampleData(), [fileId]);
+  // Convert workspace to graph data
+  const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
 
   // Observe container size
   useEffect(() => {
@@ -77,8 +77,8 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
     const g = svg.append('g');
 
     // Deep copy data to avoid mutation issues with D3
-    const nodes: GraphNode[] = data.nodes.map(n => ({ ...n }));
-    const links: GraphLink[] = data.links.map(l => ({ ...l }));
+    const nodes: WorkspaceGraphNode[] = data.nodes.map(n => ({ ...n }));
+    const links: WorkspaceGraphLink[] = data.links.map(l => ({ ...l }));
 
     // Setup zoom behavior (only active when Ctrl key is held)
     const zoom = d3
@@ -109,7 +109,7 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
     const link = g
       .append('g')
       .attr('class', 'links')
-      .selectAll<SVGLineElement, GraphLink>('line')
+      .selectAll<SVGLineElement, WorkspaceGraphLink>('line')
       .data(links)
       .join('line')
       .attr('stroke', 'white')
@@ -125,20 +125,26 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
     });
 
     // Create node groups
-    const node = g.append('g').attr('class', 'nodes').selectAll<SVGGElement, GraphNode>('g').data(nodes).join('g').attr('cursor', 'grab');
+    const node = g
+      .append('g')
+      .attr('class', 'nodes')
+      .selectAll<SVGGElement, WorkspaceGraphNode>('g')
+      .data(nodes)
+      .join('g')
+      .attr('cursor', 'grab');
 
-    // Add circles to nodes with colors based on name hash
+    // Add circles to nodes
     node
       .append('circle')
       .attr('r', GRAPH_CONFIG.nodeRadius)
-      .attr('fill', d => getNodeColor(d.name))
+      .attr('fill', 'hsl(210, 70%, 50%)')
       .attr('stroke', 'white')
       .attr('stroke-width', 2);
 
     // Add labels to nodes (white text)
     node
       .append('text')
-      .text(d => d.name)
+      .text(d => d.labelNormalized)
       .attr('text-anchor', 'middle')
       .attr('dy', GRAPH_CONFIG.nodeRadius + 14)
       .attr('fill', 'white')
@@ -147,11 +153,11 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
 
     // Setup force simulation
     const simulation = d3
-      .forceSimulation<GraphNode>(nodes)
+      .forceSimulation<WorkspaceGraphNode>(nodes)
       .force(
         'link',
         d3
-          .forceLink<GraphNode, GraphLink>(links)
+          .forceLink<WorkspaceGraphNode, WorkspaceGraphLink>(links)
           .id(d => d.id)
           .distance(GRAPH_CONFIG.linkDistance)
       )
@@ -188,32 +194,32 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
 
     // Set initial positions for links and nodes
     link
-      .attr('x1', d => (d.source as GraphNode).x ?? 0)
-      .attr('y1', d => (d.source as GraphNode).y ?? 0)
-      .attr('x2', d => (d.target as GraphNode).x ?? 0)
-      .attr('y2', d => (d.target as GraphNode).y ?? 0);
+      .attr('x1', d => (d.source as WorkspaceGraphNode).x ?? 0)
+      .attr('y1', d => (d.source as WorkspaceGraphNode).y ?? 0)
+      .attr('x2', d => (d.target as WorkspaceGraphNode).x ?? 0)
+      .attr('y2', d => (d.target as WorkspaceGraphNode).y ?? 0);
 
     node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
 
     // Update positions on each tick (for drag interactions)
     simulation.on('tick', () => {
       link
-        .attr('x1', d => (d.source as GraphNode).x ?? 0)
-        .attr('y1', d => (d.source as GraphNode).y ?? 0)
-        .attr('x2', d => (d.target as GraphNode).x ?? 0)
-        .attr('y2', d => (d.target as GraphNode).y ?? 0);
+        .attr('x1', d => (d.source as WorkspaceGraphNode).x ?? 0)
+        .attr('y1', d => (d.source as WorkspaceGraphNode).y ?? 0)
+        .attr('x2', d => (d.target as WorkspaceGraphNode).x ?? 0)
+        .attr('y2', d => (d.target as WorkspaceGraphNode).y ?? 0);
 
       node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
     // Setup drag behavior - only moves the dragged node, no simulation restart
     const drag = d3
-      .drag<SVGGElement, GraphNode>()
+      .drag<SVGGElement, WorkspaceGraphNode>()
       .on('start', function () {
         // 'this' is the <g> element the drag is attached to
         this.setAttribute('cursor', 'grabbing');
       })
-      .on('drag', function (event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d) {
+      .on('drag', function (event: d3.D3DragEvent<SVGGElement, WorkspaceGraphNode, WorkspaceGraphNode>, d) {
         // Update node position directly
         d.x = event.x;
         d.y = event.y;
@@ -226,9 +232,9 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
         const connectedLinks = nodeLinkMap.get(d.id);
         if (connectedLinks) {
           for (const linkEl of connectedLinks) {
-            const linkData = d3.select<SVGLineElement, GraphLink>(linkEl).datum();
-            const source = linkData.source as GraphNode;
-            const target = linkData.target as GraphNode;
+            const linkData = d3.select<SVGLineElement, WorkspaceGraphLink>(linkEl).datum();
+            const source = linkData.source as WorkspaceGraphNode;
+            const target = linkData.target as WorkspaceGraphNode;
             linkEl.setAttribute('x1', String(source.x ?? 0));
             linkEl.setAttribute('y1', String(source.y ?? 0));
             linkEl.setAttribute('x2', String(target.x ?? 0));
@@ -243,7 +249,7 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
     node.call(drag);
 
     // Add right-click handler for context menu
-    node.on('contextmenu', function (event: MouseEvent, d: GraphNode) {
+    node.on('contextmenu', function (event: MouseEvent, d: WorkspaceGraphNode) {
       handleNodeContextMenuRef.current(event, d);
     });
 
@@ -296,23 +302,23 @@ const WorkspaceGraphComponent = ({ fileId }: Props) => {
 
   // Context menu handlers
   const handleCopy = useCallback(() => {
-    toast.info(`Copy: ${contextMenuNode?.name ?? 'Unknown'}`);
+    toast.info(`Copy: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
   }, [contextMenuNode]);
 
   const handlePaste = useCallback(() => {
-    toast.info(`Paste: ${contextMenuNode?.name ?? 'Unknown'}`);
+    toast.info(`Paste: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
   }, [contextMenuNode]);
 
   const handleDelete = useCallback(() => {
-    toast.info(`Delete: ${contextMenuNode?.name ?? 'Unknown'}`);
+    toast.info(`Delete: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
   }, [contextMenuNode]);
 
   const handleSpreadline = useCallback(() => {
-    toast.info(`Analytics > Spreadline: ${contextMenuNode?.name ?? 'Unknown'}`);
+    toast.info(`Analytics > Spreadline: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
   }, [contextMenuNode]);
 
   // Handle right-click on nodes to open context menu
-  handleNodeContextMenuRef.current = (event: MouseEvent, node: GraphNode) => {
+  handleNodeContextMenuRef.current = (event: MouseEvent, node: WorkspaceGraphNode) => {
     event.preventDefault();
 
     const openMenu = () => {

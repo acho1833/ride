@@ -4,14 +4,14 @@
  * Routes to the appropriate editor component based on file extension.
  */
 
-import React from 'react';
 import TextComponent from '@/features/text/components/text.component';
-import WorkspaceGraphComponent from '@/features/workspace/components/workspace-graph.component';
+import WorkspaceComponent from '@/features/workspace/components/workspace.component';
 import CollaborationGraphComponent from '@/features/collaboration-graph/components/collaboration-graph.component';
 
 interface Props {
   fileId: string;
   fileName: string;
+  metadata?: Record<string, string>;
 }
 
 /**
@@ -26,13 +26,22 @@ function getFileExtension(fileName: string): string {
  * Editor content router component
  * Renders the appropriate editor based on file extension
  */
-const EditorContentComponent = ({ fileId, fileName }: Props) => {
+const EditorContentComponent = ({ fileId, fileName, metadata }: Props) => {
   const extension = getFileExtension(fileName);
 
   // Route to appropriate editor based on extension
   switch (extension) {
-    case 'ws':
-      return <WorkspaceGraphComponent fileId={fileId} fileName={fileName} />;
+    case 'ws': {
+      const workspaceId = metadata?.workspaceId;
+      if (!workspaceId) {
+        return (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-muted-foreground">Missing workspaceId in file metadata</div>
+          </div>
+        );
+      }
+      return <WorkspaceComponent workspaceId={workspaceId} />;
+    }
 
     case 'gx':
       return <CollaborationGraphComponent fileId={fileId} fileName={fileName} />;
