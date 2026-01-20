@@ -52,8 +52,8 @@ export function getFileIcon(fileName: string): LucideIcon {
  * - unicode: Used for SVG symbol definitions (D3 graph nodes)
  */
 export const ENTITY_ICON_CONFIG: Record<string, { cssClass: string; unicode: string }> = {
-  Person: { cssClass: 'ri-user-line', unicode: 'ea67' },
-  Organization: { cssClass: 'ri-building-2-line', unicode: 'ea6c' }
+  Person: { cssClass: 'ri-user-line', unicode: 'F264' },
+  Organization: { cssClass: 'ri-building-2-line', unicode: 'EB09' }
 };
 
 /** Default icon when entity type is not found */

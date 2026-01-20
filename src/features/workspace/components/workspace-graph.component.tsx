@@ -146,8 +146,10 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
     node
       .append('use')
       .attr('href', d => `#entity-icon-${d.type in ENTITY_ICON_CONFIG ? d.type : 'unknown'}`)
-      .attr('width', 20)
-      .attr('height', 20)
+      .attr('x', -GRAPH_CONFIG.iconSize / 2)
+      .attr('y', -GRAPH_CONFIG.iconSize / 2)
+      .attr('width', GRAPH_CONFIG.iconSize)
+      .attr('height', GRAPH_CONFIG.iconSize)
       .attr('fill', 'white');
 
     // Add labels to nodes (white text)

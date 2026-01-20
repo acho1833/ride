@@ -10,6 +10,8 @@
 export const GRAPH_CONFIG = {
   /** Node circle radius in pixels */
   nodeRadius: 20,
+  /** Entity icon size in pixels */
+  iconSize: 24,
   /** Target distance between linked nodes */
   linkDistance: 120,
   /** Repulsion strength between nodes (negative = repel) */
