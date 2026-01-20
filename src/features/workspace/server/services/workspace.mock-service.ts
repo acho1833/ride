@@ -179,10 +179,7 @@ export async function addEntitiesToWorkspace(workspaceId: string, entityIds: str
  * Remove entities from workspace by IDs.
  * Automatically removes relationships where either endpoint is removed.
  */
-export async function removeEntitiesFromWorkspace(
-  workspaceId: string,
-  entityIds: string[]
-): Promise<WorkspaceResponse> {
+export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds: string[]): Promise<WorkspaceResponse> {
   const state = getWorkspaceState(workspaceId);
   const entityIdsToRemove = new Set(entityIds);
 

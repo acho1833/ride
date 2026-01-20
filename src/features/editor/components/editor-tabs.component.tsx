@@ -269,7 +269,12 @@ const EditorTabsComponent = ({ groupId }: Props) => {
       try {
         const parsed: unknown = JSON.parse(data);
         // Validate parsed data has expected shape before using
-        if (typeof parsed === 'object' && parsed !== null && 'fileId' in parsed && typeof (parsed as { fileId: unknown }).fileId === 'string') {
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'fileId' in parsed &&
+          typeof (parsed as { fileId: unknown }).fileId === 'string'
+        ) {
           const { fileId } = parsed as { fileId: string };
           openFile(fileId, groupId, insertIndex ?? undefined);
         }

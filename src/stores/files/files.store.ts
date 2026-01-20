@@ -62,10 +62,7 @@ export const getAllFolderIds = (node: FolderNode): string[] => {
 /**
  * Find a file node by ID in the tree.
  */
-export const findFileById = (
-  tree: FolderNode,
-  fileId: string
-): { id: string; name: string; metadata: Record<string, unknown> } | null => {
+export const findFileById = (tree: FolderNode, fileId: string): { id: string; name: string; metadata: Record<string, unknown> } | null => {
   for (const child of tree.children) {
     if (child.id === fileId && child.type === 'file') {
       return { id: child.id, name: child.name, metadata: child.metadata };
