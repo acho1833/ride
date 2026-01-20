@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * Coordinate type for optional x/y positioning.
  * Used by Entity model for D3 graph positioning.
@@ -10,3 +12,8 @@ export type Coordinate =
       x: number;
       y: number;
     };
+
+export const coordinateSchema = z.object({
+  x: z.number().optional(),
+  y: z.number().optional()
+});
