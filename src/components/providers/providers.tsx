@@ -17,6 +17,7 @@ import { ThemeProvider } from 'next-themes';
 import ToasterProvider from '@/components/providers/toaster.provider';
 import AppConfigProviderComponent from '@/components/providers/app-config-provider.component';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { EntityIconProvider } from '@/components/icons/entity-icon-context';
 
 /**
  * Root provider component that wraps the entire application
@@ -30,7 +31,9 @@ export default function Providers({ children }: { children: ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <AppConfigProviderComponent>{children}</AppConfigProviderComponent>
+          <EntityIconProvider>
+            <AppConfigProviderComponent>{children}</AppConfigProviderComponent>
+          </EntityIconProvider>
         </TooltipProvider>
         {/* DevTools for debugging queries (bottom-right corner) */}
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />

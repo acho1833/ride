@@ -44,3 +44,17 @@ export function getFileIcon(fileName: string): LucideIcon {
   const app = FILE_APPLICATIONS.find(a => fileName.endsWith(a.extension));
   return FILE_ICON_MAP[app?.iconName ?? 'File'] ?? File;
 }
+
+/**
+ * Entity type icon configuration.
+ * Maps entity types to Remix Icon CSS class and unicode for SVG rendering.
+ * - cssClass: Used for CSS-based rendering (entity cards, search results)
+ * - unicode: Used for SVG symbol definitions (D3 graph nodes)
+ */
+export const ENTITY_ICON_CONFIG: Record<string, { cssClass: string; unicode: string }> = {
+  Person: { cssClass: 'ri-user-line', unicode: 'ea67' },
+  Organization: { cssClass: 'ri-building-2-line', unicode: 'ea6c' }
+};
+
+/** Default icon when entity type is not found */
+export const DEFAULT_ENTITY_ICON = { cssClass: 'ri-question-line', unicode: 'f045' };

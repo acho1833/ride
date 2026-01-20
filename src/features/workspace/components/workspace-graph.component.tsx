@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { GRAPH_CONFIG } from '../const';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData } from '../types';
 import type { Workspace } from '@/models/workspace.model';
+import { ENTITY_ICON_CONFIG } from '@/const';
 
 interface Props {
   workspace: Workspace;
@@ -140,6 +141,14 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
       .attr('fill', 'hsl(210, 70%, 50%)')
       .attr('stroke', 'white')
       .attr('stroke-width', 2);
+
+    // Add entity type icons (centered in circle)
+    node
+      .append('use')
+      .attr('href', d => `#entity-icon-${d.type in ENTITY_ICON_CONFIG ? d.type : 'unknown'}`)
+      .attr('width', 20)
+      .attr('height', 20)
+      .attr('fill', 'white');
 
     // Add labels to nodes (white text)
     node
