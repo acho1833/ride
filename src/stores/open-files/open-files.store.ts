@@ -44,6 +44,7 @@ export type RowId = string;
 export type OpenFile = {
   id: string;
   name: string;
+  metadata?: Record<string, string>;
 };
 
 /** Editor group with ordered tabs */
@@ -70,7 +71,7 @@ export interface OpenFilesState {
 /** Open files action methods */
 export interface OpenFilesActions {
   // File operations
-  openFile: (fileId: string, name: string, groupId?: GroupId, insertIndex?: number) => void;
+  openFile: (fileId: string, name: string, metadata?: Record<string, string>, groupId?: GroupId, insertIndex?: number) => void;
   closeFile: (fileId: string, groupId: GroupId) => void;
   setActiveFile: (fileId: string, groupId: GroupId) => void;
   closeAllFilesInGroup: (groupId: GroupId) => void;
@@ -189,8 +190,8 @@ const initialState: OpenFilesState['openFiles'] = {
         {
           id: initialGroupId1,
           files: [
-            { id: 'ws1', name: 'WS1.ws' },
-            { id: 'ws2', name: 'WS2.ws' },
+            { id: 'ws1', name: 'WS1.ws', metadata: { workspaceId: 'ws1-content' } },
+            { id: 'ws2', name: 'WS2.ws', metadata: { workspaceId: 'ws2-content' } },
             { id: 'txt1', name: 'TXT1.txt' }
           ],
           activeFileId: 'ws1'
@@ -198,7 +199,7 @@ const initialState: OpenFilesState['openFiles'] = {
         {
           id: initialGroupId2,
           files: [
-            { id: 'ws3', name: 'WS3.ws' },
+            { id: 'ws3', name: 'WS3.ws', metadata: { workspaceId: 'ws3-content' } },
             { id: 'txt2', name: 'TXT2.txt' }
           ],
           activeFileId: 'ws3'
@@ -217,7 +218,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
   openFiles: initialState,
 
   // Open file in group (or last focused, or first available)
-  openFile: (fileId: string, name: string, groupId?: GroupId, insertIndex?: number) =>
+  openFile: (fileId: string, name: string, metadata?: Record<string, string>, groupId?: GroupId, insertIndex?: number) =>
     set(state => {
       const { rows, lastFocusedGroupId } = state.openFiles;
 
@@ -251,7 +252,7 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       // Add file at specified index or end of target group
       const newFiles = [...location.group.files];
       const idx = insertIndex ?? newFiles.length;
-      newFiles.splice(idx, 0, { id: fileId, name });
+      newFiles.splice(idx, 0, { id: fileId, name, metadata });
 
       const newRows = rows.map((row, ri) =>
         ri === location.rowIndex
