@@ -41,30 +41,14 @@ export const EntityIconProvider = ({ children }: Props) => {
         <defs>
           {Object.entries(ENTITY_ICON_CONFIG).map(([entityType, { unicode }]) => (
             <symbol key={entityType} id={`entity-icon-${entityType}`} viewBox="-12 -12 24 24">
-              <text
-                x="0"
-                y="0"
-                fontFamily="remixicon"
-                fontSize="16"
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="currentColor"
-              >
+              <text x="0" y="0" fontFamily="remixicon" fontSize="16" textAnchor="middle" dominantBaseline="central" fill="currentColor">
                 {String.fromCodePoint(parseInt(unicode, 16))}
               </text>
             </symbol>
           ))}
           {/* Default/unknown icon */}
           <symbol id="entity-icon-unknown" viewBox="-12 -12 24 24">
-            <text
-              x="0"
-              y="0"
-              fontFamily="remixicon"
-              fontSize="16"
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="currentColor"
-            >
+            <text x="0" y="0" fontFamily="remixicon" fontSize="16" textAnchor="middle" dominantBaseline="central" fill="currentColor">
               {String.fromCodePoint(parseInt(DEFAULT_ENTITY_ICON.unicode, 16))}
             </text>
           </symbol>
