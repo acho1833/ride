@@ -33,6 +33,10 @@ export function createQueryClient() {
         // Disable caching by default - queries that need caching should set staleTime individually
         staleTime: 0
       },
+      mutations: {
+        // Single attempt for all mutations - no retries
+        retry: 0
+      },
       // NOTE: Hydration config below is NOT currently used.
       // Kept for future use if server-side prefetching is needed.
       // SSR dehydration config - serialize server state for client hydration

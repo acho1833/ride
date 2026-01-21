@@ -8,7 +8,9 @@
  */
 
 import { useWorkspaceQuery } from '../hooks/useWorkspaceQuery';
+import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMutation';
 import WorkspaceGraphComponent from './workspace-graph.component';
+import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
 
 interface Props {
   /** The workspaceId to fetch and display */
@@ -17,6 +19,11 @@ interface Props {
 
 const WorkspaceComponent = ({ workspaceId }: Props) => {
   const { data: workspace, isPending, isError, error } = useWorkspaceQuery(workspaceId);
+  const { mutate: saveViewState } = useWorkspaceViewStateMutation();
+
+  const handleSaveViewState = (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => {
+    saveViewState({ ...input, workspaceId });
+  };
 
   if (isPending) {
     return (
@@ -42,7 +49,7 @@ const WorkspaceComponent = ({ workspaceId }: Props) => {
     );
   }
 
-  return <WorkspaceGraphComponent workspace={workspace} />;
+  return <WorkspaceGraphComponent workspace={workspace} onSaveViewState={handleSaveViewState} />;
 };
 
 export default WorkspaceComponent;
