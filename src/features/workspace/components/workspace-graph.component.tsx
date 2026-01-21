@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import * as d3 from 'd3';
+import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
 import {
   ContextMenu,
@@ -25,13 +26,41 @@ import { toast } from 'sonner';
 import { GRAPH_CONFIG } from '../const';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData } from '../types';
 import type { Workspace } from '@/models/workspace.model';
+import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
 import { ENTITY_ICON_CONFIG } from '@/const';
+
+/**
+ * Calculate zoom-to-fit transform for given nodes and dimensions.
+ */
+function calculateFitTransform(
+  nodes: WorkspaceGraphNode[],
+  width: number,
+  height: number
+): d3.ZoomTransform {
+  if (nodes.length === 0) return d3.zoomIdentity;
+
+  const padding = GRAPH_CONFIG.fitPadding;
+  const xExtent = d3.extent(nodes, d => d.x) as [number, number];
+  const yExtent = d3.extent(nodes, d => d.y) as [number, number];
+
+  const graphWidth = xExtent[1] - xExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
+  const graphHeight = yExtent[1] - yExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
+  const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
+  const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
+
+  const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
+  const translateX = width / 2 - graphCenterX * scale;
+  const translateY = height / 2 - graphCenterY * scale;
+
+  return d3.zoomIdentity.translate(translateX, translateY).scale(scale);
+}
 
 interface Props {
   workspace: Workspace;
+  onSaveViewState: (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => void;
 }
 
-const WorkspaceGraphComponent = ({ workspace }: Props) => {
+const WorkspaceGraphComponent = ({ workspace, onSaveViewState }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -42,9 +71,42 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
   const contextMenuOpenRef = useRef(false);
   const contextMenuTriggerRef = useRef<HTMLDivElement>(null);
   const handleNodeContextMenuRef = useRef<(event: MouseEvent, node: WorkspaceGraphNode) => void>(() => {});
+  const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
 
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
+
+  // Collect current state and save
+  const collectAndSave = useCallback(() => {
+    const transform = transformRef.current;
+    const positions: Record<string, { x: number; y: number }> = {};
+
+    for (const node of nodesRef.current) {
+      if (node.x !== undefined && node.y !== undefined) {
+        positions[node.id] = { x: node.x, y: node.y };
+      }
+    }
+
+    onSaveViewState({
+      scale: transform.k,
+      panX: transform.x,
+      panY: transform.y,
+      entityPositions: positions
+    });
+  }, [onSaveViewState]);
+
+  // Debounced save function
+  const debouncedSave = useMemo(
+    () => debounce(collectAndSave, GRAPH_CONFIG.saveDebounceMs),
+    [collectAndSave]
+  );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSave.cancel();
+    };
+  }, [debouncedSave]);
 
   // Observe container size
   useEffect(() => {
@@ -78,7 +140,15 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
     const g = svg.append('g');
 
     // Deep copy data to avoid mutation issues with D3
-    const nodes: WorkspaceGraphNode[] = data.nodes.map(n => ({ ...n }));
+    // Apply saved entity positions if viewState exists
+    const nodes: WorkspaceGraphNode[] = data.nodes.map(n => {
+      const savedPos = workspace.viewState?.entityPositions[n.id];
+      return {
+        ...n,
+        x: savedPos?.x ?? n.x,
+        y: savedPos?.y ?? n.y
+      };
+    });
     const links: WorkspaceGraphLink[] = data.links.map(l => ({ ...l }));
 
     // Setup zoom behavior (only active when Ctrl key is held)
@@ -97,6 +167,8 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
       })
       .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
         g.attr('transform', event.transform.toString());
+        transformRef.current = event.transform;
+        debouncedSave();
       });
 
     svg.call(zoom);
@@ -185,23 +257,15 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
     simulationRef.current = simulation;
     nodesRef.current = nodes;
 
-    // Calculate zoom-to-fit transform
-    const padding = GRAPH_CONFIG.fitPadding;
-    const xExtent = d3.extent(nodes, d => d.x) as [number, number];
-    const yExtent = d3.extent(nodes, d => d.y) as [number, number];
+    // Apply saved transform or calculate auto-fit
+    const initialTransform = workspace.viewState
+      ? d3.zoomIdentity
+          .translate(workspace.viewState.panX, workspace.viewState.panY)
+          .scale(workspace.viewState.scale)
+      : calculateFitTransform(nodes, width, height);
 
-    const graphWidth = xExtent[1] - xExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
-    const graphHeight = yExtent[1] - yExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
-    const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
-    const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
-
-    const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
-
-    const translateX = width / 2 - graphCenterX * scale;
-    const translateY = height / 2 - graphCenterY * scale;
-
-    // Apply zoom-to-fit transform immediately (no transition)
-    svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
+    transformRef.current = initialTransform;
+    svg.call(zoom.transform, initialTransform);
 
     // Set initial positions for links and nodes
     link
@@ -255,6 +319,7 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
       })
       .on('end', function () {
         this.setAttribute('cursor', 'grab');
+        debouncedSave();
       });
 
     node.call(drag);
@@ -268,7 +333,7 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
     return () => {
       simulation.stop();
     };
-  }, [data, dimensions]);
+  }, [data, dimensions, workspace.viewState, debouncedSave]);
 
   // Zoom control handlers
   const handleZoomIn = () => {
@@ -286,29 +351,11 @@ const WorkspaceGraphComponent = ({ workspace }: Props) => {
 
   const handleZoomToFit = () => {
     if (!svgRef.current || !zoomRef.current || !dimensions) return;
-
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
 
-    const { width, height } = dimensions;
-    const padding = GRAPH_CONFIG.fitPadding;
-    const xExtent = d3.extent(nodes, d => d.x) as [number, number];
-    const yExtent = d3.extent(nodes, d => d.y) as [number, number];
-
-    const graphWidth = xExtent[1] - xExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
-    const graphHeight = yExtent[1] - yExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
-    const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
-    const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
-
-    const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
-
-    const translateX = width / 2 - graphCenterX * scale;
-    const translateY = height / 2 - graphCenterY * scale;
-
-    d3.select(svgRef.current)
-      .transition()
-      .duration(300)
-      .call(zoomRef.current.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
+    const fitTransform = calculateFitTransform(nodes, dimensions.width, dimensions.height);
+    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.transform, fitTransform);
   };
 
   // Context menu handlers
