@@ -23,5 +23,7 @@ export const GRAPH_CONFIG = {
   /** Zoom scale factor for buttons */
   zoomStep: 1.3,
   /** Padding around nodes when fitting to view */
-  fitPadding: 50
+  fitPadding: 50,
+  /** Debounce delay for saving view state in milliseconds */
+  saveDebounceMs: 500
 } as const;
