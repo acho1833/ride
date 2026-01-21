@@ -249,9 +249,12 @@ const WorkspaceGraphComponent = ({ workspace, onSaveViewState }: Props) => {
       .force('collision', d3.forceCollide().radius(GRAPH_CONFIG.nodeRadius + 10));
 
     // Run simulation synchronously to calculate initial positions
+    // Skip if we have saved positions - they're already applied to nodes
     simulation.stop();
-    for (let i = 0; i < 300; i++) {
-      simulation.tick();
+    if (!workspace.viewState) {
+      for (let i = 0; i < 300; i++) {
+        simulation.tick();
+      }
     }
 
     simulationRef.current = simulation;
