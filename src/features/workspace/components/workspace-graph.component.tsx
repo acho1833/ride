@@ -27,16 +27,35 @@ import { GRAPH_CONFIG } from '../const';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData } from '../types';
 import type { Workspace } from '@/models/workspace.model';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
+import type { Entity } from '@/models/entity.model';
 import { ENTITY_ICON_CONFIG } from '@/const';
+import { getDraggingEntityId } from '@/features/entity-card/components/entity-card.component';
+
+/**
+ * Convert screen coordinates to SVG graph coordinates.
+ * Accounts for SVG position and current zoom/pan transform.
+ */
+function screenToSvgCoords(
+  screenX: number,
+  screenY: number,
+  svgElement: SVGSVGElement,
+  transform: d3.ZoomTransform
+): { x: number; y: number } {
+  const rect = svgElement.getBoundingClientRect();
+  const svgX = screenX - rect.left;
+  const svgY = screenY - rect.top;
+
+  // Invert the zoom/pan transform
+  return {
+    x: (svgX - transform.x) / transform.k,
+    y: (svgY - transform.y) / transform.k
+  };
+}
 
 /**
  * Calculate zoom-to-fit transform for given nodes and dimensions.
  */
-function calculateFitTransform(
-  nodes: WorkspaceGraphNode[],
-  width: number,
-  height: number
-): d3.ZoomTransform {
+function calculateFitTransform(nodes: WorkspaceGraphNode[], width: number, height: number): d3.ZoomTransform {
   if (nodes.length === 0) return d3.zoomIdentity;
 
   const padding = GRAPH_CONFIG.fitPadding;
@@ -57,10 +76,13 @@ function calculateFitTransform(
 
 interface Props {
   workspace: Workspace;
+  /** Map of entity IDs to entities for O(1) lookups */
+  entityMap: Map<string, Entity>;
   onSaveViewState: (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => void;
+  onAddEntity: (entityId: string, position: { x: number; y: number }) => void;
 }
 
-const WorkspaceGraphComponent = ({ workspace, onSaveViewState }: Props) => {
+const WorkspaceGraphComponent = ({ workspace, entityMap, onSaveViewState, onAddEntity }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -96,10 +118,7 @@ const WorkspaceGraphComponent = ({ workspace, onSaveViewState }: Props) => {
   }, [onSaveViewState]);
 
   // Debounced save function
-  const debouncedSave = useMemo(
-    () => debounce(collectAndSave, GRAPH_CONFIG.saveDebounceMs),
-    [collectAndSave]
-  );
+  const debouncedSave = useMemo(() => debounce(collectAndSave, GRAPH_CONFIG.saveDebounceMs), [collectAndSave]);
 
   // Cleanup debounce on unmount
   useEffect(() => {
@@ -262,9 +281,7 @@ const WorkspaceGraphComponent = ({ workspace, onSaveViewState }: Props) => {
 
     // Apply saved transform or calculate auto-fit
     const initialTransform = workspace.viewState
-      ? d3.zoomIdentity
-          .translate(workspace.viewState.panX, workspace.viewState.panY)
-          .scale(workspace.viewState.scale)
+      ? d3.zoomIdentity.translate(workspace.viewState.panX, workspace.viewState.panY).scale(workspace.viewState.scale)
       : calculateFitTransform(nodes, width, height);
 
     transformRef.current = initialTransform;
@@ -378,6 +395,50 @@ const WorkspaceGraphComponent = ({ workspace, onSaveViewState }: Props) => {
     toast.info(`Analytics > Spreadline: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
   }, [contextMenuNode]);
 
+  // Handle drag over to accept drops
+  const handleDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+
+      // Check if dragging entity already exists in workspace
+      const draggingId = getDraggingEntityId();
+      const entityExists = draggingId ? entityMap.has(draggingId) : false;
+
+      // Show 'none' (not allowed) cursor if entity exists, 'copy' otherwise
+      event.dataTransfer.dropEffect = entityExists ? 'none' : 'copy';
+    },
+    [entityMap]
+  );
+
+  // Handle drop of entity cards
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+
+      // Parse entity data from dataTransfer
+      const jsonData = event.dataTransfer.getData('application/json');
+      if (!jsonData) return;
+
+      let entity: Entity;
+      try {
+        entity = JSON.parse(jsonData) as Entity;
+      } catch {
+        toast.error('Invalid entity data');
+        return;
+      }
+
+      // Check if entity already exists in workspace (user already saw not-allowed cursor)
+      if (entityMap.has(entity.id)) return;
+
+      // Convert screen coordinates to SVG coordinates
+      if (!svgRef.current) return;
+      const position = screenToSvgCoords(event.clientX, event.clientY, svgRef.current, transformRef.current);
+
+      onAddEntity(entity.id, position);
+    },
+    [entityMap, onAddEntity]
+  );
+
   // Handle right-click on nodes to open context menu
   handleNodeContextMenuRef.current = (event: MouseEvent, node: WorkspaceGraphNode) => {
     event.preventDefault();
@@ -413,7 +474,7 @@ const WorkspaceGraphComponent = ({ workspace, onSaveViewState }: Props) => {
   };
 
   return (
-    <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden" onDragOver={handleDragOver} onDrop={handleDrop}>
       <svg ref={svgRef} className="h-full w-full" />
 
       {/* Context menu for nodes */}

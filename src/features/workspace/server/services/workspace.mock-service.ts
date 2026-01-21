@@ -3,35 +3,19 @@ import 'server-only';
 import { faker } from '@faker-js/faker';
 import type { EntityResponse } from '@/models/entity-response.model';
 import type { WorkspaceResponse, RelationshipResponse } from '@/models/workspace-response.model';
+import { getMockEntities, RELATIONSHIP_PREDICATES } from '@/lib/mock-data';
 
 const FAKER_SEED = 12345;
-const MOCK_ENTITY_TYPES = ['Person', 'Organization'];
-const RELATIONSHIP_PREDICATES = ['works_for', 'knows', 'manages', 'reports_to', 'collaborates_with'];
 
 // ============================================================================
-// Global mock data pool (all available entities and relationships)
+// Global mock relationships (generated from shared entity pool)
 // ============================================================================
 
-let cachedEntities: EntityResponse[] | null = null;
 let cachedRelationships: RelationshipResponse[] | null = null;
 
-function generateMockEntities(): EntityResponse[] {
-  faker.seed(FAKER_SEED);
-  const entities: EntityResponse[] = [];
-  for (const type of MOCK_ENTITY_TYPES) {
-    for (let i = 0; i < 300; i++) {
-      entities.push({
-        id: faker.string.uuid(),
-        labelNormalized: type === 'Person' ? faker.person.fullName() : faker.company.name(),
-        type
-      });
-    }
-  }
-  return entities;
-}
-
-function generateMockRelationships(entities: EntityResponse[]): RelationshipResponse[] {
+function generateMockRelationships(): RelationshipResponse[] {
   faker.seed(FAKER_SEED + 1);
+  const entities = getMockEntities();
   const relationships: RelationshipResponse[] = [];
   const targetCount = Math.floor(entities.length * 0.2);
   for (let i = 0; i < targetCount; i++) {
@@ -39,7 +23,7 @@ function generateMockRelationships(entities: EntityResponse[]): RelationshipResp
     const target = faker.helpers.arrayElement(entities.filter(e => e.id !== source.id));
     relationships.push({
       relationshipId: faker.string.uuid(),
-      predicate: faker.helpers.arrayElement(RELATIONSHIP_PREDICATES),
+      predicate: faker.helpers.arrayElement([...RELATIONSHIP_PREDICATES]),
       sourceEntityId: source.id,
       relatedEntityId: target.id
     });
@@ -47,12 +31,11 @@ function generateMockRelationships(entities: EntityResponse[]): RelationshipResp
   return relationships;
 }
 
-function getMockData(): { entities: EntityResponse[]; relationships: RelationshipResponse[] } {
-  if (!cachedEntities || !cachedRelationships) {
-    cachedEntities = generateMockEntities();
-    cachedRelationships = generateMockRelationships(cachedEntities);
+function getMockRelationships(): RelationshipResponse[] {
+  if (!cachedRelationships) {
+    cachedRelationships = generateMockRelationships();
   }
-  return { entities: cachedEntities, relationships: cachedRelationships };
+  return cachedRelationships;
 }
 
 // ============================================================================
@@ -81,7 +64,7 @@ function hashString(str: string): number {
  */
 function getWorkspaceState(workspaceId: string): WorkspaceState {
   if (!workspaceStateMap.has(workspaceId)) {
-    const { entities } = getMockData();
+    const entities = getMockEntities();
 
     // Use workspace ID as seed for consistent initial subset
     faker.seed(hashString(workspaceId));
@@ -98,7 +81,7 @@ function getWorkspaceState(workspaceId: string): WorkspaceState {
       if (target) {
         generatedRelationships.push({
           relationshipId: faker.string.uuid(),
-          predicate: faker.helpers.arrayElement(RELATIONSHIP_PREDICATES),
+          predicate: faker.helpers.arrayElement([...RELATIONSHIP_PREDICATES]),
           sourceEntityId: source.id,
           relatedEntityId: target.id
         });
@@ -118,7 +101,7 @@ function getWorkspaceState(workspaceId: string): WorkspaceState {
  * to entities already in the workspace.
  */
 function findConnectingRelationships(entityId: string, existingEntityIds: Set<string>): RelationshipResponse[] {
-  const { relationships } = getMockData();
+  const relationships = getMockRelationships();
   return relationships.filter(
     r =>
       (r.sourceEntityId === entityId && existingEntityIds.has(r.relatedEntityId)) ||
@@ -149,7 +132,7 @@ export async function getWorkspaceById(id: string): Promise<WorkspaceResponse> {
  */
 export async function addEntitiesToWorkspace(workspaceId: string, entityIds: string[]): Promise<WorkspaceResponse> {
   const state = getWorkspaceState(workspaceId);
-  const { entities } = getMockData();
+  const entities = getMockEntities();
 
   const existingEntityIds = new Set(state.entityList.map(e => e.id));
   const existingRelationshipIds = new Set(state.relationshipList.map(r => r.relationshipId));

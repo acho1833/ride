@@ -7,10 +7,13 @@
  * Retrieves workspace data by workspaceId and passes to graph component.
  */
 
+import { useMemo, useCallback } from 'react';
 import { useWorkspaceQuery } from '../hooks/useWorkspaceQuery';
 import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMutation';
+import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitiesMutation';
 import WorkspaceGraphComponent from './workspace-graph.component';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
+import type { Entity } from '@/models/entity.model';
 
 interface Props {
   /** The workspaceId to fetch and display */
@@ -20,10 +23,41 @@ interface Props {
 const WorkspaceComponent = ({ workspaceId }: Props) => {
   const { data: workspace, isPending, isError, error } = useWorkspaceQuery(workspaceId);
   const { mutate: saveViewState } = useWorkspaceViewStateMutation();
+  const { mutate: addEntities } = useWorkspaceAddEntitiesMutation();
 
-  const handleSaveViewState = (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => {
-    saveViewState({ ...input, workspaceId });
-  };
+  // Create entity map for O(1) lookups
+  const entityMap = useMemo<Map<string, Entity>>(() => {
+    if (!workspace) return new Map();
+    return new Map(workspace.entityList.map(e => [e.id, e]));
+  }, [workspace]);
+
+  const handleSaveViewState = useCallback(
+    (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => {
+      saveViewState({ ...input, workspaceId });
+    },
+    [saveViewState, workspaceId]
+  );
+
+  const handleAddEntity = useCallback(
+    (entityId: string, position: { x: number; y: number }) => {
+      // Add entity to workspace
+      addEntities({ workspaceId, entityIds: [entityId] });
+
+      // Save position immediately so it appears at the drop location
+      const currentPositions = workspace?.viewState?.entityPositions ?? {};
+      saveViewState({
+        workspaceId,
+        scale: workspace?.viewState?.scale ?? 1,
+        panX: workspace?.viewState?.panX ?? 0,
+        panY: workspace?.viewState?.panY ?? 0,
+        entityPositions: {
+          ...currentPositions,
+          [entityId]: position
+        }
+      });
+    },
+    [addEntities, saveViewState, workspaceId, workspace?.viewState]
+  );
 
   if (isPending) {
     return (
@@ -49,7 +83,14 @@ const WorkspaceComponent = ({ workspaceId }: Props) => {
     );
   }
 
-  return <WorkspaceGraphComponent workspace={workspace} onSaveViewState={handleSaveViewState} />;
+  return (
+    <WorkspaceGraphComponent
+      workspace={workspace}
+      entityMap={entityMap}
+      onSaveViewState={handleSaveViewState}
+      onAddEntity={handleAddEntity}
+    />
+  );
 };
 
 export default WorkspaceComponent;

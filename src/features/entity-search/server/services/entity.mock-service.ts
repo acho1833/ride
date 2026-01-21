@@ -1,44 +1,7 @@
 import 'server-only';
 
-import { faker } from '@faker-js/faker';
-import { EntityResponse } from '@/models/entity-response.model';
+import { getMockEntities, MOCK_ENTITY_TYPES } from '@/lib/mock-data';
 import { EntitySearchParams, EntitySearchMockResponse } from '../../types';
-
-/** Random seed for deterministic fake data generation */
-const FAKER_SEED = 12345;
-
-/** Mock entity types - in production this would come from external API */
-const MOCK_ENTITY_TYPES = ['Person', 'Organization'];
-
-/**
- * Generates deterministic mock entity data using faker.
- * Uses a fixed seed so the same data is returned on every call.
- */
-function generateMockEntities(personCount: number, orgCount: number): EntityResponse[] {
-  faker.seed(FAKER_SEED);
-  const entities: EntityResponse[] = [];
-
-  for (let i = 1; i <= personCount; i++) {
-    entities.push({
-      id: `person-${i}`,
-      labelNormalized: faker.person.fullName(),
-      type: 'Person'
-    });
-  }
-
-  for (let i = 1; i <= orgCount; i++) {
-    entities.push({
-      id: `org-${i}`,
-      labelNormalized: faker.company.name(),
-      type: 'Organization'
-    });
-  }
-
-  return entities;
-}
-
-/** In-memory mock data: 300 Person + 300 Organization = 600 total entities */
-const MOCK_ENTITIES = generateMockEntities(300, 300);
 
 /**
  * Checks if entity label matches the search pattern.
@@ -64,7 +27,7 @@ function matchesNamePattern(label: string, pattern: string): boolean {
  * - Applies pagination
  */
 export async function searchEntities(params: EntitySearchParams): Promise<EntitySearchMockResponse> {
-  let filtered = [...MOCK_ENTITIES];
+  let filtered = [...getMockEntities()];
 
   // Filter by name (supports trailing wildcard for prefix match)
   if (params.name && params.name.trim() !== '') {
