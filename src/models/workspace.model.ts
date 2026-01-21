@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { Entity, entitySchema, toEntity } from './entity.model';
 import { Relationship, relationshipSchema } from './relationship.model';
 import { ViewPreference, viewPreferenceSchema } from './view-preference.model';
+import { WorkspaceViewState, workspaceViewStateSchema } from './workspace-view-state.model';
 import type { WorkspaceResponse } from './workspace-response.model';
 
 export interface Workspace {
@@ -10,6 +11,7 @@ export interface Workspace {
   entityList: Entity[];
   viewPreference: ViewPreference;
   relationshipList: Relationship[];
+  viewState: WorkspaceViewState | null;
 }
 
 export const workspaceSchema = z.object({
@@ -17,13 +19,14 @@ export const workspaceSchema = z.object({
   name: z.string(),
   entityList: entitySchema.array(),
   viewPreference: viewPreferenceSchema,
-  relationshipList: relationshipSchema.array()
+  relationshipList: relationshipSchema.array(),
+  viewState: workspaceViewStateSchema.nullable()
 });
 
 /**
  * Converts external API response to Workspace model.
  */
-export function toWorkspace(response: WorkspaceResponse): Workspace {
+export function toWorkspace(response: WorkspaceResponse): Omit<Workspace, 'viewState'> {
   return {
     id: response.id,
     name: response.name,

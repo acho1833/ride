@@ -3,6 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 import { appProcedure } from '@/lib/orpc';
 import { workspaceSchema } from '@/models/workspace.model';
+import { workspaceViewStateSchema, workspaceViewStateInputSchema } from '@/models/workspace-view-state.model';
 import * as workspaceService from './services/workspace.service';
 
 const API_WORKSPACE_PREFIX = '/workspaces';
@@ -18,8 +19,34 @@ export const workspaceRouter = appProcedure.router({
     })
     .input(z.object({ id: z.string() }))
     .output(workspaceSchema)
-    .handler(async ({ input }) => {
-      return workspaceService.getWorkspaceById(input.id);
+    .handler(async ({ input, context }) => {
+      return workspaceService.getWorkspaceById(input.id, context.sid);
+    }),
+
+  saveViewState: appProcedure
+    .route({
+      method: 'PUT',
+      path: `${API_WORKSPACE_PREFIX}/:workspaceId/view-state`,
+      summary: 'Save workspace view state',
+      tags
+    })
+    .input(workspaceViewStateInputSchema)
+    .output(workspaceViewStateSchema)
+    .handler(async ({ input, context }) => {
+      return workspaceService.saveViewState(input, context.sid);
+    }),
+
+  delete: appProcedure
+    .route({
+      method: 'DELETE',
+      path: `${API_WORKSPACE_PREFIX}/:id`,
+      summary: 'Delete workspace',
+      tags
+    })
+    .input(z.object({ id: z.string() }))
+    .output(z.void())
+    .handler(async ({ input, context }) => {
+      return workspaceService.deleteWorkspace(input.id, context.sid);
     }),
 
   addEntities: appProcedure
@@ -31,8 +58,8 @@ export const workspaceRouter = appProcedure.router({
     })
     .input(z.object({ workspaceId: z.string(), entityIds: z.array(z.string()) }))
     .output(workspaceSchema)
-    .handler(async ({ input }) => {
-      return workspaceService.addEntitiesToWorkspace(input.workspaceId, input.entityIds);
+    .handler(async ({ input, context }) => {
+      return workspaceService.addEntitiesToWorkspace(input.workspaceId, input.entityIds, context.sid);
     }),
 
   removeEntities: appProcedure
@@ -44,7 +71,7 @@ export const workspaceRouter = appProcedure.router({
     })
     .input(z.object({ workspaceId: z.string(), entityIds: z.array(z.string()) }))
     .output(workspaceSchema)
-    .handler(async ({ input }) => {
-      return workspaceService.removeEntitiesFromWorkspace(input.workspaceId, input.entityIds);
+    .handler(async ({ input, context }) => {
+      return workspaceService.removeEntitiesFromWorkspace(input.workspaceId, input.entityIds, context.sid);
     })
 });
