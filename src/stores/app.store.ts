@@ -17,9 +17,17 @@ import { createFileTreeSlice, FileTreeSlice } from './files/files.store';
 import { createOpenFilesSlice, OpenFilesSlice } from './open-files/open-files.store';
 import { createTypeTabSlice, TypeTabSlice } from '@/stores/type-tabs/type-tabs.store';
 import { createProjectSlice, ProjectSlice } from './projects/projects.store';
+import { createWorkspaceGraphSlice, WorkspaceGraphSlice } from './workspace-graph/workspace-graph.store';
 
 // Combined store type
-type AppStore = AppConfigSlice & AppSettingsSlice & UiSlice & FileTreeSlice & OpenFilesSlice & TypeTabSlice & ProjectSlice;
+type AppStore = AppConfigSlice &
+  AppSettingsSlice &
+  UiSlice &
+  FileTreeSlice &
+  OpenFilesSlice &
+  TypeTabSlice &
+  ProjectSlice &
+  WorkspaceGraphSlice;
 
 /**
  * Main app store with devtools and sessionStorage persistence
@@ -34,7 +42,8 @@ export const useAppStore = create<AppStore>()(
         ...createFileTreeSlice(...a),
         ...createOpenFilesSlice(...a),
         ...createTypeTabSlice(...a),
-        ...createProjectSlice(...a)
+        ...createProjectSlice(...a),
+        ...createWorkspaceGraphSlice(...a)
       }),
       {
         name: 'app-store',

@@ -7,10 +7,11 @@
  * Retrieves workspace data by workspaceId and passes to graph component.
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { useWorkspaceQuery } from '../hooks/useWorkspaceQuery';
 import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMutation';
 import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitiesMutation';
+import { useSelectedEntityIds, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
 import WorkspaceGraphComponent from './workspace-graph.component';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
 import type { Entity } from '@/models/entity.model';
@@ -24,6 +25,15 @@ const WorkspaceComponent = ({ workspaceId }: Props) => {
   const { data: workspace, isPending, isError, error } = useWorkspaceQuery(workspaceId);
   const { mutate: saveViewState } = useWorkspaceViewStateMutation();
   const { mutate: addEntities } = useWorkspaceAddEntitiesMutation();
+  const selectedEntityIds = useSelectedEntityIds(workspaceId);
+  const { setSelectedEntityIds, toggleEntitySelection, clearEntitySelection } = useWorkspaceGraphActions();
+
+  // Clear selection state when this workspace component unmounts (tab closed)
+  useEffect(() => {
+    return () => {
+      clearEntitySelection(workspaceId);
+    };
+  }, [workspaceId, clearEntitySelection]);
 
   // Create entity map for O(1) lookups
   const entityMap = useMemo<Map<string, Entity>>(() => {
@@ -87,6 +97,10 @@ const WorkspaceComponent = ({ workspaceId }: Props) => {
     <WorkspaceGraphComponent
       workspace={workspace}
       entityMap={entityMap}
+      selectedEntityIds={selectedEntityIds}
+      onSetSelectedEntityIds={ids => setSelectedEntityIds(workspaceId, ids)}
+      onToggleEntitySelection={id => toggleEntitySelection(workspaceId, id)}
+      onClearEntitySelection={() => clearEntitySelection(workspaceId)}
       onSaveViewState={handleSaveViewState}
       onAddEntity={handleAddEntity}
     />

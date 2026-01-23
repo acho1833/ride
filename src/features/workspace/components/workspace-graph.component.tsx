@@ -78,11 +78,28 @@ interface Props {
   workspace: Workspace;
   /** Map of entity IDs to entities for O(1) lookups */
   entityMap: Map<string, Entity>;
+  /** IDs of currently selected entity nodes (from Zustand store) */
+  selectedEntityIds: string[];
+  /** Replace the entire selection with the given IDs */
+  onSetSelectedEntityIds: (ids: string[]) => void;
+  /** Toggle a single entity in/out of the selection */
+  onToggleEntitySelection: (id: string) => void;
+  /** Clear all selected entities */
+  onClearEntitySelection: () => void;
   onSaveViewState: (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => void;
   onAddEntity: (entityId: string, position: { x: number; y: number }) => void;
 }
 
-const WorkspaceGraphComponent = ({ workspace, entityMap, onSaveViewState, onAddEntity }: Props) => {
+const WorkspaceGraphComponent = ({
+  workspace,
+  entityMap,
+  selectedEntityIds = [],
+  onSetSelectedEntityIds,
+  onToggleEntitySelection,
+  onClearEntitySelection,
+  onSaveViewState,
+  onAddEntity
+}: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -94,6 +111,10 @@ const WorkspaceGraphComponent = ({ workspace, entityMap, onSaveViewState, onAddE
   const contextMenuTriggerRef = useRef<HTMLDivElement>(null);
   const handleNodeContextMenuRef = useRef<(event: MouseEvent, node: WorkspaceGraphNode) => void>(() => {});
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+
+  // Keep a ref of selectedEntityIds so D3 drag handlers always read the latest value
+  const selectedEntityIdsRef = useRef<string[]>(selectedEntityIds);
+  selectedEntityIdsRef.current = selectedEntityIds;
 
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
@@ -307,34 +328,59 @@ const WorkspaceGraphComponent = ({ workspace, entityMap, onSaveViewState, onAddE
       node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
-    // Setup drag behavior - only moves the dragged node, no simulation restart
+    // Build node ID → <g> element map for group drag updates
+    const nodeElementMap = new Map<string, SVGGElement>();
+    node.each(function (d) {
+      nodeElementMap.set(d.id, this);
+    });
+
+    // Helper: update connected links for a given node
+    const updateLinksForNode = (nodeId: string) => {
+      const connectedLinks = nodeLinkMap.get(nodeId);
+      if (connectedLinks) {
+        for (const linkEl of connectedLinks) {
+          const linkData = d3.select<SVGLineElement, WorkspaceGraphLink>(linkEl).datum();
+          const source = linkData.source as WorkspaceGraphNode;
+          const target = linkData.target as WorkspaceGraphNode;
+          linkEl.setAttribute('x1', String(source.x ?? 0));
+          linkEl.setAttribute('y1', String(source.y ?? 0));
+          linkEl.setAttribute('x2', String(target.x ?? 0));
+          linkEl.setAttribute('y2', String(target.y ?? 0));
+        }
+      }
+    };
+
+    // Setup drag behavior - supports group drag when node is in selection
     const drag = d3
       .drag<SVGGElement, WorkspaceGraphNode>()
       .on('start', function () {
-        // 'this' is the <g> element the drag is attached to
         this.setAttribute('cursor', 'grabbing');
       })
       .on('drag', function (event: d3.D3DragEvent<SVGGElement, WorkspaceGraphNode, WorkspaceGraphNode>, d) {
-        // Update node position directly
-        d.x = event.x;
-        d.y = event.y;
+        const selected = selectedEntityIdsRef.current;
+        const isDraggedNodeSelected = selected.includes(d.id);
 
-        // Update the node's visual position (direct DOM manipulation)
-        // 'this' is the <g> element
-        this.setAttribute('transform', `translate(${d.x},${d.y})`);
+        if (isDraggedNodeSelected && selected.length > 1) {
+          // Group drag: compute delta from dragged node and apply to all selected
+          const dx = event.x - (d.x ?? 0);
+          const dy = event.y - (d.y ?? 0);
 
-        // Update connected links using pre-computed map (direct DOM manipulation)
-        const connectedLinks = nodeLinkMap.get(d.id);
-        if (connectedLinks) {
-          for (const linkEl of connectedLinks) {
-            const linkData = d3.select<SVGLineElement, WorkspaceGraphLink>(linkEl).datum();
-            const source = linkData.source as WorkspaceGraphNode;
-            const target = linkData.target as WorkspaceGraphNode;
-            linkEl.setAttribute('x1', String(source.x ?? 0));
-            linkEl.setAttribute('y1', String(source.y ?? 0));
-            linkEl.setAttribute('x2', String(target.x ?? 0));
-            linkEl.setAttribute('y2', String(target.y ?? 0));
+          for (const nodeId of selected) {
+            const nodeData = nodes.find(n => n.id === nodeId);
+            const nodeEl = nodeElementMap.get(nodeId);
+            if (!nodeData || !nodeEl) continue;
+
+            nodeData.x = (nodeData.x ?? 0) + dx;
+            nodeData.y = (nodeData.y ?? 0) + dy;
+            nodeEl.setAttribute('transform', `translate(${nodeData.x},${nodeData.y})`);
+            updateLinksForNode(nodeId);
           }
+        } else {
+          // Single node drag (original behavior)
+          d.x = event.x;
+          d.y = event.y;
+          this.setAttribute('transform', `translate(${d.x},${d.y})`);
+          updateLinksForNode(d.id);
         }
       })
       .on('end', function () {
@@ -344,16 +390,41 @@ const WorkspaceGraphComponent = ({ workspace, entityMap, onSaveViewState, onAddE
 
     node.call(drag);
 
+    // Left-click on node: single select or ctrl+click toggle
+    node.on('click', function (event: MouseEvent, d: WorkspaceGraphNode) {
+      event.stopPropagation();
+      if (event.ctrlKey || event.metaKey) {
+        // Ctrl+click: toggle this node in/out of selection
+        onToggleEntitySelection(d.id);
+      } else {
+        // Regular click: select only this node
+        onSetSelectedEntityIds([d.id]);
+      }
+    });
+
     // Add right-click handler for context menu
     node.on('contextmenu', function (event: MouseEvent, d: WorkspaceGraphNode) {
       handleNodeContextMenuRef.current(event, d);
+    });
+
+    // Click on empty canvas: clear selection
+    svg.on('click', function () {
+      onClearEntitySelection();
     });
 
     // Cleanup
     return () => {
       simulation.stop();
     };
-  }, [data, dimensions, workspace.viewState, debouncedSave]);
+  }, [data, dimensions, workspace.viewState, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection]);
+
+  // Update node colors when selection changes (driven by prop from parent/store)
+  useEffect(() => {
+    if (!svgRef.current) return;
+    d3.select(svgRef.current)
+      .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle')
+      .attr('fill', d => (selectedEntityIds.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor));
+  }, [selectedEntityIds]);
 
   // Zoom control handlers
   const handleZoomIn = () => {
@@ -440,8 +511,14 @@ const WorkspaceGraphComponent = ({ workspace, entityMap, onSaveViewState, onAddE
   );
 
   // Handle right-click on nodes to open context menu
+  // If the node is not already selected, select it (clears others)
   handleNodeContextMenuRef.current = (event: MouseEvent, node: WorkspaceGraphNode) => {
     event.preventDefault();
+
+    // Select the node if not already in the current selection
+    if (!selectedEntityIds.includes(node.id)) {
+      onSetSelectedEntityIds([node.id]);
+    }
 
     const openMenu = () => {
       setContextMenuNode(node);
