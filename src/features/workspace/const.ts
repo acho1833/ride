@@ -25,5 +25,9 @@ export const GRAPH_CONFIG = {
   /** Padding around nodes when fitting to view */
   fitPadding: 50,
   /** Debounce delay for saving view state in milliseconds */
-  saveDebounceMs: 500
+  saveDebounceMs: 500,
+  /** Default node fill color (teal) */
+  nodeColor: 'hsl(175, 40%, 45%)',
+  /** Node fill color when selected (blue) */
+  nodeColorSelected: 'hsl(210, 70%, 50%)'
 } as const;

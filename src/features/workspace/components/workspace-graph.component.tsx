@@ -229,7 +229,7 @@ const WorkspaceGraphComponent = ({ workspace, entityMap, onSaveViewState, onAddE
     node
       .append('circle')
       .attr('r', GRAPH_CONFIG.nodeRadius)
-      .attr('fill', 'hsl(210, 70%, 50%)')
+      .attr('fill', GRAPH_CONFIG.nodeColor)
       .attr('stroke', 'white')
       .attr('stroke-width', 2);
 

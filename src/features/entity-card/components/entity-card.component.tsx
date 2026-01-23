@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { getEntityIconClass } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { ENTITY_ICON_CONFIG } from '@/const';
+import { GRAPH_CONFIG } from '@/features/workspace/const';
 
 // Module-level variable to track the currently dragging entity ID.
 // Only one drag operation can happen at a time, so this is safe.
@@ -81,7 +82,7 @@ const EntityCardComponent = ({ entity, className, onClick, draggable = true }: P
       {draggable && (
         <div ref={dragImageRef} className="pointer-events-none fixed -top-[9999px] -left-[9999px]">
           <svg width="40" height="40">
-            <circle cx="20" cy="20" r="20" fill="hsl(210, 70%, 50%)" />
+            <circle cx="20" cy="20" r="20" fill={GRAPH_CONFIG.nodeColor} />
             <use href={`#entity-icon-${iconSymbolId}`} x="4" y="4" width="32" height="32" fill="white" />
           </svg>
         </div>
