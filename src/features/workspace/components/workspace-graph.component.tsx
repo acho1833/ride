@@ -13,7 +13,7 @@ import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG } from '../const';
+import { GRAPH_CONFIG, SELECTION_CONFIG } from '../const';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData } from '../types';
 import type { Workspace } from '@/models/workspace.model';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
@@ -64,6 +64,17 @@ function calculateFitTransform(nodes: WorkspaceGraphNode[], width: number, heigh
   return d3.zoomIdentity.translate(translateX, translateY).scale(scale);
 }
 
+/**
+ * Check if a point is inside a rectangle.
+ */
+function isPointInRect(
+  x: number,
+  y: number,
+  rect: { x: number; y: number; width: number; height: number }
+): boolean {
+  return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+}
+
 interface Props {
   workspace: Workspace;
   /** Map of entity IDs to entities for O(1) lookups */
@@ -104,6 +115,11 @@ const WorkspaceGraphComponent = ({
   // Keep a ref of selectedEntityIds so D3 drag handlers always read the latest value
   const selectedEntityIdsRef = useRef<string[]>(selectedEntityIds);
   selectedEntityIdsRef.current = selectedEntityIds;
+
+  // Rectangle selection state refs
+  const isDraggingSelectionRef = useRef(false);
+  const dragStartRef = useRef<{ x: number; y: number; screenX: number; screenY: number } | null>(null);
+  const justCompletedDragRef = useRef(false);
 
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
@@ -263,6 +279,17 @@ const WorkspaceGraphComponent = ({
       .attr('font-size', '12px')
       .attr('pointer-events', 'none');
 
+    // Create selection rectangle (initially hidden, rendered on top of nodes)
+    const selectionRect = g
+      .append('rect')
+      .attr('class', 'selection-rect')
+      .attr('fill', SELECTION_CONFIG.rectFill)
+      .attr('stroke', SELECTION_CONFIG.rectStroke)
+      .attr('stroke-width', SELECTION_CONFIG.rectStrokeWidth)
+      .attr('stroke-dasharray', SELECTION_CONFIG.rectStrokeDash)
+      .attr('pointer-events', 'none')
+      .attr('visibility', 'hidden');
+
     // Setup force simulation
     const simulation = d3
       .forceSimulation<WorkspaceGraphNode>(nodes)
@@ -397,8 +424,132 @@ const WorkspaceGraphComponent = ({
       onContextMenu(event, d.id);
     });
 
-    // Click on empty canvas: clear selection
+    // Rectangle selection: use native event listeners to avoid D3 zoom interference
+    const svgElement = svgRef.current!;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      // Only handle left-click without Ctrl (Ctrl+drag is for panning)
+      if (event.button !== 0 || event.ctrlKey || event.metaKey) return;
+
+      // Check if clicked on a node (not empty canvas)
+      const target = event.target as Element;
+      if (target.closest('.nodes g')) return;
+
+      // Store start position in both screen and graph coordinates
+      const graphCoords = screenToSvgCoords(event.clientX, event.clientY, svgElement, transformRef.current);
+      dragStartRef.current = {
+        x: graphCoords.x,
+        y: graphCoords.y,
+        screenX: event.clientX,
+        screenY: event.clientY
+      };
+      isDraggingSelectionRef.current = false;
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!dragStartRef.current) return;
+
+      // Calculate screen distance moved
+      const dx = event.clientX - dragStartRef.current.screenX;
+      const dy = event.clientY - dragStartRef.current.screenY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Start rectangle selection if moved past threshold
+      if (!isDraggingSelectionRef.current && distance >= SELECTION_CONFIG.minDragDistance) {
+        isDraggingSelectionRef.current = true;
+        selectionRect.attr('visibility', 'visible');
+      }
+
+      // Update rectangle if actively dragging
+      if (isDraggingSelectionRef.current) {
+        const currentCoords = screenToSvgCoords(event.clientX, event.clientY, svgElement, transformRef.current);
+
+        // Calculate rectangle bounds (handle drag in any direction)
+        const rectX = Math.min(dragStartRef.current.x, currentCoords.x);
+        const rectY = Math.min(dragStartRef.current.y, currentCoords.y);
+        const rectWidth = Math.abs(currentCoords.x - dragStartRef.current.x);
+        const rectHeight = Math.abs(currentCoords.y - dragStartRef.current.y);
+
+        selectionRect
+          .attr('x', rectX)
+          .attr('y', rectY)
+          .attr('width', rectWidth)
+          .attr('height', rectHeight);
+
+        // Visual feedback: highlight nodes inside rectangle (without triggering state update)
+        const rect = { x: rectX, y: rectY, width: rectWidth, height: rectHeight };
+        d3.select(svgElement)
+          .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle')
+          .attr('fill', d => {
+            const isInRect = isPointInRect(d.x ?? 0, d.y ?? 0, rect);
+            const isSelected = selectedEntityIdsRef.current.includes(d.id);
+            return isInRect || isSelected ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor;
+          });
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (!dragStartRef.current) return;
+
+      const wasDragging = isDraggingSelectionRef.current;
+
+      if (wasDragging) {
+        // Complete rectangle selection - use current rect position
+        const rectX = parseFloat(selectionRect.attr('x') || '0');
+        const rectY = parseFloat(selectionRect.attr('y') || '0');
+        const rectWidth = parseFloat(selectionRect.attr('width') || '0');
+        const rectHeight = parseFloat(selectionRect.attr('height') || '0');
+
+        // Find all nodes inside the rectangle
+        const nodesInRect = nodes.filter(n =>
+          isPointInRect(n.x ?? 0, n.y ?? 0, { x: rectX, y: rectY, width: rectWidth, height: rectHeight })
+        );
+        const selectedIds = nodesInRect.map(n => n.id);
+
+        // Update selection
+        onSetSelectedEntityIds(selectedIds);
+
+        // Hide rectangle
+        selectionRect.attr('visibility', 'hidden');
+
+        // Prevent click handler from firing
+        justCompletedDragRef.current = true;
+        setTimeout(() => {
+          justCompletedDragRef.current = false;
+        }, 0);
+      }
+
+      // Reset drag state
+      dragStartRef.current = null;
+      isDraggingSelectionRef.current = false;
+    };
+
+    const handleMouseLeave = () => {
+      if (isDraggingSelectionRef.current) {
+        // Cancel rectangle selection
+        selectionRect.attr('visibility', 'hidden');
+
+        // Reset node colors to match current selection state
+        d3.select(svgElement)
+          .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle')
+          .attr('fill', d =>
+            selectedEntityIdsRef.current.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor
+          );
+
+        dragStartRef.current = null;
+        isDraggingSelectionRef.current = false;
+      }
+    };
+
+    // Add event listeners
+    svgElement.addEventListener('mousedown', handleMouseDown);
+    svgElement.addEventListener('mousemove', handleMouseMove);
+    svgElement.addEventListener('mouseup', handleMouseUp);
+    svgElement.addEventListener('mouseleave', handleMouseLeave);
+
+    // Click on empty canvas: clear selection (only if not completing a drag)
     svg.on('click', function () {
+      if (justCompletedDragRef.current) return;
       onClearEntitySelection();
     });
 
@@ -411,6 +562,10 @@ const WorkspaceGraphComponent = ({
     // Cleanup
     return () => {
       simulation.stop();
+      svgElement.removeEventListener('mousedown', handleMouseDown);
+      svgElement.removeEventListener('mousemove', handleMouseMove);
+      svgElement.removeEventListener('mouseup', handleMouseUp);
+      svgElement.removeEventListener('mouseleave', handleMouseLeave);
     };
   }, [data, dimensions, workspace, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection]);
 
@@ -491,7 +646,7 @@ const WorkspaceGraphComponent = ({
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden" onDragOver={handleDragOver} onDrop={handleDrop}>
-      <svg ref={svgRef} className="h-full w-full" />
+      <svg ref={svgRef} className="h-full w-full select-none" />
 
       {/* Control buttons - lower right */}
       <div className="absolute right-4 bottom-4 flex flex-col gap-2">

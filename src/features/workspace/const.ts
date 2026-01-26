@@ -31,3 +31,19 @@ export const GRAPH_CONFIG = {
   /** Node fill color when selected (blue) */
   nodeColorSelected: 'hsl(210, 70%, 50%)'
 } as const;
+
+/**
+ * Rectangle selection configuration.
+ */
+export const SELECTION_CONFIG = {
+  /** Minimum drag distance in pixels to trigger rectangle selection vs click */
+  minDragDistance: 5,
+  /** Selection rectangle fill color (semi-transparent blue) */
+  rectFill: 'rgba(59, 130, 246, 0.2)',
+  /** Selection rectangle stroke color */
+  rectStroke: 'rgba(59, 130, 246, 0.8)',
+  /** Selection rectangle stroke width */
+  rectStrokeWidth: 1,
+  /** Selection rectangle stroke dash pattern */
+  rectStrokeDash: '4,2'
+} as const;
