@@ -39,25 +39,23 @@ export const useWorkspaceRemoveEntitiesMutation = () => {
 
   return useMutation(
     orpc.workspace.removeEntities.mutationOptions({
-      onMutate: async variables => {
+      onMutate: variables => {
         const toastId = toast.loading('Deleting...');
+        const queryKey = orpc.workspace.getById.key({ input: { id: variables.workspaceId } });
 
-        // Snapshot previous value
-        const previousWorkspace = queryClient.getQueryData<Workspace>(
-          orpc.workspace.getById.key({ input: { id: variables.workspaceId } })
+        // Snapshot for rollback, then optimistically remove entities
+        const previousWorkspace = queryClient.getQueryData<Workspace>(queryKey);
+        queryClient.setQueryData<Workspace>(queryKey, old =>
+          old
+            ? {
+                ...old,
+                entityList: old.entityList.filter(e => !variables.entityIds.includes(e.id)),
+                relationshipList: old.relationshipList.filter(
+                  r => !variables.entityIds.includes(r.sourceId) && !variables.entityIds.includes(r.targetId)
+                )
+              }
+            : old
         );
-
-        // Optimistically update: remove entities from cache
-        if (previousWorkspace) {
-          const updatedWorkspace: Workspace = {
-            ...previousWorkspace,
-            entityList: previousWorkspace.entityList.filter(e => !variables.entityIds.includes(e.id)),
-            relationshipList: previousWorkspace.relationshipList.filter(
-              r => !variables.entityIds.includes(r.sourceId) && !variables.entityIds.includes(r.targetId)
-            )
-          };
-          queryClient.setQueryData(orpc.workspace.getById.key({ input: { id: variables.workspaceId } }), updatedWorkspace);
-        }
 
         return { toastId, previousWorkspace };
       },
