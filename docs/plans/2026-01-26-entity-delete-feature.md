@@ -42,11 +42,6 @@ export const useWorkspaceRemoveEntitiesMutation = () => {
       onMutate: async variables => {
         const toastId = toast.loading('Deleting...');
 
-        // Cancel outgoing refetches
-        await queryClient.cancelQueries({
-          queryKey: orpc.workspace.getById.key({ input: { id: variables.workspaceId } })
-        });
-
         // Snapshot previous value
         const previousWorkspace = queryClient.getQueryData<Workspace>(
           orpc.workspace.getById.key({ input: { id: variables.workspaceId } })
