@@ -18,12 +18,15 @@ export const useChartTabs = () => useAppStore((state: TypeTabSlice) => state.typ
 /** Hook for active chart tab ID */
 export const useChartActiveTabId = () => useAppStore((state: TypeTabSlice) => state.typeTabs.charts.activeTabId);
 
-/** Hook for active chart tab object */
+/** Hook for active chart tab object (falls back to first tab if none active) */
 export const useChartActiveTab = () =>
   useAppStore((state: TypeTabSlice) => {
-    const activeTabId = state.typeTabs.charts.activeTabId;
-    if (!activeTabId) return null;
-    return state.typeTabs.charts.tabs.find(tab => tab.id === activeTabId) || null;
+    const { tabs, activeTabId } = state.typeTabs.charts;
+    if (activeTabId) {
+      return tabs.find(tab => tab.id === activeTabId) || null;
+    }
+    // Fallback to first tab if none is active
+    return tabs[0] || null;
   });
 
 /** Hook for entire charts object */

@@ -83,7 +83,7 @@ export const createTypeTabSlice: StateCreator<TypeTabSlice, [], [], TypeTabSlice
         //   }
         // }
       ],
-      activeTabId: 'chart-123'
+      activeTabId: null
     }
   },
 
