@@ -206,12 +206,12 @@ interface Props {
   /** Called when menu closes */
   onClose: () => void;
   /** Number of selected entities */
-  selectedCount: number;
+  selectedEntityCount: number;
   /** Called when delete is clicked */
   onDelete: () => void;
 }
 
-const WorkspaceContextMenuComponent = ({ position, onClose, selectedCount, onDelete }: Props) => {
+const WorkspaceContextMenuComponent = ({ position, onClose, selectedEntityCount, onDelete }: Props) => {
   const triggerRef = useRef<HTMLDivElement>(null);
   const openRef = useRef(false);
 
@@ -272,13 +272,15 @@ const WorkspaceContextMenuComponent = ({ position, onClose, selectedCount, onDel
           Paste
         </ContextMenuItem>
         <ContextMenuSeparator />
-        {selectedCount > 0 && (
-          <ContextMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </ContextMenuItem>
+        {selectedEntityCount > 0 && (
+          <>
+            <ContextMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
         )}
-        {selectedCount > 0 && <ContextMenuSeparator />}
         <ContextMenuSub>
           <ContextMenuSubTrigger disabled>
             <BarChart3 className="mr-2 h-4 w-4" />
