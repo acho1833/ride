@@ -77,13 +77,19 @@ const WorkspaceComponent = ({ workspaceId }: Props) => {
 
   const handleContextMenu = useCallback(
     (event: MouseEvent, entityId?: string) => {
-      // If right-clicked on entity, single-select it
+      // If right-clicked on entity, handle selection
       if (entityId) {
-        setSelectedEntityIds(workspaceId, [entityId]);
+        if (event.ctrlKey || event.metaKey) {
+          // Ctrl+right-click: add to multi-selection (like ctrl+left-click)
+          toggleEntitySelection(workspaceId, entityId);
+        } else {
+          // Regular right-click: single-select
+          setSelectedEntityIds(workspaceId, [entityId]);
+        }
       }
       setContextMenuPosition({ x: event.clientX, y: event.clientY });
     },
-    [workspaceId, setSelectedEntityIds]
+    [workspaceId, setSelectedEntityIds, toggleEntitySelection]
   );
 
   const handleContextMenuClose = useCallback(() => {
