@@ -252,7 +252,7 @@ export const useTodosCreateMutation = () => {
     orpc.todo.create.mutationOptions({
       onMutate: () => ({ toastId: toast.loading('Creating...') }),
       onSuccess: async (_data, _variables, context) => {
-        await queryClient.invalidateQueries({ queryKey: orpc.todo.getAll.key() });
+        await queryClient.invalidateQueries({ queryKey: orpc.todo.getAll.queryKey() });
         toast.success('Created', { id: context?.toastId });
       },
       onError: (_error, _variables, context) => {
@@ -266,7 +266,7 @@ export const useTodosCreateMutation = () => {
 Key rules:
 - Use `orpc.[feature].[method].queryOptions()` for queries
 - Use `orpc.[feature].[method].mutationOptions()` for mutations
-- Invalidate related queries on mutation success using `orpc.[feature].[method].key()`
+- **CRITICAL**: Use `orpc.[feature].[method].queryKey()` (not `.key()`) for `getQueryData`, `setQueryData`, and `invalidateQueries`. The `.queryKey()` method includes `type: "query"` which is required to match the cache key format used by `useQuery`.
 - Show toast notifications for loading/success/error states
 
 ### View/Component Pattern
@@ -772,7 +772,7 @@ export const useCommentCreateMutation = () => {
     orpc.comment.create.mutationOptions({
       onMutate: () => ({ toastId: toast.loading('Creating comment...') }),
       onSuccess: async (_data, _variables, context) => {
-        await queryClient.invalidateQueries({ queryKey: orpc.comment.getAll.key() });
+        await queryClient.invalidateQueries({ queryKey: orpc.comment.getAll.queryKey() });
         toast.success('Comment created', { id: context?.toastId });
       },
       onError: (_error, _variables, context) => {

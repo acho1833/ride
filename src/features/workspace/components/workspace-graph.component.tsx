@@ -11,17 +11,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger
-} from '@/components/ui/context-menu';
-import { Plus, Minus, Maximize, Copy, ClipboardPaste, Trash2, BarChart3, TrendingUp } from 'lucide-react';
+import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
 import { GRAPH_CONFIG } from '../const';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData } from '../types';
@@ -88,6 +78,8 @@ interface Props {
   onClearEntitySelection: () => void;
   onSaveViewState: (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => void;
   onAddEntity: (entityId: string, position: { x: number; y: number }) => void;
+  /** Called when user right-clicks on graph (entity or canvas) */
+  onContextMenu: (event: MouseEvent, entityId?: string) => void;
 }
 
 const WorkspaceGraphComponent = ({
@@ -98,7 +90,8 @@ const WorkspaceGraphComponent = ({
   onToggleEntitySelection,
   onClearEntitySelection,
   onSaveViewState,
-  onAddEntity
+  onAddEntity,
+  onContextMenu
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -106,10 +99,6 @@ const WorkspaceGraphComponent = ({
   const simulationRef = useRef<d3.Simulation<WorkspaceGraphNode, WorkspaceGraphLink> | null>(null);
   const nodesRef = useRef<WorkspaceGraphNode[]>([]);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [contextMenuNode, setContextMenuNode] = useState<WorkspaceGraphNode | null>(null);
-  const contextMenuOpenRef = useRef(false);
-  const contextMenuTriggerRef = useRef<HTMLDivElement>(null);
-  const handleNodeContextMenuRef = useRef<(event: MouseEvent, node: WorkspaceGraphNode) => void>(() => {});
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
 
   // Keep a ref of selectedEntityIds so D3 drag handlers always read the latest value
@@ -404,7 +393,8 @@ const WorkspaceGraphComponent = ({
 
     // Add right-click handler for context menu
     node.on('contextmenu', function (event: MouseEvent, d: WorkspaceGraphNode) {
-      handleNodeContextMenuRef.current(event, d);
+      event.preventDefault();
+      onContextMenu(event, d.id);
     });
 
     // Click on empty canvas: clear selection
@@ -412,11 +402,17 @@ const WorkspaceGraphComponent = ({
       onClearEntitySelection();
     });
 
+    // Right-click on empty canvas: open context menu without changing selection
+    svg.on('contextmenu', function (event: MouseEvent) {
+      event.preventDefault();
+      onContextMenu(event);
+    });
+
     // Cleanup
     return () => {
       simulation.stop();
     };
-  }, [data, dimensions, workspace.viewState, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection]);
+  }, [data, dimensions, workspace, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection]);
 
   // Update node colors when selection changes (driven by prop from parent/store)
   useEffect(() => {
@@ -448,23 +444,6 @@ const WorkspaceGraphComponent = ({
     const fitTransform = calculateFitTransform(nodes, dimensions.width, dimensions.height);
     d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.transform, fitTransform);
   };
-
-  // Context menu handlers
-  const handleCopy = useCallback(() => {
-    toast.info(`Copy: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
-  }, [contextMenuNode]);
-
-  const handlePaste = useCallback(() => {
-    toast.info(`Paste: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
-  }, [contextMenuNode]);
-
-  const handleDelete = useCallback(() => {
-    toast.info(`Delete: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
-  }, [contextMenuNode]);
-
-  const handleSpreadline = useCallback(() => {
-    toast.info(`Analytics > Spreadline: ${contextMenuNode?.labelNormalized ?? 'Unknown'}`);
-  }, [contextMenuNode]);
 
   // Handle drag over to accept drops
   const handleDragOver = useCallback(
@@ -510,84 +489,9 @@ const WorkspaceGraphComponent = ({
     [entityMap, onAddEntity]
   );
 
-  // Handle right-click on nodes to open context menu
-  // If the node is not already selected, select it (clears others)
-  handleNodeContextMenuRef.current = (event: MouseEvent, node: WorkspaceGraphNode) => {
-    event.preventDefault();
-
-    // Select the node if not already in the current selection
-    if (!selectedEntityIds.includes(node.id)) {
-      onSetSelectedEntityIds([node.id]);
-    }
-
-    const openMenu = () => {
-      setContextMenuNode(node);
-      if (contextMenuTriggerRef.current) {
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (rect) {
-          // Position the invisible trigger at the mouse location
-          contextMenuTriggerRef.current.style.left = `${event.clientX - rect.left}px`;
-          contextMenuTriggerRef.current.style.top = `${event.clientY - rect.top}px`;
-          // Dispatch contextmenu event to open the Radix context menu
-          contextMenuTriggerRef.current.dispatchEvent(
-            new MouseEvent('contextmenu', {
-              bubbles: true,
-              clientX: event.clientX,
-              clientY: event.clientY
-            })
-          );
-        }
-      }
-    };
-
-    // If menu is already open, close it first then reopen at new position
-    if (contextMenuOpenRef.current) {
-      // Dispatch Escape to close the menu
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      setTimeout(openMenu, 150);
-    } else {
-      openMenu();
-    }
-  };
-
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden" onDragOver={handleDragOver} onDrop={handleDrop}>
       <svg ref={svgRef} className="h-full w-full" />
-
-      {/* Context menu for nodes */}
-      <ContextMenu onOpenChange={open => (contextMenuOpenRef.current = open)}>
-        <ContextMenuTrigger asChild>
-          <div ref={contextMenuTriggerRef} className="pointer-events-none absolute h-1 w-1" />
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-48">
-          <ContextMenuItem onClick={handleCopy}>
-            <Copy className="mr-2 h-4 w-4" />
-            Copy
-          </ContextMenuItem>
-          <ContextMenuItem onClick={handlePaste}>
-            <ClipboardPaste className="mr-2 h-4 w-4" />
-            Paste
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={handleDelete}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Analytics
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="w-40">
-              <ContextMenuItem onClick={handleSpreadline}>
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Spreadline
-              </ContextMenuItem>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        </ContextMenuContent>
-      </ContextMenu>
 
       {/* Control buttons - lower right */}
       <div className="absolute right-4 bottom-4 flex flex-col gap-2">
