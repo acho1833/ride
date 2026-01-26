@@ -67,11 +67,7 @@ function calculateFitTransform(nodes: WorkspaceGraphNode[], width: number, heigh
 /**
  * Check if a point is inside a rectangle.
  */
-function isPointInRect(
-  x: number,
-  y: number,
-  rect: { x: number; y: number; width: number; height: number }
-): boolean {
+function isPointInRect(x: number, y: number, rect: { x: number; y: number; width: number; height: number }): boolean {
   return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
 }
 
@@ -458,11 +454,19 @@ const WorkspaceGraphComponent = ({
       if (!isDraggingSelectionRef.current && distance >= SELECTION_CONFIG.minDragDistance) {
         isDraggingSelectionRef.current = true;
         selectionRect.attr('visibility', 'visible');
+
+        // Clear previous selection visually (without state update yet)
+        d3.select(svgElement).selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle').attr('fill', GRAPH_CONFIG.nodeColor);
       }
 
       // Update rectangle if actively dragging
       if (isDraggingSelectionRef.current) {
-        const currentCoords = screenToSvgCoords(event.clientX, event.clientY, svgElement, transformRef.current);
+        // Clamp mouse coordinates to SVG bounds
+        const svgRect = svgElement.getBoundingClientRect();
+        const clampedX = Math.max(svgRect.left, Math.min(event.clientX, svgRect.right));
+        const clampedY = Math.max(svgRect.top, Math.min(event.clientY, svgRect.bottom));
+
+        const currentCoords = screenToSvgCoords(clampedX, clampedY, svgElement, transformRef.current);
 
         // Calculate rectangle bounds (handle drag in any direction)
         const rectX = Math.min(dragStartRef.current.x, currentCoords.x);
@@ -470,11 +474,7 @@ const WorkspaceGraphComponent = ({
         const rectWidth = Math.abs(currentCoords.x - dragStartRef.current.x);
         const rectHeight = Math.abs(currentCoords.y - dragStartRef.current.y);
 
-        selectionRect
-          .attr('x', rectX)
-          .attr('y', rectY)
-          .attr('width', rectWidth)
-          .attr('height', rectHeight);
+        selectionRect.attr('x', rectX).attr('y', rectY).attr('width', rectWidth).attr('height', rectHeight);
 
         // Visual feedback: highlight nodes inside rectangle (without triggering state update)
         const rect = { x: rectX, y: rectY, width: rectWidth, height: rectHeight };
@@ -482,8 +482,7 @@ const WorkspaceGraphComponent = ({
           .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle')
           .attr('fill', d => {
             const isInRect = isPointInRect(d.x ?? 0, d.y ?? 0, rect);
-            const isSelected = selectedEntityIdsRef.current.includes(d.id);
-            return isInRect || isSelected ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor;
+            return isInRect ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor;
           });
       }
     };
@@ -524,28 +523,11 @@ const WorkspaceGraphComponent = ({
       isDraggingSelectionRef.current = false;
     };
 
-    const handleMouseLeave = () => {
-      if (isDraggingSelectionRef.current) {
-        // Cancel rectangle selection
-        selectionRect.attr('visibility', 'hidden');
-
-        // Reset node colors to match current selection state
-        d3.select(svgElement)
-          .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle')
-          .attr('fill', d =>
-            selectedEntityIdsRef.current.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor
-          );
-
-        dragStartRef.current = null;
-        isDraggingSelectionRef.current = false;
-      }
-    };
-
     // Add event listeners
+    // Use document for mousemove/mouseup so selection works when mouse goes outside SVG
     svgElement.addEventListener('mousedown', handleMouseDown);
-    svgElement.addEventListener('mousemove', handleMouseMove);
-    svgElement.addEventListener('mouseup', handleMouseUp);
-    svgElement.addEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
 
     // Click on empty canvas: clear selection (only if not completing a drag)
     svg.on('click', function () {
@@ -563,9 +545,8 @@ const WorkspaceGraphComponent = ({
     return () => {
       simulation.stop();
       svgElement.removeEventListener('mousedown', handleMouseDown);
-      svgElement.removeEventListener('mousemove', handleMouseMove);
-      svgElement.removeEventListener('mouseup', handleMouseUp);
-      svgElement.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [data, dimensions, workspace, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection]);
 
