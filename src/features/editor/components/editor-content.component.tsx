@@ -12,6 +12,7 @@ interface Props {
   fileId: string;
   fileName: string;
   metadata?: Record<string, string>;
+  groupId: string;
 }
 
 /**
@@ -26,7 +27,7 @@ function getFileExtension(fileName: string): string {
  * Editor content router component
  * Renders the appropriate editor based on file extension
  */
-const EditorContentComponent = ({ fileId, fileName, metadata }: Props) => {
+const EditorContentComponent = ({ fileId, fileName, metadata, groupId }: Props) => {
   const extension = getFileExtension(fileName);
 
   // Route to appropriate editor based on extension
@@ -40,7 +41,7 @@ const EditorContentComponent = ({ fileId, fileName, metadata }: Props) => {
           </div>
         );
       }
-      return <WorkspaceComponent workspaceId={workspaceId} />;
+      return <WorkspaceComponent workspaceId={workspaceId} groupId={groupId} />;
     }
 
     case 'gx':

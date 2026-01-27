@@ -67,11 +67,11 @@ const EditorGroupComponent = ({ groupId }: Props) => {
         {activeFile ? (
           isFullHeight ? (
             <div className="h-full">
-              <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} metadata={activeFile.metadata} />
+              <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} metadata={activeFile.metadata} groupId={groupId} />
             </div>
           ) : (
             <ScrollArea className="h-full" type="hover">
-              <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} metadata={activeFile.metadata} />
+              <EditorContentComponent fileId={activeFile.id} fileName={activeFile.name} metadata={activeFile.metadata} groupId={groupId} />
             </ScrollArea>
           )
         ) : (

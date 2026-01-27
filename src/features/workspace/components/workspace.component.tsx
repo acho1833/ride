@@ -13,6 +13,7 @@ import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMut
 import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitiesMutation';
 import { useWorkspaceRemoveEntitiesMutation } from '../hooks/useWorkspaceRemoveEntitiesMutation';
 import { useSelectedEntityIds, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
+import { useIsEditorGroupFocused } from '@/stores/ui/ui.selector';
 import WorkspaceGraphComponent from './workspace-graph.component';
 import WorkspaceContextMenuComponent from './workspace-context-menu.component';
 import DeleteEntitiesDialogComponent from './delete-entities-dialog.component';
@@ -22,15 +23,18 @@ import type { Entity } from '@/models/entity.model';
 interface Props {
   /** The workspaceId to fetch and display */
   workspaceId: string;
+  /** The editor group ID this workspace is rendered in */
+  groupId: string;
 }
 
-const WorkspaceComponent = ({ workspaceId }: Props) => {
+const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const { data: workspace, isPending, isError, error } = useWorkspaceQuery(workspaceId);
   const { mutate: saveViewState } = useWorkspaceViewStateMutation();
   const { mutate: addEntities } = useWorkspaceAddEntitiesMutation();
   const { mutate: removeEntities, isPending: isDeleting } = useWorkspaceRemoveEntitiesMutation();
   const selectedEntityIds = useSelectedEntityIds(workspaceId);
   const { setSelectedEntityIds, toggleEntitySelection, clearEntitySelection } = useWorkspaceGraphActions();
+  const isEditorGroupFocused = useIsEditorGroupFocused(groupId);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -40,6 +44,26 @@ const WorkspaceComponent = ({ workspaceId }: Props) => {
       clearEntitySelection(workspaceId);
     };
   }, [workspaceId, clearEntitySelection]);
+
+  // Handle Delete key to open delete confirmation dialog
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle Delete or Backspace key
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+
+      // Only act if this editor group is focused and entities are selected
+      if (!isEditorGroupFocused || selectedEntityIds.length === 0) return;
+
+      // Prevent default browser behavior (e.g., navigating back on Backspace)
+      event.preventDefault();
+
+      // Open the delete confirmation dialog
+      setDeleteDialogOpen(true);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isEditorGroupFocused, selectedEntityIds.length]);
 
   // Create entity map for O(1) lookups
   const entityMap = useMemo<Map<string, Entity>>(() => {
