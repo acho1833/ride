@@ -89,6 +89,7 @@ export const useOpenFilesActions = () =>
     useShallow((state: OpenFilesSlice) => ({
       openFile: state.openFile,
       closeFile: state.closeFile,
+      closeFileFromAllGroups: state.closeFileFromAllGroups,
       setActiveFile: state.setActiveFile,
       closeAllFilesInGroup: state.closeAllFilesInGroup,
       closeOtherFiles: state.closeOtherFiles,

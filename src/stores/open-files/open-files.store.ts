@@ -74,6 +74,7 @@ export interface OpenFilesActions {
   // File operations
   openFile: (fileId: string, groupId?: GroupId, insertIndex?: number) => void;
   closeFile: (fileId: string, groupId: GroupId) => void;
+  closeFileFromAllGroups: (fileId: string) => void;
   setActiveFile: (fileId: string, groupId: GroupId) => void;
   closeAllFilesInGroup: (groupId: GroupId) => void;
   closeOtherFiles: (fileId: string, groupId: GroupId) => void;
@@ -333,6 +334,57 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       // Update lastFocusedGroupId if needed
       let newLastFocusedGroupId = state.openFiles.lastFocusedGroupId;
       if (newLastFocusedGroupId === groupId && newFiles.length === 0) {
+        // Group was removed, focus first available
+        newLastFocusedGroupId = cleanedRows[0]?.groups[0]?.id ?? null;
+      }
+
+      return {
+        openFiles: {
+          rows: cleanedRows,
+          lastFocusedGroupId: newLastFocusedGroupId
+        }
+      };
+    }),
+
+  // Close file from all groups (used when file is deleted)
+  closeFileFromAllGroups: (fileId: string) =>
+    set(state => {
+      const { rows } = state.openFiles;
+
+      // Find if file exists in any group
+      const location = findGroupContainingFile(rows, fileId);
+      if (!location) return state;
+
+      const { group } = location;
+      const fileIndex = group.files.findIndex(f => f.id === fileId);
+      const newFiles = group.files.filter(f => f.id !== fileId);
+      let newActiveFileId = group.activeFileId;
+
+      // If closing active file, select next/prev
+      if (group.activeFileId === fileId) {
+        if (newFiles.length > 0) {
+          const nextIndex = Math.min(fileIndex, newFiles.length - 1);
+          newActiveFileId = newFiles[nextIndex].id;
+        } else {
+          newActiveFileId = null;
+        }
+      }
+
+      const newRows = rows.map((row, ri) =>
+        ri === location.rowIndex
+          ? {
+              ...row,
+              groups: row.groups.map((g, gi) => (gi === location.groupIndex ? { ...g, files: newFiles, activeFileId: newActiveFileId } : g))
+            }
+          : row
+      );
+
+      // Cleanup empty groups/rows
+      const cleanedRows = cleanupEmptyGroupsAndRows(newRows);
+
+      // Update lastFocusedGroupId if needed
+      let newLastFocusedGroupId = state.openFiles.lastFocusedGroupId;
+      if (newLastFocusedGroupId === group.id && newFiles.length === 0) {
         // Group was removed, focus first available
         newLastFocusedGroupId = cleanedRows[0]?.groups[0]?.id ?? null;
       }
