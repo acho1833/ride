@@ -164,6 +164,36 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   };
 
   /**
+   * Handle Delete key to open delete confirmation dialog.
+   * Only triggers when files panel is focused and a non-root node is selected.
+   */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle Delete or Backspace key
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+
+      // Only act if files panel is focused and something is selected
+      if (!isPanelFocused || !selectedId) return;
+
+      // Can't delete root folder
+      if (selectedId === fileStructure.id) return;
+
+      // Find the selected node
+      const selectedNode = findNodeById(fileStructure, selectedId);
+      if (!selectedNode) return;
+
+      // Prevent default browser behavior (e.g., navigating back on Backspace)
+      event.preventDefault();
+
+      // Open the delete confirmation dialog
+      handleStartDelete(selectedNode);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isPanelFocused, selectedId, fileStructure]);
+
+  /**
    * Closes the delete dialog
    */
   const handleDeleteDialogClose = (): void => {
