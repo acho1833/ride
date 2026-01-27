@@ -166,8 +166,14 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   /**
    * Handle Delete key to open delete confirmation dialog.
    * Only triggers when files panel is focused and a non-root node is selected.
+   *
+   * Note: Only attaches listener when panel is focused to avoid multiple listeners
+   * from different FilesComponent instances (which can happen due to CSS-hidden rendering).
    */
   useEffect(() => {
+    // Only attach listener when this panel is focused
+    if (!isPanelFocused) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only handle Delete or Backspace key
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
@@ -175,11 +181,8 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
       // Don't trigger if dialog is already open
       if (deleteDialog.open) return;
 
-      // Only act if files panel is focused and something is selected
-      if (!isPanelFocused || !selectedId) return;
-
-      // Can't delete root folder
-      if (selectedId === fileStructure.id) return;
+      // Must have something selected (not root)
+      if (!selectedId || selectedId === fileStructure.id) return;
 
       // Find the selected node
       const selectedNode = findNodeById(fileStructure, selectedId);

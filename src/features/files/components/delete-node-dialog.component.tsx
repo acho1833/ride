@@ -1,7 +1,15 @@
 'use client';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { useFileDeleteMutation } from '@/features/files/hooks/useFileDeleteMutation';
 import { useCurrentProject } from '@/stores/projects/projects.selector';
 
@@ -28,25 +36,26 @@ const DeleteNodeDialogComponent = ({ open, nodeId, nodeName, nodeType, onClose }
   };
 
   return (
-    <Dialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Delete {nodeType === 'file' ? 'File' : 'Folder'}</DialogTitle>
-          <DialogDescription>
+    <AlertDialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {nodeType === 'file' ? 'File' : 'Folder'}</AlertDialogTitle>
+          <AlertDialogDescription>
             Are you sure you want to delete &quot;{nodeName}&quot;?
             {nodeType === 'folder' && ' This will also delete all contents inside.'}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={handleConfirm}>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirm}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
             Delete
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };
 
