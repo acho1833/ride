@@ -7,7 +7,7 @@ interface Props {
 
 const NotificationsComponent = ({ pos }: Props) => {
   return (
-    <MainPanelsComponent title="Notifications" pos={pos}>
+    <MainPanelsComponent title="Notifications" pos={pos} focusPanelType="alerts">
       <div>Notifications 1</div>
       <div>Notifications 2</div>
     </MainPanelsComponent>

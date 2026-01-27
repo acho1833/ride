@@ -74,7 +74,7 @@ const EntitySearchComponent = ({ pos }: Props) => {
   };
 
   return (
-    <MainPanelsComponent title="Entity Search" pos={pos}>
+    <MainPanelsComponent title="Entity Search" pos={pos} focusPanelType="entity-search">
       <div className="flex h-full flex-col gap-y-2">
         {/* Search form (always visible) */}
         <EntitySearchFormComponent onSearch={handleSearch} />

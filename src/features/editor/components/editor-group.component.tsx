@@ -27,6 +27,7 @@ import { GroupId } from '@/stores/open-files/open-files.store';
 import EditorTabsComponent from '@/features/editor/components/editor-tabs.component';
 import EditorContentComponent from '@/features/editor/components/editor-content.component';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useUiActions } from '@/stores/ui/ui.selector';
 
 interface Props {
   groupId: GroupId;
@@ -35,6 +36,7 @@ interface Props {
 const EditorGroupComponent = ({ groupId }: Props) => {
   const group = useEditorGroup(groupId);
   const { setLastFocusedGroup } = useOpenFilesActions();
+  const { setFocusedPanel } = useUiActions();
 
   // Group may not exist briefly during cleanup transitions
   if (!group) {
@@ -50,8 +52,10 @@ const EditorGroupComponent = ({ groupId }: Props) => {
 
   // Track which group user last interacted with.
   // Used by openFile() to determine default target when no group specified.
+  // Also sets focusedPanel for visual highlighting.
   const handleFocus = () => {
     setLastFocusedGroup(groupId);
+    setFocusedPanel(`editor-group-${groupId}`);
   };
 
   return (

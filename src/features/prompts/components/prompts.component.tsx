@@ -110,7 +110,7 @@ const PromptsComponent = ({ pos }: Props) => {
   };
 
   return (
-    <MainPanelsComponent title="AI Prompts" pos={pos}>
+    <MainPanelsComponent title="AI Prompts" pos={pos} focusPanelType="prompt">
       <div className="bg-background flex h-full flex-col">
         <div className="flex-1 p-5">
           <div className="h-full rounded-2xl border p-2">Sample Response</div>

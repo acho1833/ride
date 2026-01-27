@@ -40,6 +40,8 @@ interface FileTreeContextValue {
   openFolderIds: string[];
   /** Set of file IDs currently open in editor (for visual distinction) */
   openFileIds: Set<string>;
+  /** Whether the file explorer panel is currently focused */
+  isPanelFocused: boolean;
   /** Select a node (highlight it) */
   onSelect: (id: string) => void;
   /** Toggle folder expand/collapse */

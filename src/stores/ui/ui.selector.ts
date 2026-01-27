@@ -12,7 +12,7 @@
  */
 
 import { useShallow } from 'zustand/react/shallow';
-import { UiSlice } from './ui.store';
+import { FocusedPanelType, UiSlice } from './ui.store';
 import { useAppStore } from '@/stores/app.store';
 
 // ============================================================================
@@ -34,6 +34,13 @@ export const useSelectOpenedFiles = (): boolean => useAppStore((state: UiSlice):
 /** Get entire UI state object (use sparingly, prefer granular selectors) */
 export const useUi = () => useAppStore((state: UiSlice) => state.ui);
 
+/** Get the currently focused panel */
+export const useFocusedPanel = (): FocusedPanelType => useAppStore((state: UiSlice): FocusedPanelType => state.ui.focusedPanel);
+
+/** Check if a specific editor group is focused */
+export const useIsEditorGroupFocused = (groupId: string): boolean =>
+  useAppStore((state: UiSlice): boolean => state.ui.focusedPanel === `editor-group-${groupId}`);
+
 // ============================================================================
 // Action Selector
 // ============================================================================
@@ -47,6 +54,7 @@ export const useUiActions = () =>
     useShallow((state: UiSlice) => ({
       setToggleMode: state.setToggleMode,
       toggleToolbar: state.toggleToolbar,
-      toggleSelectOpenedFiles: state.toggleSelectOpenedFiles
+      toggleSelectOpenedFiles: state.toggleSelectOpenedFiles,
+      setFocusedPanel: state.setFocusedPanel
     }))
   );

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ToolType } from '@/features/toolbars/types';
+import { FocusedPanelType, ToolType } from '@/features/toolbars/types';
 
 /** Valid view setting keys - add/remove features here */
 export type ViewSettingKey = 'entitySearch' | 'notification' | 'aiPrompt' | 'charts';
@@ -72,4 +72,13 @@ export const TOOL_TYPE_TO_VIEW_SETTING: Partial<Record<ToolType, ViewSettingKey>
   PROMPT: 'aiPrompt',
   CHARTS: 'charts'
   // FILES has no view setting - always visible
+};
+
+/** Map ToolType to FocusedPanelType for focus state management */
+export const TOOL_TYPE_TO_FOCUS_PANEL: Record<ToolType, FocusedPanelType> = {
+  FILES: 'files',
+  ENTITY_SEARCH: 'entity-search',
+  CHARTS: 'charts',
+  PROMPT: 'prompt',
+  ALERT: 'alerts'
 };

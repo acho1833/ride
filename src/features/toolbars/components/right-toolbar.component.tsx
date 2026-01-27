@@ -5,9 +5,9 @@ import { BellIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useUiActions } from '@/stores/ui/ui.selector';
+import { useFocusedPanel, useUiActions } from '@/stores/ui/ui.selector';
 import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
-import { VIEW_SETTINGS_CONFIG, VIEW_SETTING_TO_TOOL_TYPE } from '@/models/view-settings.model';
+import { TOOL_TYPE_TO_FOCUS_PANEL, VIEW_SETTINGS_CONFIG, VIEW_SETTING_TO_TOOL_TYPE } from '@/models/view-settings.model';
 
 const tools: ToolTypeOption[] = [
   {
@@ -24,6 +24,7 @@ interface Props {
 const RightToolbarComponent = ({ activeToolType }: Props) => {
   const { toggleToolbar } = useUiActions();
   const viewSettings = useViewSettings()!;
+  const focusedPanel = useFocusedPanel();
 
   // Get enabled tool types for right position from config
   const enabledRightToolTypes = VIEW_SETTINGS_CONFIG.filter(s => s.position === 'right' && viewSettings[s.key]).map(
@@ -41,21 +42,25 @@ const RightToolbarComponent = ({ activeToolType }: Props) => {
 
   return (
     <div className="flex flex-col items-center gap-y-2">
-      {enabledTools.map(tool => (
-        <Tooltip key={tool.type}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => toggleRightToolbar(tool.type)}
-              className={cn(activeToolType === tool.type && 'bg-input dark:hover:bg-input/50')}
-            >
-              <tool.icon className="size-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="left">{tool.description}</TooltipContent>
-        </Tooltip>
-      ))}
+      {enabledTools.map(tool => {
+        const isActive = activeToolType === tool.type;
+        const isFocused = focusedPanel === TOOL_TYPE_TO_FOCUS_PANEL[tool.type];
+        return (
+          <Tooltip key={tool.type}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleRightToolbar(tool.type)}
+                className={cn(isActive && '!bg-input', isFocused && '!bg-primary !text-primary-foreground')}
+              >
+                <tool.icon className="size-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">{tool.description}</TooltipContent>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 };

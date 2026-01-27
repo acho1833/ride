@@ -25,6 +25,7 @@ import React from 'react';
 import type { TreeNode } from '@/models/user-file-tree.model';
 import { ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon } from 'lucide-react';
 import { getFileIcon } from '@/const';
+import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
@@ -67,6 +68,7 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
     selectedId,
     openFolderIds,
     openFileIds,
+    isPanelFocused,
     onSelect,
     onToggleFolder,
     onAddFile,
@@ -131,6 +133,12 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
   const highlightClass = shouldHighlight && !isDragging ? 'bg-accent/50' : '';
   const draggingClass = isDndKitDragging ? 'opacity-50' : '';
 
+  // Selection styling based on panel focus
+  const getSelectionClass = (isSelected: boolean) => {
+    if (!isSelected) return '';
+    return isPanelFocused ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20';
+  };
+
   /**
    * Initiate HTML5 drag with file data in custom MIME type.
    * This allows dropping files onto editor tab bars.
@@ -151,9 +159,13 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
           <div
             ref={setDragRef}
             data-node-id={node.id}
-            className={`hover:bg-accent flex cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 transition-colors ${
-              selectedId === node.id ? 'bg-accent' : ''
-            } ${highlightClass} ${draggingClass}`}
+            className={cn(
+              'flex cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 transition-colors',
+              selectedId !== node.id && 'hover:bg-accent',
+              getSelectionClass(selectedId === node.id),
+              highlightClass,
+              draggingClass
+            )}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             draggable
             onDragStart={handleDragStart}
@@ -191,9 +203,12 @@ const FileTreeComponent = ({ node, depth = 0, isRoot = false, parentId }: Props)
             <div
               ref={setRefs}
               data-node-id={node.id}
-              className={`hover:bg-accent flex w-full cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
-                selectedId === node.id ? 'bg-accent' : ''
-              } ${draggingClass}`}
+              className={cn(
+                'flex w-full cursor-grab items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors',
+                selectedId !== node.id && 'hover:bg-accent',
+                getSelectionClass(selectedId === node.id),
+                draggingClass
+              )}
               style={{ paddingLeft: `${depth * 10}px` }}
               onClick={e => {
                 e.stopPropagation();

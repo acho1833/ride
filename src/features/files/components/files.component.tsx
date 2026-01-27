@@ -30,7 +30,7 @@ import { ToolbarPositions } from '@/stores/ui/ui.store';
 import type { TreeNode } from '@/models/user-file-tree.model';
 import { useFileActions, useFileStructure, useOpenFolderIds, useSelectedFileId } from '@/stores/files/files.selector';
 import { useOpenFileIds, useLastFocusedGroupId, useEditorGroup } from '@/stores/open-files/open-files.selector';
-import { useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
+import { useFocusedPanel, useSelectOpenedFiles, useUiActions } from '@/stores/ui/ui.selector';
 import FileTreeComponent from '@/features/files/components/file-tree.component';
 import { FileTreeProvider, FileType } from '@/features/files/components/file-tree-context';
 import FileTreeDndContextComponent from '@/features/files/components/file-tree-dnd-context.component';
@@ -60,7 +60,9 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
 
   // Get UI state and actions
   const selectOpenedFiles = useSelectOpenedFiles();
-  const { toggleSelectOpenedFiles } = useUiActions();
+  const focusedPanel = useFocusedPanel();
+  const isPanelFocused = focusedPanel === 'files';
+  const { toggleSelectOpenedFiles, setFocusedPanel } = useUiActions();
 
   // Get active file from last focused group
   const lastFocusedGroupId = useLastFocusedGroupId();
@@ -237,6 +239,7 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     selectedId,
     openFolderIds,
     openFileIds,
+    isPanelFocused,
     onSelect: setSelectedFileId,
     onToggleFolder: toggleFolder,
     onAddFile: handleAddFile,
@@ -279,7 +282,7 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
   };
 
   return (
-    <MainPanelsComponent title="Files" pos={pos} tools={toolbarButtons}>
+    <MainPanelsComponent title="Files" pos={pos} tools={toolbarButtons} focusPanelType="files">
       <FileTreeDndContextComponent
         fileStructure={fileStructure}
         openFolderIds={openFolderIds}
@@ -292,7 +295,12 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
           <ContextMenuTrigger asChild>
             <div className="min-h-0 flex-1 overflow-hidden">
               <ScrollArea className="h-full" type="hover" viewportRef={viewportRef}>
-                <div ref={setEmptyDropRef} className="min-h-full" onContextMenu={handleEmptySpaceContextMenu}>
+                <div
+                  ref={setEmptyDropRef}
+                  className="min-h-full"
+                  onContextMenu={handleEmptySpaceContextMenu}
+                  onClick={() => setFocusedPanel('files')}
+                >
                   <FileTreeProvider value={fileTreeContextValue}>
                     <FileTreeComponent node={fileStructure} isRoot={true} />
                   </FileTreeProvider>

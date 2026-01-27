@@ -17,10 +17,14 @@
  */
 
 import { StateCreator } from 'zustand';
-import { ToolType } from '@/features/toolbars/types';
+import { FocusedPanelType, ToolType } from '@/features/toolbars/types';
+import { TOOL_TYPE_TO_FOCUS_PANEL } from '@/models/view-settings.model';
 
 /** Panel positions where toolbars can be docked */
 export type ToolbarPositions = 'left' | 'right' | 'bottom';
+
+// Re-export for consumers
+export type { FocusedPanelType } from '@/features/toolbars/types';
 
 /** UI component state interface */
 export interface UiComponentState {
@@ -33,6 +37,8 @@ export interface UiComponentState {
     };
     /** Whether tab clicks should reveal files in the explorer tree */
     selectOpenedFiles: boolean;
+    /** Currently focused panel for visual highlighting */
+    focusedPanel: FocusedPanelType;
   };
 }
 
@@ -42,6 +48,8 @@ export interface UiActions {
   toggleToolbar: (position: ToolbarPositions, toolType: ToolType | null) => void;
   /** Toggle the "Select Opened Files" sync feature */
   toggleSelectOpenedFiles: () => void;
+  /** Set the currently focused panel */
+  setFocusedPanel: (panel: FocusedPanelType) => void;
 }
 
 /** Combined UI store type */
@@ -58,7 +66,8 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
       right: 'ALERT' as ToolType,
       bottom: 'CHARTS' as ToolType
     },
-    selectOpenedFiles: false
+    selectOpenedFiles: false,
+    focusedPanel: null
   },
 
   setToggleMode: (toggleMode: boolean) =>
@@ -67,18 +76,38 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
     })),
 
   toggleToolbar: (pos: ToolbarPositions, toolType: ToolType | null) =>
-    set(state => ({
-      ui: {
-        ...state.ui,
-        toolbar: {
-          ...state.ui.toolbar,
-          [pos]: state.ui.toolbar[pos] === toolType ? null : toolType
-        }
+    set(state => {
+      const isClosing = state.ui.toolbar[pos] === toolType;
+      const newToolType = isClosing ? null : toolType;
+
+      // Set focus when opening a panel, clear focus when closing
+      let newFocusedPanel = state.ui.focusedPanel;
+      if (isClosing && toolType && state.ui.focusedPanel === TOOL_TYPE_TO_FOCUS_PANEL[toolType]) {
+        newFocusedPanel = null;
+      } else if (!isClosing && toolType) {
+        // Opening a panel - set focus to it
+        newFocusedPanel = TOOL_TYPE_TO_FOCUS_PANEL[toolType];
       }
-    })),
+
+      return {
+        ui: {
+          ...state.ui,
+          toolbar: {
+            ...state.ui.toolbar,
+            [pos]: newToolType
+          },
+          focusedPanel: newFocusedPanel
+        }
+      };
+    }),
 
   toggleSelectOpenedFiles: () =>
     set(state => ({
       ui: { ...state.ui, selectOpenedFiles: !state.ui.selectOpenedFiles }
+    })),
+
+  setFocusedPanel: (focusedPanel: FocusedPanelType) =>
+    set(state => ({
+      ui: { ...state.ui, focusedPanel }
     }))
 });

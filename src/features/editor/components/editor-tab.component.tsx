@@ -30,9 +30,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { OpenFile, GroupId } from '@/stores/open-files/open-files.store';
-import { useOpenFilesActions, useCanMoveInDirection, useLastFocusedGroupId } from '@/stores/open-files/open-files.selector';
+import { useOpenFilesActions, useCanMoveInDirection } from '@/stores/open-files/open-files.selector';
 import { useFileActions } from '@/stores/files/files.selector';
-import { useSelectOpenedFiles } from '@/stores/ui/ui.selector';
+import { useIsEditorGroupFocused, useSelectOpenedFiles } from '@/stores/ui/ui.selector';
 import { Button } from '@/components/ui/button';
 import { MoveDirection } from '@/features/editor/const';
 
@@ -66,9 +66,8 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
   const { closeFile, setActiveFile, moveFileToNewGroup, closeAllFilesInGroup, closeOtherFiles } = useOpenFilesActions();
   const { revealFile } = useFileActions();
   const selectOpenedFiles = useSelectOpenedFiles();
-  const lastFocusedGroupId = useLastFocusedGroupId();
   // Visual distinction: Active tab in the focused group gets a top highlight bar
-  const isLastFocusedGroup = lastFocusedGroupId === groupId;
+  const isGroupFocused = useIsEditorGroupFocused(groupId);
 
   // SSR Guard: dnd-kit's useSortable generates IDs that differ server vs client.
   // We disable drag functionality until after first client render.
@@ -148,7 +147,7 @@ const EditorTabComponent = ({ file, isActive, groupId, disableTransform, tabInde
           className={cn(
             'group border-border relative flex h-9 cursor-pointer items-center gap-2 border-r px-3 text-sm transition-colors',
             isActive ? 'bg-secondary text-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
-            isActive && isLastFocusedGroup ? 'border-t-primary border-t-4' : 'border-t-4 border-t-transparent',
+            isActive && isGroupFocused ? 'border-t-primary border-t-4' : 'border-t-4 border-t-transparent',
             isDragging && 'z-50'
           )}
           onClick={handleActivate}

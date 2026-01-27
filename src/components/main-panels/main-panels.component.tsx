@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
+import { FocusedPanelType } from '@/features/toolbars/types';
 import { Button } from '@/components/ui/button';
 import { MinusIcon } from 'lucide-react';
 import { useUiActions } from '@/stores/ui/ui.selector';
@@ -11,17 +12,24 @@ interface Props {
   children: ReactNode;
   pos?: ToolbarPositions;
   tools?: ReactNode;
+  focusPanelType?: FocusedPanelType;
 }
 
-const MainPanelsComponent = ({ children, title, pos, tools }: Props) => {
-  const { toggleToolbar } = useUiActions();
+const MainPanelsComponent = ({ children, title, pos, tools, focusPanelType }: Props) => {
+  const { toggleToolbar, setFocusedPanel } = useUiActions();
   const onMinimize = () => {
     if (!pos) return;
     toggleToolbar(pos, null);
   };
 
+  const handleClick = () => {
+    if (focusPanelType) {
+      setFocusedPanel(focusPanelType);
+    }
+  };
+
   return (
-    <div className="bg-background group flex h-full w-full flex-col overflow-hidden rounded-xl p-1">
+    <div className="bg-background group flex h-full w-full flex-col overflow-hidden rounded-xl p-1" onClick={handleClick}>
       {title && pos && (
         <div className="flex flex-col gap-y-1">
           <div className="flex justify-between gap-y-1">

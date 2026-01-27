@@ -23,7 +23,7 @@ const TypeTabContainer = ({ pos }: Props) => {
   const activeTab = useChartActiveTab();
 
   return (
-    <MainPanelsComponent title="Charts" pos={pos}>
+    <MainPanelsComponent title="Charts" pos={pos} focusPanelType="charts">
       <div className="flex h-full flex-col">
         {/* Tab bar */}
         <TypeTabBar />

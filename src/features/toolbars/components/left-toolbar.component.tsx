@@ -5,9 +5,9 @@ import { BotIcon, ChartCandlestickIcon, FolderIcon, SearchIcon } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useUiActions } from '@/stores/ui/ui.selector';
+import { useFocusedPanel, useUiActions } from '@/stores/ui/ui.selector';
 import { useViewSettings } from '@/stores/app-settings/app-settings.selector';
-import { VIEW_SETTINGS_CONFIG, VIEW_SETTING_TO_TOOL_TYPE } from '@/models/view-settings.model';
+import { TOOL_TYPE_TO_FOCUS_PANEL, VIEW_SETTINGS_CONFIG, VIEW_SETTING_TO_TOOL_TYPE } from '@/models/view-settings.model';
 import SettingsMenuComponent from '@/features/user-settings/components/settings-menu.component';
 import AppSettingsMenuComponent from '@/features/app-settings/components/app-settings-menu.component';
 
@@ -44,6 +44,7 @@ interface Props {
 const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
   const { toggleToolbar } = useUiActions();
   const viewSettings = useViewSettings()!;
+  const focusedPanel = useFocusedPanel();
 
   // Get enabled tool types for each position from config
   const enabledLeftToolTypes = VIEW_SETTINGS_CONFIG.filter(s => s.position === 'left' && viewSettings[s.key]).map(
@@ -71,39 +72,47 @@ const LeftToolbarComponent = ({ activeToolTypes = [] }: Props) => {
     <div className="flex h-full flex-col items-center justify-between">
       <div className="flex flex-col items-center gap-y-2">
         <AppSettingsMenuComponent />
-        {enabledTopTools.map(tool => (
-          <Tooltip key={tool.type}>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => toggleLeftToolbar(tool.type)}
-                className={cn(activeToolTypes.includes(tool.type) && 'bg-input dark:hover:bg-input/50')}
-              >
-                <tool.icon className="size-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{tool.description}</TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-      <div className="mb-1 flex flex-col items-center gap-y-2">
-        {showBottomSection &&
-          enabledBottomTools.map(tool => (
+        {enabledTopTools.map(tool => {
+          const isActive = activeToolTypes.includes(tool.type);
+          const isFocused = focusedPanel === TOOL_TYPE_TO_FOCUS_PANEL[tool.type];
+          return (
             <Tooltip key={tool.type}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => toggleBottomToolbar(tool.type)}
-                  className={cn(activeToolTypes.includes(tool.type) && 'bg-input dark:hover:bg-input/50')}
+                  onClick={() => toggleLeftToolbar(tool.type)}
+                  className={cn(isActive && '!bg-input', isFocused && '!bg-primary !text-primary-foreground')}
                 >
                   <tool.icon className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">{tool.description}</TooltipContent>
             </Tooltip>
-          ))}
+          );
+        })}
+      </div>
+      <div className="mb-1 flex flex-col items-center gap-y-2">
+        {showBottomSection &&
+          enabledBottomTools.map(tool => {
+            const isActive = activeToolTypes.includes(tool.type);
+            const isFocused = focusedPanel === TOOL_TYPE_TO_FOCUS_PANEL[tool.type];
+            return (
+              <Tooltip key={tool.type}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => toggleBottomToolbar(tool.type)}
+                    className={cn(isActive && '!bg-input', isFocused && '!bg-primary !text-primary-foreground')}
+                  >
+                    <tool.icon className="size-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{tool.description}</TooltipContent>
+              </Tooltip>
+            );
+          })}
         <SettingsMenuComponent />
       </div>
     </div>
