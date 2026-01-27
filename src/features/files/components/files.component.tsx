@@ -172,6 +172,9 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
       // Only handle Delete or Backspace key
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 
+      // Don't trigger if dialog is already open
+      if (deleteDialog.open) return;
+
       // Only act if files panel is focused and something is selected
       if (!isPanelFocused || !selectedId) return;
 
@@ -191,7 +194,7 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isPanelFocused, selectedId, fileStructure]);
+  }, [isPanelFocused, selectedId, fileStructure, deleteDialog.open]);
 
   /**
    * Closes the delete dialog

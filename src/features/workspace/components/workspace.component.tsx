@@ -51,6 +51,9 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
       // Only handle Delete or Backspace key
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 
+      // Don't trigger if dialog is already open
+      if (deleteDialogOpen) return;
+
       // Only act if this editor group is focused and entities are selected
       if (!isEditorGroupFocused || selectedEntityIds.length === 0) return;
 
@@ -63,7 +66,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isEditorGroupFocused, selectedEntityIds.length]);
+  }, [isEditorGroupFocused, selectedEntityIds.length, deleteDialogOpen]);
 
   // Create entity map for O(1) lookups
   const entityMap = useMemo<Map<string, Entity>>(() => {
