@@ -42,12 +42,17 @@ export interface TypeTabState {
   };
 }
 
+/** Tab category type - extend as needed for future categories */
+export type TabCategory = 'charts';
+
 /** Type tabs action methods */
 export interface TypeTabActions {
   openChartTab: (tab: Tab) => void;
   closeChartTab: (tabId: string) => void;
   activateChartTab: (tabId: string) => void;
   closeAllChartTabs: () => void;
+  /** Reorder a tab within its category */
+  reorderTab: (category: TabCategory, tabId: string, newIndex: number) => void;
 }
 
 /** Combined type tabs store type */
@@ -65,23 +70,32 @@ export const createTypeTabSlice: StateCreator<TypeTabSlice, [], [], TypeTabSlice
     charts: {
       tabs: [
         {
-          id: 'chart-123', // Using a fixed ID
+          id: 'chart-123',
           name: 'SPREADLINE-sample1',
           type: 'SPREADLINE',
           data: {
             values: [100, 200],
             labels: ['X', 'Y']
           }
+        },
+        {
+          id: 'chart-222',
+          name: 'SPREADLINE-sample2',
+          type: 'SPREADLINE',
+          data: {
+            values: [150, 250],
+            labels: ['A', 'B']
+          }
+        },
+        {
+          id: 'chart-333',
+          name: 'SPREADLINE-sample3',
+          type: 'SPREADLINE',
+          data: {
+            values: [200, 300],
+            labels: ['P', 'Q']
+          }
         }
-        // {
-        //   id: 'chart-222', // Using a fixed ID
-        //   name: 'SPREADLINE-sample2',
-        //   type: 'SPREADLINE',
-        //   data: {
-        //     values: [100, 200],
-        //     labels: ['X', 'Y']
-        //   }
-        // }
       ],
       activeTabId: null
     }
@@ -163,5 +177,21 @@ export const createTypeTabSlice: StateCreator<TypeTabSlice, [], [], TypeTabSlice
           activeTabId: null
         }
       }
-    }))
+    })),
+
+  reorderTab: (category: TabCategory, tabId: string, newIndex: number) =>
+    set(state => {
+      const categoryData = state.typeTabs[category];
+      const tabs = [...categoryData.tabs];
+      const currentIndex = tabs.findIndex(t => t.id === tabId);
+      if (currentIndex === -1 || currentIndex === newIndex) return state;
+      const [tab] = tabs.splice(currentIndex, 1);
+      tabs.splice(newIndex, 0, tab);
+      return {
+        typeTabs: {
+          ...state.typeTabs,
+          [category]: { ...categoryData, tabs }
+        }
+      };
+    })
 });

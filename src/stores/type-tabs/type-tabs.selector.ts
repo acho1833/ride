@@ -39,6 +39,7 @@ export const useTypeTabActions = () =>
       openChartTab: state.openChartTab,
       closeChartTab: state.closeChartTab,
       activateChartTab: state.activateChartTab,
-      closeAllChartTabs: state.closeAllChartTabs
+      closeAllChartTabs: state.closeAllChartTabs,
+      reorderTab: state.reorderTab
     }))
   );
