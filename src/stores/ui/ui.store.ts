@@ -107,7 +107,9 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
     })),
 
   setFocusedPanel: (focusedPanel: FocusedPanelType) =>
-    set(state => ({
-      ui: { ...state.ui, focusedPanel }
-    }))
+    set(state => {
+      // Skip update if already focused on this panel
+      if (state.ui.focusedPanel === focusedPanel) return state;
+      return { ui: { ...state.ui, focusedPanel } };
+    })
 });

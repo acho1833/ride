@@ -87,6 +87,8 @@ interface Props {
   onAddEntity: (entityId: string, position: { x: number; y: number }) => void;
   /** Called when user right-clicks on graph (entity or canvas) */
   onContextMenu: (event: MouseEvent, entityId?: string) => void;
+  /** Called to focus the editor group panel (e.g., on node click) */
+  onFocusPanel?: () => void;
 }
 
 const WorkspaceGraphComponent = ({
@@ -98,7 +100,8 @@ const WorkspaceGraphComponent = ({
   onClearEntitySelection,
   onSaveViewState,
   onAddEntity,
-  onContextMenu
+  onContextMenu,
+  onFocusPanel
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -405,6 +408,8 @@ const WorkspaceGraphComponent = ({
     // Left-click on node: single select or ctrl+click toggle
     node.on('click', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.stopPropagation();
+      // Focus the editor group panel when clicking a node
+      onFocusPanel?.();
       if (event.ctrlKey || event.metaKey) {
         // Ctrl+click: toggle this node in/out of selection
         onToggleEntitySelection(d.id);

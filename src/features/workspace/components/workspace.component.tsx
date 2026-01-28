@@ -13,7 +13,7 @@ import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMut
 import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitiesMutation';
 import { useWorkspaceRemoveEntitiesMutation } from '../hooks/useWorkspaceRemoveEntitiesMutation';
 import { useSelectedEntityIds, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
-import { useIsEditorGroupFocused } from '@/stores/ui/ui.selector';
+import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
 import WorkspaceGraphComponent from './workspace-graph.component';
 import WorkspaceContextMenuComponent from './workspace-context-menu.component';
 import DeleteEntitiesDialogComponent from './delete-entities-dialog.component';
@@ -35,6 +35,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const selectedEntityIds = useSelectedEntityIds(workspaceId);
   const { setSelectedEntityIds, toggleEntitySelection, clearEntitySelection } = useWorkspaceGraphActions();
   const isEditorGroupFocused = useIsEditorGroupFocused(groupId);
+  const { setFocusedPanel } = useUiActions();
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -44,6 +45,13 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
       clearEntitySelection(workspaceId);
     };
   }, [workspaceId, clearEntitySelection]);
+
+  // Clear selection when this editor group loses focus
+  useEffect(() => {
+    if (!isEditorGroupFocused) {
+      clearEntitySelection(workspaceId);
+    }
+  }, [isEditorGroupFocused, workspaceId, clearEntitySelection]);
 
   // Handle Delete key to open delete confirmation dialog
   useEffect(() => {
@@ -127,6 +135,10 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     setDeleteDialogOpen(true);
   }, []);
 
+  const handleFocusPanel = useCallback(() => {
+    setFocusedPanel(`editor-group-${groupId}`);
+  }, [setFocusedPanel, groupId]);
+
   const handleDeleteConfirm = useCallback(() => {
     removeEntities(
       { workspaceId, entityIds: selectedEntityIds },
@@ -175,6 +187,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         onSaveViewState={handleSaveViewState}
         onAddEntity={handleAddEntity}
         onContextMenu={handleContextMenu}
+        onFocusPanel={handleFocusPanel}
       />
       <WorkspaceContextMenuComponent
         position={contextMenuPosition}
