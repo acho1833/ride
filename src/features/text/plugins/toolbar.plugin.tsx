@@ -38,6 +38,13 @@ const ToolbarPlugin = () => {
       return;
     }
 
+    // Only show toolbar if selection is inside this editor
+    const editorRoot = editor.getRootElement();
+    if (!editorRoot || !editorRoot.contains(domSelection.anchorNode)) {
+      setIsVisible(false);
+      return;
+    }
+
     const range = domSelection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
@@ -51,7 +58,7 @@ const ToolbarPlugin = () => {
       left: rect.left + window.scrollX + rect.width / 2 - 60
     });
     setIsVisible(true);
-  }, []);
+  }, [editor]);
 
   useEffect(() => {
     return editor.registerCommand(
