@@ -156,12 +156,7 @@ const findGroupContainingFile = (
  * Core logic for opening a file in a group.
  * Used by both openFile (looks up metadata) and openNewFile (metadata provided).
  */
-const openFileInGroup = (
-  state: OpenFilesState,
-  file: OpenFile,
-  groupId?: GroupId,
-  insertIndex?: number
-): OpenFilesState => {
+const openFileInGroup = (state: OpenFilesState, file: OpenFile, groupId?: GroupId, insertIndex?: number): OpenFilesState => {
   const { rows, lastFocusedGroupId } = state.openFiles;
 
   // Check if file already exists anywhere - if so, just activate it

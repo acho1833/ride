@@ -120,9 +120,7 @@ export async function addNode(sid: string, projectId: string, parentId: string, 
   }
 
   const node: TreeNode =
-    type === 'file'
-      ? { id: fileId, name, type: 'file', metadata }
-      : { id: crypto.randomUUID(), name, type: 'folder', children: [] };
+    type === 'file' ? { id: fileId, name, type: 'file', metadata } : { id: crypto.randomUUID(), name, type: 'folder', children: [] };
 
   const newTree = addNodeToTree(currentTree, parentId, node);
   await saveTree(sid, projectId, newTree);
