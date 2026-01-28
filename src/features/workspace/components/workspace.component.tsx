@@ -19,6 +19,7 @@ import WorkspaceContextMenuComponent from './workspace-context-menu.component';
 import DeleteEntitiesDialogComponent from './delete-entities-dialog.component';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
 import type { Entity } from '@/models/entity.model';
+import { isEditableElement } from '@/lib/utils';
 
 interface Props {
   /** The workspaceId to fetch and display */
@@ -56,6 +57,9 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   // Handle Delete key to open delete confirmation dialog
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore if user is typing in an input field
+      if (isEditableElement(event)) return;
+
       // Only handle Delete or Backspace key
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 

@@ -42,6 +42,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 import { useDroppable } from '@dnd-kit/core';
 import type { FileDropData } from '@/features/files/components/file-tree-dnd-context.component';
 import { findNodeById, findParentFolder } from '@/features/files/utils/drag-drop.utils';
+import { isEditableElement } from '@/lib/utils';
 
 interface Props {
   /** Position of this panel in the layout (for MainPanelsComponent) */
@@ -175,6 +176,9 @@ const FilesComponent: React.FC<Props> = ({ pos }) => {
     if (!isPanelFocused) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore if user is typing in an input field
+      if (isEditableElement(event)) return;
+
       // Only handle Delete or Backspace key
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 

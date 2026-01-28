@@ -38,3 +38,17 @@ export function sleep(ms: number): Promise<void> {
 export function getEntityIconClass(type: string): string {
   return (ENTITY_ICON_CONFIG[type] ?? DEFAULT_ENTITY_ICON).cssClass;
 }
+
+/**
+ * Checks if a keyboard event originated from an editable element.
+ * Use this to prevent keyboard shortcuts from triggering when user is typing.
+ * @param event - The keyboard event to check
+ * @returns true if the event came from an input, textarea, or contenteditable element
+ */
+export function isEditableElement(event: KeyboardEvent): boolean {
+  const target = event.target as HTMLElement | null;
+  if (!target) return false;
+
+  const tagName = target.tagName.toLowerCase();
+  return tagName === 'input' || tagName === 'textarea' || target.isContentEditable;
+}
