@@ -73,6 +73,7 @@ export interface OpenFilesState {
 export interface OpenFilesActions {
   // File operations
   openFile: (fileId: string, groupId?: GroupId, insertIndex?: number) => void;
+  openNewFile: (file: OpenFile, groupId?: GroupId, insertIndex?: number) => void;
   closeFile: (fileId: string, groupId: GroupId) => void;
   closeFileFromAllGroups: (fileId: string) => void;
   setActiveFile: (fileId: string, groupId: GroupId) => void;
@@ -152,6 +153,74 @@ const findGroupContainingFile = (
 };
 
 /**
+ * Core logic for opening a file in a group.
+ * Used by both openFile (looks up metadata) and openNewFile (metadata provided).
+ */
+const openFileInGroup = (
+  state: OpenFilesState,
+  file: OpenFile,
+  groupId?: GroupId,
+  insertIndex?: number
+): OpenFilesState => {
+  const { rows, lastFocusedGroupId } = state.openFiles;
+
+  // Check if file already exists anywhere - if so, just activate it
+  const existing = findGroupContainingFile(rows, file.id);
+  if (existing) {
+    const newRows = rows.map((row, ri) =>
+      ri === existing.rowIndex
+        ? {
+            ...row,
+            groups: row.groups.map((g, gi) => (gi === existing.groupIndex ? { ...g, activeFileId: file.id } : g))
+          }
+        : row
+    );
+    return {
+      openFiles: {
+        rows: newRows,
+        lastFocusedGroupId: existing.group.id
+      }
+    };
+  }
+
+  // Determine target group
+  const targetGroupId = groupId ?? lastFocusedGroupId ?? rows[0]?.groups[0]?.id;
+  if (!targetGroupId) return state;
+
+  const location = findGroupLocation(rows, targetGroupId);
+  if (!location) return state;
+
+  // Add file at specified index or end of target group
+  const newFiles = [...location.group.files];
+  const idx = insertIndex ?? newFiles.length;
+  newFiles.splice(idx, 0, file);
+
+  const newRows = rows.map((row, ri) =>
+    ri === location.rowIndex
+      ? {
+          ...row,
+          groups: row.groups.map((g, gi) =>
+            gi === location.groupIndex
+              ? {
+                  ...g,
+                  files: newFiles,
+                  activeFileId: file.id
+                }
+              : g
+          )
+        }
+      : row
+  );
+
+  return {
+    openFiles: {
+      rows: newRows,
+      lastFocusedGroupId: targetGroupId
+    }
+  };
+};
+
+/**
  * Remove empty groups and rows after file operations.
  *
  * @remarks
@@ -227,27 +296,6 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
   openFile: (fileId: string, groupId?: GroupId, insertIndex?: number) =>
     set(() => {
       const state = get() as CombinedStore;
-      const { rows, lastFocusedGroupId } = state.openFiles;
-
-      // Check if file already exists anywhere
-      const existing = findGroupContainingFile(rows, fileId);
-      if (existing) {
-        // Activate existing file
-        const newRows = rows.map((row, ri) =>
-          ri === existing.rowIndex
-            ? {
-                ...row,
-                groups: row.groups.map((g, gi) => (gi === existing.groupIndex ? { ...g, activeFileId: fileId } : g))
-              }
-            : row
-        );
-        return {
-          openFiles: {
-            rows: newRows,
-            lastFocusedGroupId: existing.group.id
-          }
-        };
-      }
 
       // Look up file info from files store
       const fileTree = state.files.structure;
@@ -256,43 +304,21 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       const fileInfo = findFileById(fileTree, fileId);
       if (!fileInfo) return { openFiles: state.openFiles };
 
-      const { name, metadata } = fileInfo;
-
-      // Determine target group
-      const targetGroupId = groupId ?? lastFocusedGroupId ?? rows[0]?.groups[0]?.id;
-      if (!targetGroupId) return { openFiles: state.openFiles };
-
-      const location = findGroupLocation(rows, targetGroupId);
-      if (!location) return { openFiles: state.openFiles };
-
-      // Add file at specified index or end of target group
-      const newFiles = [...location.group.files];
-      const idx = insertIndex ?? newFiles.length;
-      newFiles.splice(idx, 0, { id: fileId, name, metadata: metadata as Record<string, string> });
-
-      const newRows = rows.map((row, ri) =>
-        ri === location.rowIndex
-          ? {
-              ...row,
-              groups: row.groups.map((g, gi) =>
-                gi === location.groupIndex
-                  ? {
-                      ...g,
-                      files: newFiles,
-                      activeFileId: fileId
-                    }
-                  : g
-              )
-            }
-          : row
-      );
-
-      return {
-        openFiles: {
-          rows: newRows,
-          lastFocusedGroupId: targetGroupId
-        }
+      const file: OpenFile = {
+        id: fileId,
+        name: fileInfo.name,
+        metadata: fileInfo.metadata as Record<string, string>
       };
+
+      return openFileInGroup(state, file, groupId, insertIndex);
+    }),
+
+  // Open a new file with provided info (bypasses store lookup)
+  // Used when opening newly created files that aren't in the store yet
+  openNewFile: (file: OpenFile, groupId?: GroupId, insertIndex?: number) =>
+    set(() => {
+      const state = get();
+      return openFileInGroup(state, file, groupId, insertIndex);
     }),
 
   // Close file from specific group

@@ -78,7 +78,7 @@ interface Props {
  */
 const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
   const { mutateAsync: addNodeAsync } = useFileAddMutation();
-  const { openFile } = useOpenFilesActions();
+  const { openNewFile } = useOpenFilesActions();
   const { setSelectedFileId } = useFileActions();
   const lastFocusedGroupId = useLastFocusedGroupId();
   const lastFocusedGroup = useEditorGroup(lastFocusedGroupId ?? '');
@@ -151,10 +151,23 @@ const NewNodeDialogComponent = ({ open, type, parentId, onClose }: Props) => {
       setSelectedFileId(createdNode.id);
 
       // For files, open in editor right after the currently active tab
-      if (type === 'file' && lastFocusedGroup) {
-        const activeIndex = lastFocusedGroup.files.findIndex(f => f.id === lastFocusedGroup.activeFileId);
-        const insertIndex = activeIndex !== -1 ? activeIndex + 1 : lastFocusedGroup.files.length;
-        openFile(createdNode.id, lastFocusedGroupId ?? undefined, insertIndex);
+      if (type === 'file' && createdNode.type === 'file') {
+        // Calculate insert position if we have a focused group
+        let insertIndex: number | undefined;
+        if (lastFocusedGroup) {
+          const activeIndex = lastFocusedGroup.files.findIndex(f => f.id === lastFocusedGroup.activeFileId);
+          insertIndex = activeIndex !== -1 ? activeIndex + 1 : lastFocusedGroup.files.length;
+        }
+        // Use openNewFile with the created node info (bypasses store lookup)
+        openNewFile(
+          {
+            id: createdNode.id,
+            name: createdNode.name,
+            metadata: createdNode.metadata as Record<string, string>
+          },
+          lastFocusedGroupId ?? undefined,
+          insertIndex
+        );
       }
 
       onClose();

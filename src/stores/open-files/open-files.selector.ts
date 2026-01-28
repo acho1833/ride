@@ -88,6 +88,7 @@ export const useOpenFilesActions = () =>
   useAppStore(
     useShallow((state: OpenFilesSlice) => ({
       openFile: state.openFile,
+      openNewFile: state.openNewFile,
       closeFile: state.closeFile,
       closeFileFromAllGroups: state.closeFileFromAllGroups,
       setActiveFile: state.setActiveFile,

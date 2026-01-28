@@ -111,9 +111,17 @@ export async function addNode(sid: string, projectId: string, parentId: string, 
     throw new ORPCError('BAD_REQUEST', { message: `A file with the name '${name}' already exists.` });
   }
 
+  const fileId = crypto.randomUUID();
+  const metadata: Record<string, string> = {};
+
+  // Generate workspaceId for .ws files
+  if (type === 'file' && name.toLowerCase().endsWith('.ws')) {
+    metadata.workspaceId = `${fileId}-content`;
+  }
+
   const node: TreeNode =
     type === 'file'
-      ? { id: crypto.randomUUID(), name, type: 'file', metadata: {} }
+      ? { id: fileId, name, type: 'file', metadata }
       : { id: crypto.randomUUID(), name, type: 'folder', children: [] };
 
   const newTree = addNodeToTree(currentTree, parentId, node);
