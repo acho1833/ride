@@ -188,10 +188,7 @@ const WorkspaceGraphComponent = ({
     const anchorX = nodeX + GRAPH_CONFIG.nodeRadius;
     const anchorY = nodeY + GRAPH_CONFIG.nodeRadius;
 
-    g.append('g')
-      .attr('id', popupId)
-      .attr('class', 'popup-anchor')
-      .attr('transform', `translate(${anchorX}, ${anchorY})`);
+    g.append('g').attr('id', popupId).attr('class', 'popup-anchor').attr('transform', `translate(${anchorX}, ${anchorY})`);
 
     setOpenPopups(prev => [...prev, { id: popupId, entityId }]);
   }, []);
@@ -648,7 +645,16 @@ const WorkspaceGraphComponent = ({
       d3.select(svgRef.current).selectAll('.popup-anchor').remove();
       setOpenPopups([]);
     };
-  }, [data, dimensions, workspace, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection, handleOpenPopup]);
+  }, [
+    data,
+    dimensions,
+    workspace,
+    debouncedSave,
+    onSetSelectedEntityIds,
+    onToggleEntitySelection,
+    onClearEntitySelection,
+    handleOpenPopup
+  ]);
 
   // Update node colors when selection changes (driven by prop from parent/store)
   useEffect(() => {
