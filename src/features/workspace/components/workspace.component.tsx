@@ -12,7 +12,7 @@ import { useWorkspaceQuery } from '../hooks/useWorkspaceQuery';
 import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMutation';
 import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitiesMutation';
 import { useWorkspaceRemoveEntitiesMutation } from '../hooks/useWorkspaceRemoveEntitiesMutation';
-import { useSelectedEntityIds, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
+import { useSelectedEntityIds, useOpenPopups, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
 import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
 import WorkspaceGraphComponent from './workspace-graph.component';
 import WorkspaceContextMenuComponent from './workspace-context-menu.component';
@@ -34,7 +34,9 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const { mutate: addEntities } = useWorkspaceAddEntitiesMutation();
   const { mutate: removeEntities, isPending: isDeleting } = useWorkspaceRemoveEntitiesMutation();
   const selectedEntityIds = useSelectedEntityIds(workspaceId);
-  const { setSelectedEntityIds, toggleEntitySelection, clearEntitySelection } = useWorkspaceGraphActions();
+  const openPopups = useOpenPopups(workspaceId);
+  const { setSelectedEntityIds, toggleEntitySelection, clearEntitySelection, openPopup, closePopup, updatePopupPosition } =
+    useWorkspaceGraphActions();
   const isEditorGroupFocused = useIsEditorGroupFocused(groupId);
   const { setFocusedPanel } = useUiActions();
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -192,6 +194,10 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         onAddEntity={handleAddEntity}
         onContextMenu={handleContextMenu}
         onFocusPanel={handleFocusPanel}
+        openPopups={openPopups}
+        onOpenPopup={popup => openPopup(workspaceId, popup)}
+        onClosePopup={popupId => closePopup(workspaceId, popupId)}
+        onUpdatePopupPosition={(popupId, svgX, svgY) => updatePopupPosition(workspaceId, popupId, svgX, svgY)}
       />
       <WorkspaceContextMenuComponent
         position={contextMenuPosition}

@@ -23,15 +23,8 @@ import { getDraggingEntityId } from '@/features/entity-card/components/entity-ca
 import DetailPopupComponent from './detail-popup.component';
 import { EntityDetailHeader, EntityDetailBody } from './entity-detail-content.component';
 
-/**
- * Represents an open popup in the workspace graph.
- * Position is stored in the SVG <g> element, not in state.
- * ID format: 'workspace-graph-popup-{entityId}'
- */
-interface PopupState {
-  id: string;
-  entityId: string;
-}
+// Re-export PopupState type from store for convenience
+import type { PopupState } from '@/stores/workspace-graph/workspace-graph.store';
 
 /**
  * Convert screen coordinates to SVG graph coordinates.
@@ -101,6 +94,14 @@ interface Props {
   onContextMenu: (event: MouseEvent, entityId?: string) => void;
   /** Called to focus the editor group panel (e.g., on node click) */
   onFocusPanel?: () => void;
+  /** Open entity detail popups (from Zustand store) */
+  openPopups: PopupState[];
+  /** Called to open a popup for an entity */
+  onOpenPopup: (popup: PopupState) => void;
+  /** Called to close a popup */
+  onClosePopup: (popupId: string) => void;
+  /** Called to update popup position after drag */
+  onUpdatePopupPosition: (popupId: string, svgX: number, svgY: number) => void;
 }
 
 const WorkspaceGraphComponent = ({
@@ -113,7 +114,11 @@ const WorkspaceGraphComponent = ({
   onSaveViewState,
   onAddEntity,
   onContextMenu,
-  onFocusPanel
+  onFocusPanel,
+  openPopups,
+  onOpenPopup,
+  onClosePopup,
+  onUpdatePopupPosition
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -122,13 +127,15 @@ const WorkspaceGraphComponent = ({
   const nodesRef = useRef<WorkspaceGraphNode[]>([]);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
-
-  // Local state for open popups - position stored in SVG <g> elements
-  const [openPopups, setOpenPopups] = useState<PopupState[]>([]);
+  // Track popup state version to trigger re-renders for position updates
+  const [popupRenderKey, setPopupRenderKey] = useState(0);
 
   // Keep a ref of selectedEntityIds so D3 drag handlers always read the latest value
   const selectedEntityIdsRef = useRef<string[]>(selectedEntityIds);
   selectedEntityIdsRef.current = selectedEntityIds;
+
+  // Keep a ref of handleOpenPopup so D3 event handlers always read the latest callback
+  const handleOpenPopupRef = useRef<(entityId: string, nodeX: number, nodeY: number) => void>(() => {});
 
   // Rectangle selection state refs
   const isDraggingSelectionRef = useRef(false);
@@ -161,67 +168,67 @@ const WorkspaceGraphComponent = ({
   const debouncedSave = useMemo(() => debounce(collectAndSave, GRAPH_CONFIG.saveDebounceMs), [collectAndSave]);
 
   /**
-   * Gets position for a popup relative to the container by reading its SVG <g> anchor element.
-   * Returns null if element not found.
+   * Gets position for a popup relative to the container.
+   * Computes from SVG coordinates stored in state + current transform.
    */
-  const getPopupScreenPosition = useCallback((popupId: string): { x: number; y: number } | null => {
-    const gElement = svgRef.current?.querySelector(`#${popupId}`);
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    if (!gElement || !containerRect) return null;
-    const rect = gElement.getBoundingClientRect();
-    // Convert screen coords to container-relative coords
-    return { x: rect.left - containerRect.left, y: rect.top - containerRect.top };
+  const getPopupScreenPosition = useCallback((svgX: number, svgY: number): { x: number; y: number } => {
+    const transform = transformRef.current;
+    // Apply zoom transform: containerPos = svgPos * scale + translate
+    return {
+      x: svgX * transform.k + transform.x,
+      y: svgY * transform.k + transform.y
+    };
   }, []);
 
   /**
    * Opens a popup for an entity at its node's lower-right corner.
-   * Creates SVG <g> anchor element and adds to state.
+   * Adds to store (position stored in SVG coordinates).
    */
-  const handleOpenPopup = useCallback((entityId: string, nodeX: number, nodeY: number) => {
-    const popupId = `workspace-graph-popup-${entityId}`;
+  const handleOpenPopup = useCallback(
+    (entityId: string, nodeX: number, nodeY: number) => {
+      const popupId = `workspace-graph-popup-${entityId}`;
 
-    // Don't add if SVG anchor already exists
-    if (svgRef.current?.querySelector(`#${popupId}`)) return;
+      // Don't add if already open in store
+      if (openPopups.some(p => p.id === popupId)) return;
 
-    // Create SVG <g> anchor at lower-right of node
-    const g = d3.select(svgRef.current).select('g');
-    const anchorX = nodeX + GRAPH_CONFIG.nodeRadius;
-    const anchorY = nodeY + GRAPH_CONFIG.nodeRadius;
+      // Position at lower-right of node
+      const anchorX = nodeX + GRAPH_CONFIG.nodeRadius;
+      const anchorY = nodeY + GRAPH_CONFIG.nodeRadius;
 
-    g.append('g').attr('id', popupId).attr('class', 'popup-anchor').attr('transform', `translate(${anchorX}, ${anchorY})`);
+      onOpenPopup({ id: popupId, entityId, svgX: anchorX, svgY: anchorY });
+    },
+    [openPopups, onOpenPopup]
+  );
 
-    setOpenPopups(prev => [...prev, { id: popupId, entityId }]);
-  }, []);
+  // Update ref so D3 event handlers always use latest callback
+  handleOpenPopupRef.current = handleOpenPopup;
 
   /**
-   * Closes a popup by ID. Removes SVG anchor element.
+   * Closes a popup by ID.
    */
-  const handleClosePopup = useCallback((popupId: string) => {
-    // Remove SVG anchor
-    d3.select(svgRef.current).select(`#${popupId}`).remove();
-    setOpenPopups(prev => prev.filter(p => p.id !== popupId));
-  }, []);
+  const handleClosePopup = useCallback(
+    (popupId: string) => {
+      onClosePopup(popupId);
+    },
+    [onClosePopup]
+  );
 
   /**
    * Updates popup position on drag end.
-   * Converts final container-relative position to SVG coordinates and updates the <g> transform.
+   * Converts final container-relative position to SVG coordinates and updates store.
    * Called once when user releases the drag.
    */
-  const handlePopupDragEnd = useCallback((popupId: string, containerX: number, containerY: number) => {
-    const gElement = svgRef.current?.querySelector(`#${popupId}`);
-    if (!gElement) return;
+  const handlePopupDragEnd = useCallback(
+    (popupId: string, containerX: number, containerY: number) => {
+      const transform = transformRef.current;
+      // Convert container-relative coords to SVG coords
+      const svgX = (containerX - transform.x) / transform.k;
+      const svgY = (containerY - transform.y) / transform.k;
 
-    const transform = transformRef.current;
-    // Convert container-relative coords to SVG coords
-    const svgX = (containerX - transform.x) / transform.k;
-    const svgY = (containerY - transform.y) / transform.k;
-
-    // Update <g> transform to new SVG position
-    gElement.setAttribute('transform', `translate(${svgX}, ${svgY})`);
-
-    // Force re-render to sync popup with new <g> position
-    setOpenPopups(prev => [...prev]);
-  }, []);
+      onUpdatePopupPosition(popupId, svgX, svgY);
+    },
+    [onUpdatePopupPosition]
+  );
 
   // Cleanup debounce on unmount
   useEffect(() => {
@@ -291,8 +298,8 @@ const WorkspaceGraphComponent = ({
         g.attr('transform', event.transform.toString());
         transformRef.current = event.transform;
         debouncedSave();
-        // Force re-render to update popup screen positions from SVG anchors
-        setOpenPopups(prev => [...prev]);
+        // Force re-render to update popup screen positions
+        setPopupRenderKey(k => k + 1);
       });
 
     svg.call(zoom);
@@ -510,8 +517,8 @@ const WorkspaceGraphComponent = ({
     node.on('dblclick', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.preventDefault();
       event.stopPropagation();
-      // Open popup at node's lower-right corner
-      handleOpenPopup(d.id, d.x ?? 0, d.y ?? 0);
+      // Open popup at node's lower-right corner (use ref to avoid stale closure)
+      handleOpenPopupRef.current(d.id, d.x ?? 0, d.y ?? 0);
     });
 
     // Rectangle selection: use native event listeners to avoid D3 zoom interference
@@ -635,15 +642,12 @@ const WorkspaceGraphComponent = ({
       onContextMenu(event);
     });
 
-    // Cleanup
+    // Cleanup - note: we don't clear popups here because dimension changes shouldn't close them
     return () => {
       simulation.stop();
       svgElement.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      // Remove popup anchors
-      d3.select(svgRef.current).selectAll('.popup-anchor').remove();
-      setOpenPopups([]);
     };
   }, [
     data,
@@ -653,7 +657,8 @@ const WorkspaceGraphComponent = ({
     onSetSelectedEntityIds,
     onToggleEntitySelection,
     onClearEntitySelection,
-    handleOpenPopup
+    onContextMenu,
+    onFocusPanel
   ]);
 
   // Update node colors when selection changes (driven by prop from parent/store)
@@ -735,15 +740,15 @@ const WorkspaceGraphComponent = ({
     <div ref={containerRef} className="relative h-full w-full overflow-hidden" onDragOver={handleDragOver} onDrop={handleDrop}>
       <svg ref={svgRef} className="h-full w-full select-none" />
 
-      {/* Render entity detail popups */}
+      {/* Render entity detail popups - popupRenderKey forces re-render on zoom/pan */}
       {openPopups.map(popup => {
         const entity = entityMap.get(popup.entityId);
-        const screenPos = getPopupScreenPosition(popup.id);
-        if (!entity || !screenPos) return null;
+        if (!entity) return null;
+        const screenPos = getPopupScreenPosition(popup.svgX, popup.svgY);
 
         return (
           <DetailPopupComponent
-            key={popup.id}
+            key={`${popup.id}-${popupRenderKey}`}
             x={screenPos.x}
             y={screenPos.y}
             onClose={() => handleClosePopup(popup.id)}

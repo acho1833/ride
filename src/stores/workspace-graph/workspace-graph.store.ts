@@ -1,16 +1,26 @@
 /**
  * Workspace Graph Store Slice
  *
- * Per-workspace graph state (selection, etc.) keyed by workspaceId.
+ * Per-workspace graph state (selection, popups, etc.) keyed by workspaceId.
  * Extensible — each workspace entry can hold additional state in the future.
  */
 
 import { StateCreator } from 'zustand';
 
+/** Represents an open popup in the workspace graph */
+export interface PopupState {
+  id: string; // Format: 'workspace-graph-popup-{entityId}'
+  entityId: string;
+  svgX: number; // SVG x coordinate
+  svgY: number; // SVG y coordinate
+}
+
 /** State for a single workspace graph instance */
 interface WorkspaceGraphEntry {
   /** IDs of currently selected entity nodes (undefined when none selected) */
   selectedEntityIds?: string[];
+  /** Open entity detail popups (undefined when none open) */
+  openPopups?: PopupState[];
 }
 
 /** Slice state: map of workspaceId → workspace graph state */
@@ -24,8 +34,14 @@ export interface WorkspaceGraphActions {
   setSelectedEntityIds: (workspaceId: string, ids: string[]) => void;
   /** Toggle a single entity in/out of the selection */
   toggleEntitySelection: (workspaceId: string, id: string) => void;
-  /** Remove the workspace entry entirely (cleanup on file close) */
+  /** Clear entity selection for a workspace */
   clearEntitySelection: (workspaceId: string) => void;
+  /** Open a popup for an entity */
+  openPopup: (workspaceId: string, popup: PopupState) => void;
+  /** Close a popup by ID */
+  closePopup: (workspaceId: string, popupId: string) => void;
+  /** Update popup position (after drag) */
+  updatePopupPosition: (workspaceId: string, popupId: string, svgX: number, svgY: number) => void;
 }
 
 export type WorkspaceGraphSlice = WorkspaceGraphState & WorkspaceGraphActions;
@@ -57,10 +73,54 @@ export const createWorkspaceGraphSlice: StateCreator<WorkspaceGraphSlice, [], []
 
   clearEntitySelection: workspaceId =>
     set(state => {
-      if (!state.workspaceGraph[workspaceId]) return state;
-      // Remove the workspace entry entirely
+      const entry = state.workspaceGraph[workspaceId];
+      if (!entry?.selectedEntityIds) return state;
+      // Clear only selectedEntityIds, keep other state like popups
       return {
-        workspaceGraph: Object.fromEntries(Object.entries(state.workspaceGraph).filter(([key]) => key !== workspaceId))
+        workspaceGraph: {
+          ...state.workspaceGraph,
+          [workspaceId]: { ...entry, selectedEntityIds: undefined }
+        }
+      };
+    }),
+
+  openPopup: (workspaceId, popup) =>
+    set(state => {
+      const entry = state.workspaceGraph[workspaceId] ?? {};
+      const existing = entry.openPopups ?? [];
+      // Don't add if already open
+      if (existing.some(p => p.id === popup.id)) return state;
+      return {
+        workspaceGraph: {
+          ...state.workspaceGraph,
+          [workspaceId]: { ...entry, openPopups: [...existing, popup] }
+        }
+      };
+    }),
+
+  closePopup: (workspaceId, popupId) =>
+    set(state => {
+      const entry = state.workspaceGraph[workspaceId];
+      if (!entry?.openPopups) return state;
+      const updated = entry.openPopups.filter(p => p.id !== popupId);
+      return {
+        workspaceGraph: {
+          ...state.workspaceGraph,
+          [workspaceId]: { ...entry, openPopups: updated.length ? updated : undefined }
+        }
+      };
+    }),
+
+  updatePopupPosition: (workspaceId, popupId, svgX, svgY) =>
+    set(state => {
+      const entry = state.workspaceGraph[workspaceId];
+      if (!entry?.openPopups) return state;
+      const updated = entry.openPopups.map(p => (p.id === popupId ? { ...p, svgX, svgY } : p));
+      return {
+        workspaceGraph: {
+          ...state.workspaceGraph,
+          [workspaceId]: { ...entry, openPopups: updated }
+        }
       };
     })
 });
