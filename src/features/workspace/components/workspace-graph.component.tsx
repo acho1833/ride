@@ -20,6 +20,18 @@ import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.mode
 import type { Entity } from '@/models/entity.model';
 import { ENTITY_ICON_CONFIG } from '@/const';
 import { getDraggingEntityId } from '@/features/entity-card/components/entity-card.component';
+import DetailPopupComponent from './detail-popup.component';
+import { EntityDetailHeader, EntityDetailBody } from './entity-detail-content.component';
+
+/**
+ * Represents an open popup in the workspace graph.
+ * Position is stored in the SVG <g> element, not in state.
+ * ID format: 'workspace-graph-popup-{entityId}'
+ */
+interface PopupState {
+  id: string;
+  entityId: string;
+}
 
 /**
  * Convert screen coordinates to SVG graph coordinates.
@@ -111,6 +123,9 @@ const WorkspaceGraphComponent = ({
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
 
+  // Local state for open popups - position stored in SVG <g> elements
+  const [openPopups, setOpenPopups] = useState<PopupState[]>([]);
+
   // Keep a ref of selectedEntityIds so D3 drag handlers always read the latest value
   const selectedEntityIdsRef = useRef<string[]>(selectedEntityIds);
   selectedEntityIdsRef.current = selectedEntityIds;
@@ -144,6 +159,72 @@ const WorkspaceGraphComponent = ({
 
   // Debounced save function
   const debouncedSave = useMemo(() => debounce(collectAndSave, GRAPH_CONFIG.saveDebounceMs), [collectAndSave]);
+
+  /**
+   * Gets position for a popup relative to the container by reading its SVG <g> anchor element.
+   * Returns null if element not found.
+   */
+  const getPopupScreenPosition = useCallback((popupId: string): { x: number; y: number } | null => {
+    const gElement = svgRef.current?.querySelector(`#${popupId}`);
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (!gElement || !containerRect) return null;
+    const rect = gElement.getBoundingClientRect();
+    // Convert screen coords to container-relative coords
+    return { x: rect.left - containerRect.left, y: rect.top - containerRect.top };
+  }, []);
+
+  /**
+   * Opens a popup for an entity at its node's lower-right corner.
+   * Creates SVG <g> anchor element and adds to state.
+   */
+  const handleOpenPopup = useCallback((entityId: string, nodeX: number, nodeY: number) => {
+    const popupId = `workspace-graph-popup-${entityId}`;
+
+    // Don't add if SVG anchor already exists
+    if (svgRef.current?.querySelector(`#${popupId}`)) return;
+
+    // Create SVG <g> anchor at lower-right of node
+    const g = d3.select(svgRef.current).select('g');
+    const anchorX = nodeX + GRAPH_CONFIG.nodeRadius;
+    const anchorY = nodeY + GRAPH_CONFIG.nodeRadius;
+
+    g.append('g')
+      .attr('id', popupId)
+      .attr('class', 'popup-anchor')
+      .attr('transform', `translate(${anchorX}, ${anchorY})`);
+
+    setOpenPopups(prev => [...prev, { id: popupId, entityId }]);
+  }, []);
+
+  /**
+   * Closes a popup by ID. Removes SVG anchor element.
+   */
+  const handleClosePopup = useCallback((popupId: string) => {
+    // Remove SVG anchor
+    d3.select(svgRef.current).select(`#${popupId}`).remove();
+    setOpenPopups(prev => prev.filter(p => p.id !== popupId));
+  }, []);
+
+  /**
+   * Updates popup position on drag end.
+   * Converts final container-relative position to SVG coordinates and updates the <g> transform.
+   * Called once when user releases the drag.
+   */
+  const handlePopupDragEnd = useCallback((popupId: string, containerX: number, containerY: number) => {
+    const gElement = svgRef.current?.querySelector(`#${popupId}`);
+    if (!gElement) return;
+
+    const transform = transformRef.current;
+    // Convert container-relative coords to SVG coords
+    const svgX = (containerX - transform.x) / transform.k;
+    const svgY = (containerY - transform.y) / transform.k;
+
+    // Update <g> transform to new SVG position
+    gElement.setAttribute('transform', `translate(${svgX}, ${svgY})`);
+
+    // Force re-render to sync popup with new <g> position
+    setOpenPopups(prev => [...prev]);
+  }, []);
 
   // Cleanup debounce on unmount
   useEffect(() => {
@@ -213,6 +294,8 @@ const WorkspaceGraphComponent = ({
         g.attr('transform', event.transform.toString());
         transformRef.current = event.transform;
         debouncedSave();
+        // Force re-render to update popup screen positions from SVG anchors
+        setOpenPopups(prev => [...prev]);
       });
 
     svg.call(zoom);
@@ -368,6 +451,7 @@ const WorkspaceGraphComponent = ({
     // Setup drag behavior - supports group drag when node is in selection
     const drag = d3
       .drag<SVGGElement, WorkspaceGraphNode>()
+      .clickDistance(4) // Allow clicks/dblclicks through if pointer moves less than 4px
       .on('start', function () {
         this.setAttribute('cursor', 'grabbing');
       })
@@ -423,6 +507,14 @@ const WorkspaceGraphComponent = ({
     node.on('contextmenu', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.preventDefault();
       onContextMenu(event, d.id);
+    });
+
+    // Double-click on node: open entity detail popup
+    node.on('dblclick', function (event: MouseEvent, d: WorkspaceGraphNode) {
+      event.preventDefault();
+      event.stopPropagation();
+      // Open popup at node's lower-right corner
+      handleOpenPopup(d.id, d.x ?? 0, d.y ?? 0);
     });
 
     // Rectangle selection: use native event listeners to avoid D3 zoom interference
@@ -552,8 +644,11 @@ const WorkspaceGraphComponent = ({
       svgElement.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      // Remove popup anchors
+      d3.select(svgRef.current).selectAll('.popup-anchor').remove();
+      setOpenPopups([]);
     };
-  }, [data, dimensions, workspace, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection]);
+  }, [data, dimensions, workspace, debouncedSave, onSetSelectedEntityIds, onToggleEntitySelection, onClearEntitySelection, handleOpenPopup]);
 
   // Update node colors when selection changes (driven by prop from parent/store)
   useEffect(() => {
@@ -633,6 +728,26 @@ const WorkspaceGraphComponent = ({
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden" onDragOver={handleDragOver} onDrop={handleDrop}>
       <svg ref={svgRef} className="h-full w-full select-none" />
+
+      {/* Render entity detail popups */}
+      {openPopups.map(popup => {
+        const entity = entityMap.get(popup.entityId);
+        const screenPos = getPopupScreenPosition(popup.id);
+        if (!entity || !screenPos) return null;
+
+        return (
+          <DetailPopupComponent
+            key={popup.id}
+            x={screenPos.x}
+            y={screenPos.y}
+            onClose={() => handleClosePopup(popup.id)}
+            onDragEnd={(screenX, screenY) => handlePopupDragEnd(popup.id, screenX, screenY)}
+            header={<EntityDetailHeader entity={entity} />}
+          >
+            <EntityDetailBody entity={entity} />
+          </DetailPopupComponent>
+        );
+      })}
 
       {/* Control buttons - lower right */}
       <div className="absolute right-4 bottom-4 flex flex-col gap-2">
