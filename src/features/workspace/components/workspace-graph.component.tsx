@@ -337,15 +337,20 @@ const WorkspaceGraphComponent = ({
       .join('g')
       .attr('cursor', 'grab');
 
-    // Add circles to nodes
+    // Add squares to nodes
     node
-      .append('circle')
-      .attr('r', GRAPH_CONFIG.nodeRadius)
+      .append('rect')
+      .attr('x', -GRAPH_CONFIG.nodeRadius)
+      .attr('y', -GRAPH_CONFIG.nodeRadius)
+      .attr('width', GRAPH_CONFIG.nodeRadius * 2)
+      .attr('height', GRAPH_CONFIG.nodeRadius * 2)
+      .attr('rx', 4)
+      .attr('ry', 4)
       .attr('fill', GRAPH_CONFIG.nodeColor)
       .attr('stroke', 'white')
       .attr('stroke-width', 2);
 
-    // Add entity type icons (centered in circle)
+    // Add entity type icons (centered in square)
     node
       .append('use')
       .attr('href', d => `#entity-icon-${d.type in ENTITY_ICON_CONFIG ? d.type : 'unknown'}`)
@@ -557,7 +562,7 @@ const WorkspaceGraphComponent = ({
         selectionRect.attr('visibility', 'visible');
 
         // Clear previous selection visually (without state update yet)
-        d3.select(svgElement).selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle').attr('fill', GRAPH_CONFIG.nodeColor);
+        d3.select(svgElement).selectAll<SVGRectElement, WorkspaceGraphNode>('.nodes g rect').attr('fill', GRAPH_CONFIG.nodeColor);
       }
 
       // Update rectangle if actively dragging
@@ -580,7 +585,7 @@ const WorkspaceGraphComponent = ({
         // Visual feedback: highlight nodes inside rectangle (without triggering state update)
         const rect = { x: rectX, y: rectY, width: rectWidth, height: rectHeight };
         d3.select(svgElement)
-          .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle')
+          .selectAll<SVGRectElement, WorkspaceGraphNode>('.nodes g rect')
           .attr('fill', d => {
             const isInRect = isPointInRect(d.x ?? 0, d.y ?? 0, rect);
             return isInRect ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor;
@@ -665,7 +670,7 @@ const WorkspaceGraphComponent = ({
   useEffect(() => {
     if (!svgRef.current) return;
     d3.select(svgRef.current)
-      .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g circle')
+      .selectAll<SVGRectElement, WorkspaceGraphNode>('.nodes g rect')
       .attr('fill', d => (selectedEntityIds.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor));
   }, [selectedEntityIds]);
 

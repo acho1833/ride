@@ -8,7 +8,7 @@
  * Graph layout and physics configuration.
  */
 export const GRAPH_CONFIG = {
-  /** Node circle radius in pixels */
+  /** Node square size (half-width) in pixels */
   nodeRadius: 20,
   /** Entity icon size in pixels */
   iconSize: 32,
