@@ -9,10 +9,12 @@ export type Entity = {
   id: string;
   labelNormalized: string;
   type: string;
+  /** Related entities map - only populated when fetching single entity details */
+  relatedEntities?: Record<string, Entity>;
 } & Coordinate;
 
-/** Zod schema for Entity validation in oRPC routes */
-export const entitySchema = z.object({
+/** Base entity schema without relatedEntities (used for recursive definition) */
+const baseEntitySchema = z.object({
   id: z.string(),
   labelNormalized: z.string(),
   type: z.string(),
@@ -20,15 +22,26 @@ export const entitySchema = z.object({
   y: z.number().optional()
 });
 
+/** Zod schema for Entity validation in oRPC routes */
+export const entitySchema = baseEntitySchema.extend({
+  relatedEntities: z.record(z.string(), baseEntitySchema).optional()
+});
+
 /**
  * Converts external API response to Entity model.
  * Note: x/y coordinates are only set internally when entities are positioned in D3 graph,
  * they are never returned from the external API.
  */
-export function toEntity(response: { id: string; labelNormalized: string; type: string }): Entity {
+export function toEntity(response: {
+  id: string;
+  labelNormalized: string;
+  type: string;
+  relatedEntities?: Record<string, Entity>;
+}): Entity {
   return {
     id: response.id,
     labelNormalized: response.labelNormalized,
-    type: response.type
+    type: response.type,
+    relatedEntities: response.relatedEntities
   };
 }

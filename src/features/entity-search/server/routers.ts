@@ -25,6 +25,23 @@ const entitySearchResponseSchema = z.object({
  */
 export const entityRouter = appProcedure.router({
   /**
+   * GET /entities/:id - Get entity by ID with related entities.
+   * Returns entity details including relatedEntities map.
+   */
+  getById: appProcedure
+    .route({
+      method: 'GET',
+      path: `${API_ENTITY_PREFIX}/:id`,
+      summary: 'Get entity by ID with related entities',
+      tags
+    })
+    .input(z.object({ id: z.string() }))
+    .output(entitySchema)
+    .handler(async ({ input }) => {
+      return entityService.getEntityById(input.id);
+    }),
+
+  /**
    * POST /entities/search - Search entities with filtering and pagination.
    * Returns paginated list of entities matching the search criteria.
    */

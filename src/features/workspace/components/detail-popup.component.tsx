@@ -22,9 +22,11 @@ interface Props {
   onDragEnd: (containerX: number, containerY: number) => void; // Called on drop with final position
   header: React.ReactNode; // Header content (icon + title)
   children?: React.ReactNode; // Optional body content
+  /** Optional toolbar buttons between header and close button */
+  toolbar?: React.ReactNode;
 }
 
-const DetailPopupComponent = memo(({ x, y, onClose, onDragEnd, header, children }: Props) => {
+const DetailPopupComponent = memo(({ x, y, onClose, onDragEnd, header, children, toolbar }: Props) => {
   const popupRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 }); // Initial pointer position on drag start
@@ -97,6 +99,9 @@ const DetailPopupComponent = memo(({ x, y, onClose, onDragEnd, header, children 
 
         {/* Header content (icon + title) */}
         <div className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5">{header}</div>
+
+        {/* Optional toolbar buttons */}
+        {toolbar}
 
         {/* Close button */}
         <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onClose}>

@@ -31,7 +31,12 @@ function generateMockRelationships(): RelationshipResponse[] {
   return relationships;
 }
 
-function getMockRelationships(): RelationshipResponse[] {
+/**
+ * Get the shared mock relationships pool.
+ * Returns the same cached data on every call for consistency.
+ * Exported for use by entity mock service.
+ */
+export function getMockRelationships(): RelationshipResponse[] {
   if (!cachedRelationships) {
     cachedRelationships = generateMockRelationships();
   }

@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { toEntity } from '@/models/entity.model';
+import { ORPCError } from '@orpc/server';
+import { toEntity, type Entity } from '@/models/entity.model';
 import { EntitySearchParams, EntitySearchResponse } from '../../types';
 import * as mockService from './entity.mock-service';
 
@@ -25,4 +26,20 @@ export async function searchEntities(params: EntitySearchParams): Promise<Entity
  */
 export async function getEntityTypes(): Promise<string[]> {
   return mockService.getEntityTypes();
+}
+
+/**
+ * Get entity by ID with related entities.
+ * Returns entity with relatedEntities map populated.
+ * Errors are handled by global error middleware in src/lib/orpc/index.ts
+ */
+export async function getEntityById(id: string): Promise<Entity> {
+  const entity = await mockService.getEntityById(id);
+  if (!entity) {
+    throw new ORPCError('NOT_FOUND', {
+      message: 'Entity not found',
+      data: { id }
+    });
+  }
+  return entity;
 }

@@ -20,8 +20,7 @@ import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.mode
 import type { Entity } from '@/models/entity.model';
 import { ENTITY_ICON_CONFIG } from '@/const';
 import { getDraggingEntityId } from '@/features/entity-card/components/entity-card.component';
-import DetailPopupComponent from './detail-popup.component';
-import { EntityDetailHeader, EntityDetailBody } from './entity-detail-content.component';
+import EntityDetailPopupComponent from './entity-detail-popup.component';
 
 // Re-export PopupState type from store for convenience
 import type { PopupState } from '@/stores/workspace-graph/workspace-graph.store';
@@ -752,16 +751,15 @@ const WorkspaceGraphComponent = ({
         const screenPos = getPopupScreenPosition(popup.svgX, popup.svgY);
 
         return (
-          <DetailPopupComponent
+          <EntityDetailPopupComponent
             key={`${popup.id}-${popupRenderKey}`}
+            entity={entity}
             x={screenPos.x}
             y={screenPos.y}
+            workspace={workspace}
             onClose={() => handleClosePopup(popup.id)}
-            onDragEnd={(screenX, screenY) => handlePopupDragEnd(popup.id, screenX, screenY)}
-            header={<EntityDetailHeader entity={entity} />}
-          >
-            <EntityDetailBody entity={entity} />
-          </DetailPopupComponent>
+            onDragEnd={(screenX: number, screenY: number) => handlePopupDragEnd(popup.id, screenX, screenY)}
+          />
         );
       })}
 
