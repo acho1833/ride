@@ -709,3 +709,120 @@ Implemented the "Expand" button feature for entity detail popups. When clicked, 
 ### Build Status
 
 ✅ Build passes with no errors.
+
+---
+
+## Enhancement: Smooth Transitions & Auto-Selection
+
+### Problem
+
+When new entities are added via the Expand button:
+1. **Flicker** - Nodes appear abruptly because the entire D3 graph re-initializes (svg.selectAll('*').remove())
+2. **No selection** - User must manually select new entities to see them highlighted
+
+### Solution
+
+#### 1. Smooth Transitions for New Nodes
+
+Instead of re-initializing the entire graph, detect new nodes and use D3's enter/update/exit pattern with transitions:
+
+**Approach:**
+- Track previous node IDs in a ref
+- On data change, compare new vs existing nodes
+- New nodes: start at opacity 0 at source entity position, animate to full opacity
+- Use D3 `.transition().duration(300)` for smooth appearance
+- Run a brief force simulation to spread out new nodes
+
+**Implementation (workspace-graph.component.tsx):**
+
+```typescript
+// Track previous node IDs to detect additions
+const prevNodeIdsRef = useRef<Set<string>>(new Set());
+
+// In useEffect, instead of clearing everything:
+// 1. Identify new nodes
+const newNodeIds = data.nodes.filter(n => !prevNodeIdsRef.current.has(n.id)).map(n => n.id);
+
+// 2. Position new nodes at source entity (the entity that was expanded)
+// 3. Use D3 transition for smooth appearance
+node.filter(d => newNodeIds.includes(d.id))
+  .attr('opacity', 0)
+  .transition()
+  .duration(300)
+  .attr('opacity', 1);
+
+// 4. Update prevNodeIdsRef
+prevNodeIdsRef.current = new Set(data.nodes.map(n => n.id));
+```
+
+#### 2. Auto-Select New Entities
+
+After the mutation succeeds, automatically select all newly added entities.
+
+**Approach:**
+- Pass the new entity IDs from the expand handler to the mutation
+- On mutation success, call `onSetSelectedEntityIds` with the new entity IDs
+- The selection color effect will automatically highlight them
+
+**Implementation:**
+
+1. **Update mutation hook** to accept an `onSuccessCallback`:
+
+```typescript
+// useWorkspaceAddEntitiesMutation.ts
+export const useWorkspaceAddEntitiesMutation = (options?: {
+  onSuccessCallback?: (addedEntityIds: string[]) => void;
+}) => {
+  // ... in onSuccess:
+  options?.onSuccessCallback?.(variables.entityIds);
+};
+```
+
+2. **Update entity-detail-popup.component.tsx** to pass callback:
+
+```typescript
+// Pass onSetSelectedEntityIds to select new entities after add
+const { mutate: addEntities } = useWorkspaceAddEntitiesMutation({
+  onSuccessCallback: (addedEntityIds) => {
+    onSetSelectedEntityIds(addedEntityIds);
+  }
+});
+```
+
+3. **Add prop to EntityDetailPopupComponent**:
+
+```typescript
+interface Props {
+  // ... existing props
+  onSetSelectedEntityIds: (ids: string[]) => void;
+}
+```
+
+### Implementation Plan
+
+- [x] Step 10: Add smooth transitions for new nodes in workspace-graph.component.tsx
+- [x] Step 11: Pass onSetSelectedEntityIds to EntityDetailPopupComponent and call on expand success
+- [x] Step 12: Remove debug console.log statements from modified files
+
+### Enhancement Implementation Summary
+
+**Changes Made:**
+
+1. **Smooth position transitions** ([workspace-graph.component.tsx](src/features/workspace/components/workspace-graph.component.tsx)):
+   - Track previous node IDs in `prevNodeIdsRef`
+   - Detect new nodes by comparing with previous set
+   - Position new nodes at an existing node's location (spawn point)
+   - Fix existing nodes in place during simulation
+   - Run force simulation to animate new nodes spreading out
+   - Unfix nodes after 1 second and save positions
+
+2. **Auto-select new entities** ([entity-detail-popup.component.tsx](src/features/workspace/components/entity-detail-popup.component.tsx)):
+   - Added `onSetSelectedEntityIds` prop
+   - Call `onSetSelectedEntityIds(newEntityIds)` in mutation's `onSuccess` callback
+   - Passed prop from workspace-graph.component.tsx
+
+3. **Removed debug logs**:
+   - [useEntityQuery.ts](src/features/entity-search/hooks/useEntityQuery.ts) - removed 2 console.log statements
+   - [entity-detail-popup.component.tsx](src/features/workspace/components/entity-detail-popup.component.tsx) - removed 1 console.log statement
+
+**Build Status:** ✅ Passes

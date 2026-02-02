@@ -126,8 +126,8 @@ const WorkspaceGraphComponent = ({
   const nodesRef = useRef<WorkspaceGraphNode[]>([]);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
-  // Track popup state version to trigger re-renders for position updates
-  const [popupRenderKey, setPopupRenderKey] = useState(0);
+  // Counter to trigger re-renders for popup position updates on zoom/pan
+  const [, setRenderTrigger] = useState(0);
 
   // Keep a ref of selectedEntityIds so D3 drag handlers always read the latest value
   const selectedEntityIdsRef = useRef<string[]>(selectedEntityIds);
@@ -140,6 +140,9 @@ const WorkspaceGraphComponent = ({
   const isDraggingSelectionRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; screenX: number; screenY: number } | null>(null);
   const justCompletedDragRef = useRef(false);
+
+  // Track previous node IDs to detect new nodes for smooth transitions
+  const prevNodeIdsRef = useRef<Set<string>>(new Set());
 
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
@@ -268,13 +271,16 @@ const WorkspaceGraphComponent = ({
     const g = svg.append('g');
 
     // Deep copy data to avoid mutation issues with D3
-    // Apply saved entity positions if viewState exists
+    // Apply positions: prefer current in-memory positions (nodesRef) over persisted viewState
+    // This ensures drag positions aren't lost when graph rebuilds (e.g., on resize)
+    const prevNodesMap = new Map(nodesRef.current.map(n => [n.id, n]));
     const nodes: WorkspaceGraphNode[] = data.nodes.map(n => {
+      const prevNode = prevNodesMap.get(n.id);
       const savedPos = workspace.viewState?.entityPositions[n.id];
       return {
         ...n,
-        x: savedPos?.x ?? n.x,
-        y: savedPos?.y ?? n.y
+        x: prevNode?.x ?? savedPos?.x ?? n.x,
+        y: prevNode?.y ?? savedPos?.y ?? n.y
       };
     });
     const links: WorkspaceGraphLink[] = data.links.map(l => ({ ...l }));
@@ -298,7 +304,7 @@ const WorkspaceGraphComponent = ({
         transformRef.current = event.transform;
         debouncedSave();
         // Force re-render to update popup screen positions
-        setPopupRenderKey(k => k + 1);
+        setRenderTrigger(n => n + 1);
       });
 
     svg.call(zoom);
@@ -406,10 +412,14 @@ const WorkspaceGraphComponent = ({
     simulationRef.current = simulation;
     nodesRef.current = nodes;
 
-    // Apply saved transform or calculate auto-fit
-    const initialTransform = workspace.viewState
-      ? d3.zoomIdentity.translate(workspace.viewState.panX, workspace.viewState.panY).scale(workspace.viewState.scale)
-      : calculateFitTransform(nodes, width, height);
+    // Apply transform: prefer current in-memory transform over persisted viewState
+    // This ensures zoom/pan isn't lost when graph rebuilds (e.g., on resize)
+    const hasInMemoryTransform = transformRef.current !== d3.zoomIdentity;
+    const initialTransform = hasInMemoryTransform
+      ? transformRef.current
+      : workspace.viewState
+        ? d3.zoomIdentity.translate(workspace.viewState.panX, workspace.viewState.panY).scale(workspace.viewState.scale)
+        : calculateFitTransform(nodes, width, height);
 
     transformRef.current = initialTransform;
     svg.call(zoom.transform, initialTransform);
@@ -423,7 +433,87 @@ const WorkspaceGraphComponent = ({
 
     node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
 
-    // Update positions on each tick (for drag interactions)
+    // Detect new nodes for smooth position transitions
+    const currentNodeIds = new Set(nodes.map(n => n.id));
+    const newNodeIds = nodes.filter(n => !prevNodeIdsRef.current.has(n.id)).map(n => n.id);
+    const hasNewNodes = newNodeIds.length > 0 && prevNodeIdsRef.current.size > 0;
+
+    if (hasNewNodes) {
+      // Find an existing node to use as spawn point
+      const existingNode = nodes.find(n => prevNodeIdsRef.current.has(n.id));
+      const spawnX = existingNode?.x ?? width / 2;
+      const spawnY = existingNode?.y ?? height / 2;
+
+      // Position new nodes at spawn point
+      for (const n of nodes) {
+        if (newNodeIds.includes(n.id)) {
+          n.x = spawnX;
+          n.y = spawnY;
+        }
+      }
+
+      // Update DOM to reflect spawn positions
+      node
+        .filter(d => newNodeIds.includes(d.id))
+        .attr('transform', `translate(${spawnX},${spawnY})`);
+
+      // Fix existing nodes in place so simulation only moves new nodes
+      for (const n of nodes) {
+        if (prevNodeIdsRef.current.has(n.id)) {
+          n.fx = n.x;
+          n.fy = n.y;
+        }
+      }
+
+      // Create a gentle force simulation just for spreading new nodes
+      const expandSim = d3
+        .forceSimulation<WorkspaceGraphNode>(nodes)
+        .force(
+          'link',
+          d3
+            .forceLink<WorkspaceGraphNode, WorkspaceGraphLink>(links)
+            .id(d => d.id)
+            .distance(GRAPH_CONFIG.linkDistance)
+            .strength(0.5)
+        )
+        .force('collide', d3.forceCollide(GRAPH_CONFIG.nodeRadius * 2))
+        .force('charge', d3.forceManyBody().strength(-50))
+        .alpha(0.4)
+        .alphaDecay(0.06)
+        .on('tick', () => {
+          // Update positions during animation
+          link
+            .attr('x1', d => (d.source as WorkspaceGraphNode).x ?? 0)
+            .attr('y1', d => (d.source as WorkspaceGraphNode).y ?? 0)
+            .attr('x2', d => (d.target as WorkspaceGraphNode).x ?? 0)
+            .attr('y2', d => (d.target as WorkspaceGraphNode).y ?? 0);
+          node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+
+          // Stop early when nearly stabilized
+          if (expandSim.alpha() < 0.002) {
+            expandSim.stop();
+            // Unfix existing nodes and save
+            for (const n of nodes) {
+              n.fx = null;
+              n.fy = null;
+            }
+            debouncedSave();
+          }
+        })
+        .on('end', () => {
+          // Unfix existing nodes and save
+          for (const n of nodes) {
+            n.fx = null;
+            n.fy = null;
+          }
+          debouncedSave();
+        });
+    }
+
+    // Update previous node IDs for next render
+    prevNodeIdsRef.current = currentNodeIds;
+
+    // Update positions on each tick (for drag interactions and new node animation)
     simulation.on('tick', () => {
       link
         .attr('x1', d => (d.source as WorkspaceGraphNode).x ?? 0)
@@ -744,7 +834,7 @@ const WorkspaceGraphComponent = ({
     <div ref={containerRef} className="relative h-full w-full overflow-hidden" onDragOver={handleDragOver} onDrop={handleDrop}>
       <svg ref={svgRef} className="h-full w-full select-none" />
 
-      {/* Render entity detail popups - popupRenderKey forces re-render on zoom/pan */}
+      {/* Render entity detail popups */}
       {openPopups.map(popup => {
         const entity = entityMap.get(popup.entityId);
         if (!entity) return null;
@@ -752,13 +842,14 @@ const WorkspaceGraphComponent = ({
 
         return (
           <EntityDetailPopupComponent
-            key={`${popup.id}-${popupRenderKey}`}
+            key={popup.id}
             entity={entity}
             x={screenPos.x}
             y={screenPos.y}
             workspace={workspace}
             onClose={() => handleClosePopup(popup.id)}
             onDragEnd={(screenX: number, screenY: number) => handlePopupDragEnd(popup.id, screenX, screenY)}
+            onSetSelectedEntityIds={onSetSelectedEntityIds}
           />
         );
       })}

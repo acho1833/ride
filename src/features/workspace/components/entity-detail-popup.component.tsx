@@ -35,9 +35,11 @@ interface Props {
   onClose: () => void;
   /** Called when popup is dragged to new position */
   onDragEnd: (containerX: number, containerY: number) => void;
+  /** Called to select entities (used for auto-selecting expanded entities) */
+  onSetSelectedEntityIds: (ids: string[]) => void;
 }
 
-const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEnd }: Props) => {
+const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEnd, onSetSelectedEntityIds }: Props) => {
   // Fetch entity details with related entities
   const { data: entityDetails } = useEntityQuery(entity.id);
 
@@ -53,7 +55,15 @@ const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEn
 
   const handleExpand = () => {
     if (newEntityIds.length > 0) {
-      addEntities({ workspaceId: workspace.id, entityIds: newEntityIds });
+      addEntities(
+        { workspaceId: workspace.id, entityIds: newEntityIds },
+        {
+          onSuccess: () => {
+            // Auto-select the newly added entities
+            onSetSelectedEntityIds(newEntityIds);
+          }
+        }
+      );
     }
   };
 
