@@ -453,9 +453,7 @@ const WorkspaceGraphComponent = ({
       }
 
       // Update DOM to reflect spawn positions
-      node
-        .filter(d => newNodeIds.includes(d.id))
-        .attr('transform', `translate(${spawnX},${spawnY})`);
+      node.filter(d => newNodeIds.includes(d.id)).attr('transform', `translate(${spawnX},${spawnY})`);
 
       // Fix existing nodes in place so simulation only moves new nodes
       for (const n of nodes) {
