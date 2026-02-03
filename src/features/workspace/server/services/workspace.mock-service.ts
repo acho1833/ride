@@ -1,47 +1,8 @@
 import 'server-only';
 
-import { faker } from '@faker-js/faker';
 import type { EntityResponse } from '@/models/entity-response.model';
 import type { WorkspaceResponse, RelationshipResponse } from '@/models/workspace-response.model';
-import { getMockEntities, RELATIONSHIP_PREDICATES } from '@/lib/mock-data';
-
-const FAKER_SEED = 12345;
-
-// ============================================================================
-// Global mock relationships (generated from shared entity pool)
-// ============================================================================
-
-let cachedRelationships: RelationshipResponse[] | null = null;
-
-function generateMockRelationships(): RelationshipResponse[] {
-  faker.seed(FAKER_SEED + 1);
-  const entities = getMockEntities();
-  const relationships: RelationshipResponse[] = [];
-  const targetCount = Math.floor(entities.length * 0.2);
-  for (let i = 0; i < targetCount; i++) {
-    const source = faker.helpers.arrayElement(entities);
-    const target = faker.helpers.arrayElement(entities.filter(e => e.id !== source.id));
-    relationships.push({
-      relationshipId: faker.string.uuid(),
-      predicate: faker.helpers.arrayElement([...RELATIONSHIP_PREDICATES]),
-      sourceEntityId: source.id,
-      relatedEntityId: target.id
-    });
-  }
-  return relationships;
-}
-
-/**
- * Get the shared mock relationships pool.
- * Returns the same cached data on every call for consistency.
- * Exported for use by entity mock service.
- */
-export function getMockRelationships(): RelationshipResponse[] {
-  if (!cachedRelationships) {
-    cachedRelationships = generateMockRelationships();
-  }
-  return cachedRelationships;
-}
+import { getMockEntities, getMockRelationships } from '@/lib/mock-data';
 
 // ============================================================================
 // Per-workspace state (hashmap of workspace ID -> entities + relationships)
@@ -54,48 +15,15 @@ interface WorkspaceState {
 
 const workspaceStateMap = new Map<string, WorkspaceState>();
 
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
 /**
  * Get or initialize workspace state.
- * On first access, generates initial subset of entities with relationships.
+ * New workspaces start empty - entities are added via drag-drop or expand.
  */
 function getWorkspaceState(workspaceId: string): WorkspaceState {
   if (!workspaceStateMap.has(workspaceId)) {
-    const entities = getMockEntities();
-
-    // Use workspace ID as seed for consistent initial subset
-    faker.seed(hashString(workspaceId));
-    const entityCount = faker.number.int({ min: 5, max: 10 });
-    const selectedEntities = faker.helpers.arrayElements(entities, entityCount);
-
-    // Generate relationships between selected entities (~40% connectivity)
-    const generatedRelationships: RelationshipResponse[] = [];
-    const targetLinkCount = Math.floor(selectedEntities.length * 0.6);
-
-    for (let i = 0; i < targetLinkCount; i++) {
-      const source = faker.helpers.arrayElement(selectedEntities);
-      const target = faker.helpers.arrayElement(selectedEntities.filter(e => e.id !== source.id));
-      if (target) {
-        generatedRelationships.push({
-          relationshipId: faker.string.uuid(),
-          predicate: faker.helpers.arrayElement([...RELATIONSHIP_PREDICATES]),
-          sourceEntityId: source.id,
-          relatedEntityId: target.id
-        });
-      }
-    }
-
     workspaceStateMap.set(workspaceId, {
-      entityList: [...selectedEntities],
-      relationshipList: generatedRelationships
+      entityList: [],
+      relationshipList: []
     });
   }
   return workspaceStateMap.get(workspaceId)!;

@@ -1,7 +1,6 @@
 import 'server-only';
 
-import { getMockEntities, getMockEntityById, MOCK_ENTITY_TYPES } from '@/lib/mock-data';
-import { getMockRelationships } from '@/features/workspace/server/services/workspace.mock-service';
+import { getMockEntities, getMockEntityById, getMockRelationships, MOCK_ENTITY_TYPES } from '@/lib/mock-data';
 import type { Entity } from '@/models/entity.model';
 import { EntitySearchParams, EntitySearchMockResponse } from '../../types';
 
