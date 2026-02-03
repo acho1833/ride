@@ -439,21 +439,42 @@ const WorkspaceGraphComponent = ({
     const hasNewNodes = newNodeIds.length > 0 && prevNodeIdsRef.current.size > 0;
 
     if (hasNewNodes) {
-      // Find an existing node to use as spawn point
-      const existingNode = nodes.find(n => prevNodeIdsRef.current.has(n.id));
-      const spawnX = existingNode?.x ?? width / 2;
-      const spawnY = existingNode?.y ?? height / 2;
+      // Build a map of node ID to node for quick lookups
+      const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-      // Position new nodes at spawn point
+      // Find a related existing node for a given new node ID
+      const findRelatedExistingNode = (newNodeId: string): WorkspaceGraphNode | undefined => {
+        for (const link of links) {
+          const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+          const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+
+          // Check if this link connects the new node to an existing node
+          if (sourceId === newNodeId && prevNodeIdsRef.current.has(targetId)) {
+            return nodeMap.get(targetId);
+          }
+          if (targetId === newNodeId && prevNodeIdsRef.current.has(sourceId)) {
+            return nodeMap.get(sourceId);
+          }
+        }
+        return undefined;
+      };
+
+      // Fallback: any existing node or center
+      const fallbackNode = nodes.find(n => prevNodeIdsRef.current.has(n.id));
+      const fallbackX = fallbackNode?.x ?? width / 2;
+      const fallbackY = fallbackNode?.y ?? height / 2;
+
+      // Position each new node at its related existing node (or fallback)
       for (const n of nodes) {
         if (newNodeIds.includes(n.id)) {
-          n.x = spawnX;
-          n.y = spawnY;
+          const relatedNode = findRelatedExistingNode(n.id);
+          n.x = relatedNode?.x ?? fallbackX;
+          n.y = relatedNode?.y ?? fallbackY;
         }
       }
 
       // Update DOM to reflect spawn positions
-      node.filter(d => newNodeIds.includes(d.id)).attr('transform', `translate(${spawnX},${spawnY})`);
+      node.filter(d => newNodeIds.includes(d.id)).attr('transform', d => `translate(${d.x},${d.y})`);
 
       // Fix existing nodes in place so simulation only moves new nodes
       for (const n of nodes) {

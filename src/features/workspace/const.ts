@@ -13,7 +13,7 @@ export const GRAPH_CONFIG = {
   /** Entity icon size in pixels */
   iconSize: 32,
   /** Target distance between linked nodes */
-  linkDistance: 120,
+  linkDistance: 180,
   /** Repulsion strength between nodes (negative = repel) */
   chargeStrength: -400,
   /** Strength of centering force */
