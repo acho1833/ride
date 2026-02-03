@@ -78,12 +78,12 @@ const EntityCardComponent = ({ entity, className, onClick, draggable = true }: P
         <div className="min-h-12" />
       </Card>
 
-      {/* Hidden drag image: blue circle with entity icon */}
+      {/* Hidden drag image: primary blue square with white border (matches graph nodes) */}
       {draggable && (
         <div ref={dragImageRef} className="pointer-events-none fixed -top-[9999px] -left-[9999px]">
-          <svg width="40" height="40">
-            <circle cx="20" cy="20" r="20" fill={GRAPH_CONFIG.nodeColor} />
-            <use href={`#entity-icon-${iconSymbolId}`} x="4" y="4" width="32" height="32" fill="white" />
+          <svg width="44" height="44">
+            <rect x="2" y="2" width="40" height="40" rx="4" ry="4" fill={GRAPH_CONFIG.nodeColorSelected} stroke="white" strokeWidth="2" />
+            <use href={`#entity-icon-${iconSymbolId}`} x="6" y="6" width="32" height="32" fill="white" />
           </svg>
         </div>
       )}

@@ -97,8 +97,16 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
 
   const handleAddEntity = useCallback(
     (entityId: string, position: { x: number; y: number }) => {
-      // Add entity to workspace
-      addEntities({ workspaceId, entityIds: [entityId] });
+      // Add entity to workspace, then select it after success
+      addEntities(
+        { workspaceId, entityIds: [entityId] },
+        {
+          onSuccess: () => {
+            // Select the entity after it's been added and graph re-renders
+            setSelectedEntityIds(workspaceId, [entityId]);
+          }
+        }
+      );
 
       // Save position immediately so it appears at the drop location
       const currentPositions = workspace?.viewState?.entityPositions ?? {};
@@ -113,7 +121,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         }
       });
     },
-    [addEntities, saveViewState, workspaceId, workspace?.viewState]
+    [addEntities, saveViewState, workspaceId, workspace?.viewState, setSelectedEntityIds]
   );
 
   const handleContextMenu = useCallback(

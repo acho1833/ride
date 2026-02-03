@@ -465,20 +465,26 @@ const WorkspaceGraphComponent = ({
       const fallbackY = fallbackNode?.y ?? height / 2;
 
       // Position each new node at its related existing node (or fallback)
+      // Skip nodes that already have a saved position (e.g., from drag/drop)
       for (const n of nodes) {
         if (newNodeIds.includes(n.id)) {
-          const relatedNode = findRelatedExistingNode(n.id);
-          n.x = relatedNode?.x ?? fallbackX;
-          n.y = relatedNode?.y ?? fallbackY;
+          const savedPos = workspace.viewState?.entityPositions[n.id];
+          if (!savedPos) {
+            const relatedNode = findRelatedExistingNode(n.id);
+            n.x = relatedNode?.x ?? fallbackX;
+            n.y = relatedNode?.y ?? fallbackY;
+          }
         }
       }
 
       // Update DOM to reflect spawn positions
       node.filter(d => newNodeIds.includes(d.id)).attr('transform', d => `translate(${d.x},${d.y})`);
 
-      // Fix existing nodes in place so simulation only moves new nodes
+      // Fix existing nodes and nodes with saved positions in place
+      // Only new nodes without saved positions should move during simulation
       for (const n of nodes) {
-        if (prevNodeIdsRef.current.has(n.id)) {
+        const savedPos = workspace.viewState?.entityPositions[n.id];
+        if (prevNodeIdsRef.current.has(n.id) || savedPos) {
           n.fx = n.x;
           n.fy = n.y;
         }
@@ -844,9 +850,12 @@ const WorkspaceGraphComponent = ({
       if (!svgRef.current) return;
       const position = screenToSvgCoords(event.clientX, event.clientY, svgRef.current, transformRef.current);
 
+      // Focus this panel first (prevents selection from being cleared by focus effect)
+      onFocusPanel?.();
+
       onAddEntity(entity.id, position);
     },
-    [entityMap, onAddEntity]
+    [entityMap, onAddEntity, onFocusPanel]
   );
 
   return (
