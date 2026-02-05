@@ -13,6 +13,7 @@ import { filesRouter } from '@/features/files/server/routers';
 import { projectRouter } from '@/features/projects/server/routers';
 import { todoRouter } from '@/features/todos/server/routers';
 import { workspaceRouter } from '@/features/workspace/server/routers';
+import { patternRouter } from '@/features/pattern-search/server/routers';
 
 /** Main application router combining all feature routers */
 export const router = {
@@ -22,7 +23,8 @@ export const router = {
   files: filesRouter,
   project: projectRouter,
   todo: todoRouter,
-  workspace: workspaceRouter
+  workspace: workspaceRouter,
+  pattern: patternRouter
 };
 
 /** Type-safe client interface inferred from the router definition */
