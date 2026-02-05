@@ -40,7 +40,7 @@ interface Props {
 }
 
 const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEnd, onSetSelectedEntityIds }: Props) => {
-  // Fetch entity details with related entities
+  // Fetch entity details with related entities (grouped by type by default)
   const { data: entityDetails } = useEntityQuery(entity.id);
 
   // Mutation for adding entities to workspace
@@ -49,8 +49,13 @@ const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEn
   // Calculate which related entities are not yet in workspace
   const existingEntityIds = useMemo(() => new Set(workspace.entityList.map(e => e.id)), [workspace.entityList]);
 
+  // Extract all related entity IDs from the grouped structure
+  // relatedEntities is Record<string, RelatedEntity[]> - flatten all arrays and get IDs
   const relatedEntities = entityDetails?.relatedEntities ?? {};
-  const newEntityIds = Object.keys(relatedEntities).filter(id => !existingEntityIds.has(id));
+  const allRelatedIds = Object.values(relatedEntities)
+    .flat()
+    .map(e => e.id);
+  const newEntityIds = allRelatedIds.filter(id => !existingEntityIds.has(id));
   const isExpandDisabled = isPending || newEntityIds.length === 0;
 
   const handleExpand = () => {

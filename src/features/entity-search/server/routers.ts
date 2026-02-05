@@ -26,7 +26,9 @@ const entitySearchResponseSchema = z.object({
 export const entityRouter = appProcedure.router({
   /**
    * GET /entities/:id - Get entity by ID with related entities.
-   * Returns entity details including relatedEntities map.
+   * Returns entity details including relatedEntities map grouped by type or predicate.
+   * @param id - Entity ID
+   * @param groupRelatedEntitiesBy - How to group related entities: 'type' (default) or 'predicate'
    */
   getById: appProcedure
     .route({
@@ -35,10 +37,15 @@ export const entityRouter = appProcedure.router({
       summary: 'Get entity by ID with related entities',
       tags
     })
-    .input(z.object({ id: z.string() }))
+    .input(
+      z.object({
+        id: z.string(),
+        groupRelatedEntitiesBy: z.enum(['type', 'predicate']).optional().default('type')
+      })
+    )
     .output(entitySchema)
     .handler(async ({ input }) => {
-      return entityService.getEntityById(input.id);
+      return entityService.getEntityById(input.id, input.groupRelatedEntitiesBy);
     }),
 
   /**

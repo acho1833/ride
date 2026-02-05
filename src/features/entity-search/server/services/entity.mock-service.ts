@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { getMockEntities, getMockEntityById, getMockRelationships, MOCK_ENTITY_TYPES } from '@/lib/mock-data';
-import type { Entity } from '@/models/entity.model';
+import type { EntityResponse, RelatedEntityResponse } from '@/models/entity-response.model';
 import { EntitySearchParams, EntitySearchMockResponse } from '../../types';
 
 /**
@@ -70,34 +70,40 @@ export async function getEntityTypes(): Promise<string[]> {
 
 /**
  * Get entity by ID with all related entities.
- * Returns the entity with a relatedEntities map containing all connected entities.
+ * Returns the entity with a flat relatedEntities array (simulating external API format).
+ * @param id - Entity ID to fetch
  */
-export async function getEntityById(id: string): Promise<Entity | null> {
+export async function getEntityById(id: string): Promise<EntityResponse | null> {
   const entity = getMockEntityById(id);
   if (!entity) return null;
 
   // Find all relationships involving this entity
   const relationships = getMockRelationships();
-  const relatedEntityIds = new Set<string>();
+  const relatedEntities: RelatedEntityResponse[] = [];
 
   for (const rel of relationships) {
-    if (rel.sourceEntityId === id) {
-      relatedEntityIds.add(rel.relatedEntityId);
-    } else if (rel.relatedEntityId === id) {
-      relatedEntityIds.add(rel.sourceEntityId);
-    }
-  }
+    let relatedId: string | null = null;
 
-  // Build relatedEntities map
-  const relatedEntities: Record<string, Entity> = {};
-  for (const relatedId of relatedEntityIds) {
-    const relatedEntity = getMockEntityById(relatedId);
-    if (relatedEntity) {
-      relatedEntities[relatedId] = {
-        id: relatedEntity.id,
-        labelNormalized: relatedEntity.labelNormalized,
-        type: relatedEntity.type
-      };
+    // Determine which entity is the "other" entity in this relationship
+    if (rel.sourceEntityId === id) {
+      relatedId = rel.relatedEntityId;
+    } else if (rel.relatedEntityId === id) {
+      relatedId = rel.sourceEntityId;
+    }
+
+    if (relatedId) {
+      const relatedEntity = getMockEntityById(relatedId);
+      if (relatedEntity) {
+        // Return flat structure: { type: relationshipType, entity: EntityResponse }
+        relatedEntities.push({
+          type: rel.predicate,
+          entity: {
+            id: relatedEntity.id,
+            labelNormalized: relatedEntity.labelNormalized,
+            type: relatedEntity.type
+          }
+        });
+      }
     }
   }
 
@@ -105,6 +111,6 @@ export async function getEntityById(id: string): Promise<Entity | null> {
     id: entity.id,
     labelNormalized: entity.labelNormalized,
     type: entity.type,
-    relatedEntities: Object.keys(relatedEntities).length > 0 ? relatedEntities : undefined
+    relatedEntities: relatedEntities.length > 0 ? relatedEntities : undefined
   };
 }
