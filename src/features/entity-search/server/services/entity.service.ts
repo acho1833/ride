@@ -35,10 +35,7 @@ export async function getEntityTypes(): Promise<string[]> {
  * @param groupBy - How to group: 'type' groups by entity type, 'predicate' groups by relationship type
  * @returns Grouped relatedEntities map
  */
-function groupRelatedEntities(
-  response: EntityResponse,
-  groupBy: 'type' | 'predicate'
-): Record<string, RelatedEntity[]> | undefined {
+function groupRelatedEntities(response: EntityResponse, groupBy: 'type' | 'predicate'): Record<string, RelatedEntity[]> | undefined {
   if (!response.relatedEntities || response.relatedEntities.length === 0) {
     return undefined;
   }

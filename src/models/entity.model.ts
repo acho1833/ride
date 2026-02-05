@@ -50,11 +50,7 @@ export const entitySchema = entitySchemaBase.extend({
  * Note: x/y coordinates are only set internally when entities are positioned in D3 graph,
  * they are never returned from the external API.
  */
-export function toEntity(response: {
-  id: string;
-  labelNormalized: string;
-  type: string;
-}): Entity {
+export function toEntity(response: { id: string; labelNormalized: string; type: string }): Entity {
   return {
     id: response.id,
     labelNormalized: response.labelNormalized,
