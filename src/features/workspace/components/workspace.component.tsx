@@ -14,6 +14,7 @@ import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitie
 import { useWorkspaceRemoveEntitiesMutation } from '../hooks/useWorkspaceRemoveEntitiesMutation';
 import { useSelectedEntityIds, useOpenPopups, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
 import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
+import { useHighlightedEntityIds, usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
 import WorkspaceGraphComponent from './workspace-graph.component';
 import WorkspaceContextMenuComponent from './workspace-context-menu.component';
 import DeleteEntitiesDialogComponent from './delete-entities-dialog.component';
@@ -87,6 +88,41 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     if (!workspace) return new Map();
     return new Map(workspace.entityList.map(e => [e.id, e]));
   }, [workspace]);
+
+  // Listen to highlighted entity IDs from pattern search and select matching entities
+  const highlightedEntityIds = useHighlightedEntityIds();
+  const { setHighlightedEntityIds } = usePatternSearchActions();
+  useEffect(() => {
+    if (!highlightedEntityIds || highlightedEntityIds.length === 0) return;
+    // Filter to only entities that exist in this workspace
+    const matchingIds = highlightedEntityIds.filter(id => entityMap.has(id));
+    if (matchingIds.length > 0) {
+      setSelectedEntityIds(workspaceId, matchingIds);
+    }
+  }, [highlightedEntityIds, entityMap, workspaceId, setSelectedEntityIds]);
+
+  // Wrap selection handlers to clear pattern search highlights only when user selects different entities
+  const handleSetSelectedEntityIds = useCallback(
+    (ids: string[]) => {
+      // Only clear highlights if user is selecting different entities than the highlighted ones
+      const highlightSet = new Set(highlightedEntityIds);
+      const isSameAsHighlighted = ids.length === highlightedEntityIds.length && ids.every(id => highlightSet.has(id));
+      if (!isSameAsHighlighted) {
+        setHighlightedEntityIds([]);
+      }
+      setSelectedEntityIds(workspaceId, ids);
+    },
+    [workspaceId, setSelectedEntityIds, setHighlightedEntityIds, highlightedEntityIds]
+  );
+
+  const handleToggleEntitySelection = useCallback(
+    (id: string) => {
+      // Toggle always changes the selection, so clear highlights
+      setHighlightedEntityIds([]);
+      toggleEntitySelection(workspaceId, id);
+    },
+    [workspaceId, toggleEntitySelection, setHighlightedEntityIds]
+  );
 
   const handleSaveViewState = useCallback(
     (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => {
@@ -195,8 +231,8 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         workspace={workspace}
         entityMap={entityMap}
         selectedEntityIds={selectedEntityIds}
-        onSetSelectedEntityIds={ids => setSelectedEntityIds(workspaceId, ids)}
-        onToggleEntitySelection={id => toggleEntitySelection(workspaceId, id)}
+        onSetSelectedEntityIds={handleSetSelectedEntityIds}
+        onToggleEntitySelection={handleToggleEntitySelection}
         onClearEntitySelection={() => clearEntitySelection(workspaceId)}
         onSaveViewState={handleSaveViewState}
         onAddEntity={handleAddEntity}

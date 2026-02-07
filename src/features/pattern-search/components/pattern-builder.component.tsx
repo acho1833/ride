@@ -16,7 +16,7 @@ import '@xyflow/react/dist/style.css';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { PlusIcon, SearchIcon } from 'lucide-react';
+import { PlusIcon } from 'lucide-react';
 import PatternNodeComponent from './pattern-node.component';
 import PatternEdgeComponent from './pattern-edge.component';
 import NodeConfigPanelComponent from './node-config-panel.component';
@@ -39,16 +39,12 @@ const edgeTypes = {
   patternEdge: PatternEdgeComponent
 } as const;
 
-interface Props {
-  onSearch: () => void;
-  isSearching: boolean;
-}
-
 /**
  * Pattern builder component with React Flow canvas.
  * Manages node/edge creation, selection, and configuration.
+ * Search is now automatic (triggered by advanced-search when pattern is complete).
  */
-const PatternBuilderComponent = ({ onSearch, isSearching }: Props) => {
+const PatternBuilderComponent = () => {
   // Get pattern state from store
   const patternNodes = usePatternNodes();
   const patternEdges = usePatternEdges();
@@ -172,20 +168,13 @@ const PatternBuilderComponent = ({ onSearch, isSearching }: Props) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNode, selectedEdge, deleteNode, deleteEdge]);
 
-  // Check if search is possible (at least one node)
-  const canSearch = patternNodes.length > 0;
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-x-2 py-2">
+      {/* Toolbar - Search is automatic, only Add Node button needed */}
+      <div className="flex items-center gap-x-2 py-2">
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addNode}>
           <PlusIcon className="mr-1 h-3 w-3" />
           Add Node
-        </Button>
-        <Button variant="default" size="sm" className="h-7 text-xs" onClick={onSearch} disabled={!canSearch || isSearching}>
-          <SearchIcon className="mr-1 h-3 w-3" />
-          {isSearching ? 'Searching...' : 'Search'}
         </Button>
       </div>
 
@@ -220,6 +209,7 @@ const PatternBuilderComponent = ({ onSearch, isSearching }: Props) => {
             <div className="w-[200px] overflow-y-auto">
               {selectedNode && (
                 <NodeConfigPanelComponent
+                  key={selectedNode.id}
                   node={selectedNode}
                   onUpdate={updates => updateNode(selectedNode.id, updates)}
                   onAddFilter={filter => addNodeFilter(selectedNode.id, filter)}
@@ -230,6 +220,7 @@ const PatternBuilderComponent = ({ onSearch, isSearching }: Props) => {
               )}
               {selectedEdge && (
                 <EdgeConfigPanelComponent
+                  key={selectedEdge.id}
                   edge={selectedEdge}
                   nodes={patternNodes}
                   onUpdate={updates => updateEdge(selectedEdge.id, updates)}

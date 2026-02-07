@@ -407,6 +407,8 @@ const WorkspaceGraphComponent = ({
       for (let i = 0; i < 300; i++) {
         simulation.tick();
       }
+      // Save the calculated positions after initial layout
+      debouncedSave();
     }
 
     simulationRef.current = simulation;
@@ -575,8 +577,13 @@ const WorkspaceGraphComponent = ({
     const drag = d3
       .drag<SVGGElement, WorkspaceGraphNode>()
       .clickDistance(4) // Allow clicks/dblclicks through if pointer moves less than 4px
-      .on('start', function () {
+      .on('start', function (_event, d) {
         this.setAttribute('cursor', 'grabbing');
+        // If dragging an unselected node, select it (keeps multi-selection if already selected)
+        const selected = selectedEntityIdsRef.current;
+        if (!selected.includes(d.id)) {
+          onSetSelectedEntityIds([d.id]);
+        }
       })
       .on('drag', function (event: d3.D3DragEvent<SVGGElement, WorkspaceGraphNode, WorkspaceGraphNode>, d) {
         const selected = selectedEntityIdsRef.current;
@@ -621,8 +628,12 @@ const WorkspaceGraphComponent = ({
         // Ctrl+click: toggle this node in/out of selection
         onToggleEntitySelection(d.id);
       } else {
-        // Regular click: select only this node
-        onSetSelectedEntityIds([d.id]);
+        // Regular click: if node already selected, keep selection (allows multi-drag)
+        // Otherwise, select only this node
+        const isAlreadySelected = selectedEntityIdsRef.current.includes(d.id);
+        if (!isAlreadySelected) {
+          onSetSelectedEntityIds([d.id]);
+        }
       }
     });
 

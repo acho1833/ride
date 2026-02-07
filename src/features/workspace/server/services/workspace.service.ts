@@ -89,3 +89,17 @@ export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds
   await mockService.removeEntitiesFromWorkspace(workspaceId, entityIds);
   return getWorkspaceById(workspaceId, sid);
 }
+
+/**
+ * Create workspace with provided entity and relationship data.
+ * Used when creating workspace from search results.
+ */
+export async function createWorkspaceWithData(
+  workspaceId: string,
+  entities: { id: string; labelNormalized: string; type: string }[],
+  relationships: { relationshipId: string; predicate: string; sourceEntityId: string; relatedEntityId: string }[],
+  sid: string
+): Promise<Workspace> {
+  await mockService.setWorkspaceData(workspaceId, entities, relationships);
+  return getWorkspaceById(workspaceId, sid);
+}

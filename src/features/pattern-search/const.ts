@@ -1,6 +1,12 @@
 /** Default page size for pattern search results */
 export const DEFAULT_PATTERN_PAGE_SIZE = 50;
 
+/** Debounce delay for auto-search when pattern changes (ms) */
+export const SEARCH_DEBOUNCE_MS = 500;
+
+/** Default filename for workspace created from search results */
+export const DEFAULT_SEARCH_RESULTS_FILENAME = 'search-results';
+
 /** Minimum width class for advanced search mode (Tailwind class) */
 export const ADVANCED_SEARCH_MIN_WIDTH = 'min-w-[600px]';
 

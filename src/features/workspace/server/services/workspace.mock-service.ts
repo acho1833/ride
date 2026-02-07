@@ -106,3 +106,19 @@ export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds
 
   return getWorkspaceById(workspaceId);
 }
+
+/**
+ * Set workspace data directly (for creating from search results).
+ * Replaces any existing data in the workspace.
+ */
+export async function setWorkspaceData(
+  workspaceId: string,
+  entities: EntityResponse[],
+  relationships: RelationshipResponse[]
+): Promise<WorkspaceResponse> {
+  workspaceStateMap.set(workspaceId, {
+    entityList: entities,
+    relationshipList: relationships
+  });
+  return getWorkspaceById(workspaceId);
+}

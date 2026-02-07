@@ -1,17 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import PatternBuilderComponent from './pattern-builder.component';
 import PatternResultsComponent from './pattern-results.component';
 import { usePatternSearchMutation } from '../hooks/usePatternSearchMutation';
-import { usePatternNodes, usePatternEdges } from '@/stores/pattern-search/pattern-search.selector';
-import { DEFAULT_PATTERN_PAGE_SIZE } from '../const';
+import {
+  usePatternNodes,
+  usePatternEdges,
+  useIsPatternComplete,
+  usePatternIncompleteReason
+} from '@/stores/pattern-search/pattern-search.selector';
+import { DEFAULT_PATTERN_PAGE_SIZE, SEARCH_DEBOUNCE_MS } from '../const';
 import type { PatternSearchResponse } from '../types';
 
 /**
  * Advanced search component combining pattern builder and results.
- * Manages search execution and result pagination.
+ * Automatically searches when pattern is complete (debounced).
  */
 const AdvancedSearchComponent = () => {
   const [searchResults, setSearchResults] = useState<PatternSearchResponse | null>(null);
@@ -19,48 +24,78 @@ const AdvancedSearchComponent = () => {
   // Get pattern from store
   const nodes = usePatternNodes();
   const edges = usePatternEdges();
+  const isComplete = useIsPatternComplete();
+  const incompleteReason = usePatternIncompleteReason();
 
   // Search mutation
   const { mutate: search, isPending } = usePatternSearchMutation();
 
-  // Execute search
-  const handleSearch = () => {
-    search(
-      {
-        pattern: { nodes, edges },
-        pageSize: DEFAULT_PATTERN_PAGE_SIZE,
-        pageNumber: 1
-      },
-      {
-        onSuccess: data => {
-          setSearchResults(data);
-        }
-      }
-    );
-  };
+  // Ref for debounce timer
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Handle pagination
-  const handlePageChange = (page: number) => {
-    search(
-      {
-        pattern: { nodes, edges },
-        pageSize: DEFAULT_PATTERN_PAGE_SIZE,
-        pageNumber: page
-      },
-      {
-        onSuccess: data => {
-          setSearchResults(data);
+  // Stable serialized key to detect pattern changes (memoized to avoid inline JSON.stringify in deps)
+  const patternKey = useMemo(() => JSON.stringify({ nodes, edges }), [nodes, edges]);
+
+  // Clear results when pattern becomes incomplete
+  const displayedResults = isComplete ? searchResults : null;
+
+  // Auto-search when pattern is complete (debounced)
+  useEffect(() => {
+    // Clear any pending debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
+    // Don't search if pattern is incomplete
+    if (!isComplete) {
+      return;
+    }
+
+    // Debounce the search to avoid excessive API calls while editing
+    debounceRef.current = setTimeout(() => {
+      search(
+        {
+          pattern: { nodes, edges },
+          pageSize: DEFAULT_PATTERN_PAGE_SIZE,
+          pageNumber: 1
+        },
+        {
+          onSuccess: data => setSearchResults(data)
         }
+      );
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
       }
-    );
-  };
+    };
+  }, [isComplete, patternKey, search, nodes, edges]);
+
+  // Handle pagination (no debounce needed - explicit user action)
+  const handlePageChange = useCallback(
+    (page: number) => {
+      search(
+        {
+          pattern: { nodes, edges },
+          pageSize: DEFAULT_PATTERN_PAGE_SIZE,
+          pageNumber: page
+        },
+        {
+          onSuccess: data => setSearchResults(data)
+        }
+      );
+    },
+    [search, nodes, edges]
+  );
 
   return (
     <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
       {/* Pattern Builder */}
       <ResizablePanel defaultSize={60} minSize={20}>
         <div className="flex h-full flex-col">
-          <PatternBuilderComponent onSearch={handleSearch} isSearching={isPending} />
+          <PatternBuilderComponent />
         </div>
       </ResizablePanel>
 
@@ -69,7 +104,12 @@ const AdvancedSearchComponent = () => {
       {/* Results */}
       <ResizablePanel defaultSize={40} minSize={15}>
         <div className="flex h-full flex-col pt-2">
-          <PatternResultsComponent data={searchResults} isLoading={isPending} onPageChange={handlePageChange} />
+          <PatternResultsComponent
+            data={displayedResults}
+            isLoading={isPending}
+            onPageChange={handlePageChange}
+            incompleteReason={incompleteReason}
+          />
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>

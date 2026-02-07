@@ -7,6 +7,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/stores/app.store';
 import type { PatternSearchSlice } from './pattern-search.store';
+import { isPatternComplete, getPatternIncompleteReason } from '@/features/pattern-search/utils';
 
 // ============================================================================
 // State Selectors
@@ -42,6 +43,28 @@ export const useSelectedEdge = () =>
   });
 
 // ============================================================================
+// Highlight Selectors
+// ============================================================================
+
+const EMPTY_IDS: string[] = [];
+
+/** Get entity IDs highlighted from pattern search results */
+export const useHighlightedEntityIds = () =>
+  useAppStore((state: PatternSearchSlice) => state.patternSearch.highlightedEntityIds ?? EMPTY_IDS);
+
+// ============================================================================
+// Pattern Completeness Selectors
+// ============================================================================
+
+/** Check if current pattern is complete (ready for search) */
+export const useIsPatternComplete = () =>
+  useAppStore((state: PatternSearchSlice) => isPatternComplete(state.patternSearch.nodes, state.patternSearch.edges));
+
+/** Get reason why pattern is incomplete (null if complete) */
+export const usePatternIncompleteReason = () =>
+  useAppStore((state: PatternSearchSlice) => getPatternIncompleteReason(state.patternSearch.nodes, state.patternSearch.edges));
+
+// ============================================================================
 // Action Selector
 // ============================================================================
 
@@ -61,6 +84,7 @@ export const usePatternSearchActions = () =>
       deleteEdge: state.deleteEdge,
       selectNode: state.selectNode,
       selectEdge: state.selectEdge,
-      clearPattern: state.clearPattern
+      clearPattern: state.clearPattern,
+      setHighlightedEntityIds: state.setHighlightedEntityIds
     }))
   );

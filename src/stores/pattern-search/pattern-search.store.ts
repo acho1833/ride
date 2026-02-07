@@ -21,6 +21,8 @@ export interface PatternSearchState {
     selectedNodeId: string | null;
     /** Currently selected edge ID (null if none) */
     selectedEdgeId: string | null;
+    /** Entity IDs to highlight in open workspaces (from clicking a pattern match) */
+    highlightedEntityIds: string[];
   };
 }
 
@@ -52,6 +54,8 @@ export interface PatternSearchActions {
   selectEdge: (id: string | null) => void;
   /** Clear the entire pattern */
   clearPattern: () => void;
+  /** Set entity IDs to highlight in open workspaces */
+  setHighlightedEntityIds: (ids: string[]) => void;
 }
 
 /** Combined slice type */
@@ -86,7 +90,8 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
     nodes: [],
     edges: [],
     selectedNodeId: null,
-    selectedEdgeId: null
+    selectedEdgeId: null,
+    highlightedEntityIds: []
   },
 
   setSearchMode: mode =>
@@ -228,5 +233,10 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
         selectedNodeId: null,
         selectedEdgeId: null
       }
+    })),
+
+  setHighlightedEntityIds: ids =>
+    set(state => ({
+      patternSearch: { ...state.patternSearch, highlightedEntityIds: ids }
     }))
 });

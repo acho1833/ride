@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { appProcedure } from '@/lib/orpc';
 import { workspaceSchema } from '@/models/workspace.model';
 import { workspaceViewStateSchema, workspaceViewStateInputSchema } from '@/models/workspace-view-state.model';
+import { entitySchema } from '@/models/entity.model';
+import { relationshipSchema } from '@/models/relationship.model';
 import * as workspaceService from './services/workspace.service';
 
 const API_WORKSPACE_PREFIX = '/workspaces';
@@ -73,5 +75,24 @@ export const workspaceRouter = appProcedure.router({
     .output(workspaceSchema)
     .handler(async ({ input, context }) => {
       return workspaceService.removeEntitiesFromWorkspace(input.workspaceId, input.entityIds, context.sid);
+    }),
+
+  createWithData: appProcedure
+    .route({
+      method: 'POST',
+      path: `${API_WORKSPACE_PREFIX}/:workspaceId/data`,
+      summary: 'Create workspace with entities and relationships',
+      tags
+    })
+    .input(
+      z.object({
+        workspaceId: z.string(),
+        entities: z.array(entitySchema),
+        relationships: z.array(relationshipSchema)
+      })
+    )
+    .output(workspaceSchema)
+    .handler(async ({ input, context }) => {
+      return workspaceService.createWorkspaceWithData(input.workspaceId, input.entities, input.relationships, context.sid);
     })
 });

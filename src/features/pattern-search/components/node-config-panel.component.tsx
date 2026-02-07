@@ -23,11 +23,11 @@ interface Props {
 /**
  * Configuration panel for a selected pattern node.
  * Allows editing type filter and generic attribute filters.
+ * Filters are saved immediately as you type for live preview.
  */
 const NodeConfigPanelComponent = ({ node, onUpdate, onAddFilter, onUpdateFilter, onRemoveFilter, onDelete }: Props) => {
   const [filtersOpen, setFiltersOpen] = useState(node.filters.length > 0);
   const [newAttribute, setNewAttribute] = useState<string>(ENTITY_ATTRIBUTES[0].key);
-  const [newPattern, setNewPattern] = useState('');
 
   // Fetch available entity types
   const { data: entityTypes = [] } = useEntityTypesQuery();
@@ -37,22 +37,27 @@ const NodeConfigPanelComponent = ({ node, onUpdate, onAddFilter, onUpdateFilter,
     onUpdate({ type: value === 'any' ? null : value });
   };
 
-  // Add new filter
+  // Handle pattern change - updates filter immediately for live preview
+  const handlePatternChange = (filterIndex: number, patternIndex: number, value: string) => {
+    const filter = node.filters[filterIndex];
+    const newPatterns = [...filter.patterns];
+    newPatterns[patternIndex] = value;
+    onUpdateFilter(filterIndex, { patterns: newPatterns });
+  };
+
+  // Add new empty filter for an attribute
   const handleAddFilter = () => {
-    if (newPattern.trim()) {
-      // Check if filter for this attribute already exists
-      const existingIndex = node.filters.findIndex(f => f.attribute === newAttribute);
-      if (existingIndex >= 0) {
-        // Add pattern to existing filter
-        const existing = node.filters[existingIndex];
-        onUpdateFilter(existingIndex, {
-          patterns: [...existing.patterns, newPattern.trim()]
-        });
-      } else {
-        // Create new filter
-        onAddFilter({ attribute: newAttribute, patterns: [newPattern.trim()] });
-      }
-      setNewPattern('');
+    // Check if filter for this attribute already exists
+    const existingIndex = node.filters.findIndex(f => f.attribute === newAttribute);
+    if (existingIndex >= 0) {
+      // Add empty pattern to existing filter
+      const existing = node.filters[existingIndex];
+      onUpdateFilter(existingIndex, {
+        patterns: [...existing.patterns, '']
+      });
+    } else {
+      // Create new filter with empty pattern
+      onAddFilter({ attribute: newAttribute, patterns: [''] });
     }
   };
 
@@ -65,14 +70,6 @@ const NodeConfigPanelComponent = ({ node, onUpdate, onAddFilter, onUpdateFilter,
       onRemoveFilter(filterIndex);
     } else {
       onUpdateFilter(filterIndex, { patterns: newPatterns });
-    }
-  };
-
-  // Handle Enter key in pattern input
-  const handlePatternKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddFilter();
     }
   };
 
@@ -110,16 +107,21 @@ const NodeConfigPanelComponent = ({ node, onUpdate, onAddFilter, onUpdateFilter,
       <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
         <CollapsibleTrigger className="flex w-full items-center gap-x-1 text-xs font-medium">
           {filtersOpen ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
-          Filters ({node.filters.length})
+          Filters ({node.filters.reduce((sum, f) => sum + f.patterns.length, 0)})
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2 flex flex-col gap-y-3">
-          {/* Existing filters grouped by attribute */}
+          {/* Existing filters grouped by attribute - editable for live preview */}
           {node.filters.map((filter, filterIndex) => (
             <div key={filterIndex} className="flex flex-col gap-y-1">
               <Label className="text-muted-foreground text-xs">{getAttributeLabel(filter.attribute)} matches (any of):</Label>
               {filter.patterns.map((pattern, patternIndex) => (
                 <div key={patternIndex} className="flex items-center gap-x-1">
-                  <Input value={pattern} disabled className="h-7 flex-1 text-xs" />
+                  <Input
+                    value={pattern}
+                    onChange={e => handlePatternChange(filterIndex, patternIndex, e.target.value)}
+                    placeholder="e.g., John* or J?hn"
+                    className="h-7 flex-1 text-xs"
+                  />
                   <Button
                     type="button"
                     variant="ghost"
@@ -137,26 +139,19 @@ const NodeConfigPanelComponent = ({ node, onUpdate, onAddFilter, onUpdateFilter,
           {/* Add new filter */}
           <div className="flex flex-col gap-y-1">
             <Label className="text-xs">Add filter:</Label>
-            <Select value={newAttribute} onValueChange={setNewAttribute}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ENTITY_ATTRIBUTES.map(attr => (
-                  <SelectItem key={attr.key} value={attr.key}>
-                    {attr.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <div className="flex items-center gap-x-1">
-              <Input
-                value={newPattern}
-                onChange={e => setNewPattern(e.target.value)}
-                onKeyDown={handlePatternKeyDown}
-                placeholder="e.g., ^John"
-                className="h-7 flex-1 text-xs"
-              />
+              <Select value={newAttribute} onValueChange={setNewAttribute}>
+                <SelectTrigger className="h-7 flex-1 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENTITY_ATTRIBUTES.map(attr => (
+                    <SelectItem key={attr.key} value={attr.key}>
+                      {attr.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleAddFilter}>
                 <PlusIcon className="h-3 w-3" />
               </Button>

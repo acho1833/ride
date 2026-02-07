@@ -6,19 +6,37 @@ import type { Relationship } from '@/models/relationship.model';
 import type { PatternSearchParams, PatternSearchResponse, PatternMatch, PatternNode, PatternEdge } from '../../types';
 
 /**
+ * Convert a glob-style pattern to regex.
+ * Supports: * (any chars), ? (single char), literal text.
+ * Example: "A*" → "^A.*$", "Jo?n" → "^Jo.n$"
+ */
+function globToRegex(pattern: string): string {
+  // Escape regex special chars except * and ?
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // Convert glob wildcards to regex
+  const regexPattern = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+  // Anchor to match full string
+  return `^${regexPattern}$`;
+}
+
+/**
  * Check if a value matches any of the patterns (OR logic).
- * Patterns are treated as regex; invalid regex falls back to contains match.
+ * Patterns use glob-style matching: * for any chars, ? for single char.
+ * Empty patterns are skipped.
  */
 function matchesPatterns(value: string | undefined, patterns: string[]): boolean {
-  if (!value) return patterns.length === 0;
-  if (patterns.length === 0) return true;
+  // Filter out empty patterns
+  const nonEmptyPatterns = patterns.filter(p => p.trim().length > 0);
 
-  return patterns.some(pattern => {
+  if (!value) return nonEmptyPatterns.length === 0;
+  if (nonEmptyPatterns.length === 0) return true;
+
+  return nonEmptyPatterns.some(pattern => {
     try {
-      const regex = new RegExp(pattern, 'i');
+      const regex = new RegExp(globToRegex(pattern.trim()), 'i');
       return regex.test(value);
     } catch {
-      // Invalid regex - treat as literal string match
+      // Invalid pattern - treat as literal substring match
       return value.toLowerCase().includes(pattern.toLowerCase());
     }
   });
