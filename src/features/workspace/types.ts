@@ -52,3 +52,25 @@ export function toGraphData(workspace: {
 
   return { nodes, links };
 }
+
+/**
+ * Grouped preview data for entities exceeding threshold.
+ */
+export interface PreviewGroup {
+  entityType: string;
+  entities: Entity[];
+  count: number;
+}
+
+/**
+ * Preview state passed from workspace to graph components.
+ */
+export interface PreviewState {
+  isActive: boolean;
+  sourceEntityId: string;
+  sourcePosition: { x: number; y: number };
+  /** Individual preview entities (when count <= threshold) */
+  nodes: Entity[];
+  /** Grouped by type (when count > threshold) */
+  groups: PreviewGroup[];
+}

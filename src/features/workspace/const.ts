@@ -47,3 +47,19 @@ export const SELECTION_CONFIG = {
   /** Selection rectangle stroke dash pattern */
   rectStrokeDash: '4,2'
 } as const;
+
+/**
+ * Preview mode configuration.
+ */
+export const PREVIEW_CONFIG = {
+  /** Maximum entities to show as individual nodes before grouping */
+  threshold: 50,
+  /** Preview node opacity (0-1) */
+  nodeOpacity: 0.6,
+  /** Preview node border color */
+  borderColor: 'hsl(0, 0%, 60%)',
+  /** Preview connecting line dash pattern */
+  lineDash: '4,4',
+  /** Distance from source node for preview nodes */
+  previewDistance: 120
+} as const;
