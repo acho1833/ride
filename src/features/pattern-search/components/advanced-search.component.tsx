@@ -5,6 +5,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import PatternBuilderComponent from './pattern-builder.component';
 import PatternResultsComponent from './pattern-results.component';
 import { usePatternSearchMutation } from '../hooks/usePatternSearchMutation';
+import { useSort } from '../hooks/useSort';
 import {
   usePatternNodes,
   usePatternEdges,
@@ -26,6 +27,9 @@ const AdvancedSearchComponent = () => {
   const edges = usePatternEdges();
   const isComplete = useIsPatternComplete();
   const incompleteReason = usePatternIncompleteReason();
+
+  // Sort state
+  const { sortState, setAttribute, toggleDirection } = useSort();
 
   // Search mutation
   const { mutate: search, isPending } = usePatternSearchMutation();
@@ -58,7 +62,9 @@ const AdvancedSearchComponent = () => {
         {
           pattern: { nodes, edges },
           pageSize: DEFAULT_PATTERN_PAGE_SIZE,
-          pageNumber: 1
+          pageNumber: 1,
+          sortAttribute: sortState.attribute,
+          sortDirection: sortState.direction
         },
         {
           onSuccess: data => setSearchResults(data)
@@ -80,15 +86,34 @@ const AdvancedSearchComponent = () => {
         {
           pattern: { nodes, edges },
           pageSize: DEFAULT_PATTERN_PAGE_SIZE,
-          pageNumber: page
+          pageNumber: page,
+          sortAttribute: sortState.attribute,
+          sortDirection: sortState.direction
         },
         {
           onSuccess: data => setSearchResults(data)
         }
       );
     },
-    [search, nodes, edges]
+    [search, nodes, edges, sortState]
   );
+
+  // Handle sort change (triggers immediate search)
+  const handleSortChange = useCallback(() => {
+    if (!isComplete) return;
+    search(
+      {
+        pattern: { nodes, edges },
+        pageSize: DEFAULT_PATTERN_PAGE_SIZE,
+        pageNumber: 1,
+        sortAttribute: sortState.attribute,
+        sortDirection: sortState.direction
+      },
+      {
+        onSuccess: data => setSearchResults(data)
+      }
+    );
+  }, [search, nodes, edges, isComplete, sortState]);
 
   return (
     <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
@@ -109,6 +134,10 @@ const AdvancedSearchComponent = () => {
             isLoading={isPending}
             onPageChange={handlePageChange}
             incompleteReason={incompleteReason}
+            sortState={sortState}
+            onAttributeChange={setAttribute}
+            onDirectionToggle={toggleDirection}
+            onSortChange={handleSortChange}
           />
         </div>
       </ResizablePanel>

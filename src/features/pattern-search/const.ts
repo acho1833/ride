@@ -40,3 +40,15 @@ export const ENTITY_ATTRIBUTES = [
 
 /** Type for entity attribute keys */
 export type EntityAttributeKey = (typeof ENTITY_ATTRIBUTES)[number]['key'];
+
+/**
+ * Available sort attributes for pattern search results.
+ * Each attribute has a value (for API) and label (for UI display).
+ */
+export const SORT_ATTRIBUTES = [{ value: 'label', label: 'Label' }] as const;
+
+/** Default sort attribute */
+export const DEFAULT_SORT_ATTRIBUTE = 'label';
+
+/** Default sort direction */
+export const DEFAULT_SORT_DIRECTION = 'asc' as const;

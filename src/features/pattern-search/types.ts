@@ -54,12 +54,19 @@ export interface SearchPattern {
 }
 
 /**
+ * Sort direction for pattern search results.
+ */
+export type SortDirection = 'asc' | 'desc';
+
+/**
  * Search input parameters for pattern search API.
  */
 export interface PatternSearchParams {
   pattern: SearchPattern;
   pageSize: number;
   pageNumber: number;
+  sortAttribute?: string;
+  sortDirection?: SortDirection;
 }
 
 /**

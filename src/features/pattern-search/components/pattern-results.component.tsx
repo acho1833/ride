@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeftIcon, ChevronRightIcon, NetworkIcon } from 'lucide-react';
 import PatternMatchRowComponent from './pattern-match-row.component';
 import SaveWorkspaceModalComponent from './save-workspace-modal.component';
+import SortSplitButtonComponent from './sort-split-button.component';
+import { SORT_ATTRIBUTES } from '../const';
+import type { SortState } from '../hooks/useSort';
 import type { PatternSearchResponse } from '../types';
 
 interface Props {
@@ -14,6 +17,14 @@ interface Props {
   onPageChange: (page: number) => void;
   /** Message to display when pattern is incomplete (not ready for search) */
   incompleteReason: string | null;
+  /** Current sort state */
+  sortState: SortState;
+  /** Callback when sort attribute changes */
+  onAttributeChange: (attribute: string) => void;
+  /** Callback when sort direction toggles */
+  onDirectionToggle: () => void;
+  /** Callback to trigger search after sort change */
+  onSortChange: () => void;
 }
 
 /**
@@ -21,7 +32,16 @@ interface Props {
  * Each result is a linear chain of matched entities.
  * Shows appropriate messages for incomplete patterns or loading states.
  */
-const PatternResultsComponent = ({ data, isLoading, onPageChange, incompleteReason }: Props) => {
+const PatternResultsComponent = ({
+  data,
+  isLoading,
+  onPageChange,
+  incompleteReason,
+  sortState,
+  onAttributeChange,
+  onDirectionToggle,
+  onSortChange
+}: Props) => {
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   // Show incomplete pattern message
@@ -46,19 +66,34 @@ const PatternResultsComponent = ({ data, isLoading, onPageChange, incompleteReas
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-y-2">
-      {/* Header with count and Show Graph button */}
+      {/* Header with count, sort, and Show Graph button */}
       <div className="flex items-center justify-between">
         <div className="text-muted-foreground text-xs">Results ({data.totalCount} matches)</div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-x-1 text-xs"
-          onClick={() => setShowSaveModal(true)}
-          disabled={data.matches.length === 0}
-        >
-          <NetworkIcon className="h-3 w-3" />
-          Show Graph
-        </Button>
+        <div className="flex items-center gap-x-2">
+          <SortSplitButtonComponent
+            attributes={[...SORT_ATTRIBUTES]}
+            selectedAttribute={sortState.attribute}
+            direction={sortState.direction}
+            onAttributeChange={attr => {
+              onAttributeChange(attr);
+              onSortChange();
+            }}
+            onDirectionToggle={() => {
+              onDirectionToggle();
+              onSortChange();
+            }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-x-1 text-xs"
+            onClick={() => setShowSaveModal(true)}
+            disabled={data.matches.length === 0}
+          >
+            <NetworkIcon className="h-3 w-3" />
+            Show Graph
+          </Button>
+        </div>
       </div>
 
       {/* Results list */}

@@ -192,11 +192,25 @@ function findMatchingEntitySets(
 }
 
 /**
+ * Sort matches by first entity's labelNormalized (case-insensitive).
+ */
+function sortMatches(matches: PatternMatch[], sortAttribute: string, sortDirection: 'asc' | 'desc'): PatternMatch[] {
+  if (sortAttribute !== 'label') return matches;
+
+  return [...matches].sort((a, b) => {
+    const labelA = (a.entities[0]?.labelNormalized ?? '').toLowerCase();
+    const labelB = (b.entities[0]?.labelNormalized ?? '').toLowerCase();
+    const comparison = labelA.localeCompare(labelB);
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+}
+
+/**
  * Search for pattern matches in the entity graph.
  * Returns paginated results with entities ordered alphabetically by node label.
  */
 export async function searchPattern(params: PatternSearchParams): Promise<PatternSearchResponse> {
-  const { pattern, pageSize, pageNumber } = params;
+  const { pattern, pageSize, pageNumber, sortAttribute = 'label', sortDirection = 'asc' } = params;
 
   // Handle empty pattern
   if (pattern.nodes.length === 0) {
@@ -226,10 +240,13 @@ export async function searchPattern(params: PatternSearchParams): Promise<Patter
     relationships: match.relationships
   }));
 
+  // Sort matches before pagination
+  const sortedMatches = sortMatches(matches, sortAttribute, sortDirection);
+
   // Apply pagination
-  const totalCount = matches.length;
+  const totalCount = sortedMatches.length;
   const startIndex = (pageNumber - 1) * pageSize;
-  const pagedMatches = matches.slice(startIndex, startIndex + pageSize);
+  const pagedMatches = sortedMatches.slice(startIndex, startIndex + pageSize);
 
   return {
     matches: pagedMatches,

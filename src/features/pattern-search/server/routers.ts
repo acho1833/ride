@@ -74,7 +74,9 @@ export const patternRouter = appProcedure.router({
       z.object({
         pattern: searchPatternSchema,
         pageSize: z.number(),
-        pageNumber: z.number()
+        pageNumber: z.number(),
+        sortAttribute: z.string().optional(),
+        sortDirection: z.enum(['asc', 'desc']).optional()
       })
     )
     .output(patternSearchResponseSchema)
