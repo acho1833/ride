@@ -8,6 +8,7 @@ import PatternMatchRowComponent from './pattern-match-row.component';
 import SaveWorkspaceModalComponent from './save-workspace-modal.component';
 import SortSplitButtonComponent from './sort-split-button.component';
 import { SORT_ATTRIBUTES } from '../const';
+import { useSelectedMatchId, usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
 import type { SortState } from '../hooks/useSort';
 import type { PatternSearchResponse } from '../types';
 
@@ -43,6 +44,8 @@ const PatternResultsComponent = ({
   onSortChange
 }: Props) => {
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const selectedMatchId = useSelectedMatchId();
+  const { setSelectedMatchId, setHighlightedEntityIds } = usePatternSearchActions();
 
   // Show incomplete pattern message
   if (incompleteReason) {
@@ -99,9 +102,29 @@ const PatternResultsComponent = ({
       {/* Results list */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-y-2 pr-2">
-          {data.matches.map((match, index) => (
-            <PatternMatchRowComponent key={index} match={match} />
-          ))}
+          {data.matches.map(match => {
+            // Generate unique ID by concatenating entity IDs
+            const matchId = match.entities.map(e => e.id).join('-');
+            const isSelected = selectedMatchId === matchId;
+            return (
+              <PatternMatchRowComponent
+                key={matchId}
+                match={match}
+                isSelected={isSelected}
+                onSelect={() => {
+                  if (isSelected) {
+                    // Toggle off - deselect and clear highlights
+                    setSelectedMatchId(null);
+                    setHighlightedEntityIds([]);
+                  } else {
+                    // Select and highlight entities
+                    setSelectedMatchId(matchId);
+                    setHighlightedEntityIds(match.entities.map(e => e.id));
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       </ScrollArea>
 

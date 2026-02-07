@@ -5,10 +5,11 @@ import { cn, getEntityIconClass } from '@/lib/utils';
 import type { PatternMatch } from '../types';
 import { ChevronRightIcon, ChevronDownIcon } from 'lucide-react';
 import EntityCardComponent from '@/features/entity-card/components/entity-card.component';
-import { usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
 
 interface Props {
   match: PatternMatch;
+  isSelected: boolean;
+  onSelect: () => void;
 }
 
 /**
@@ -17,10 +18,9 @@ interface Props {
  * Expandable to show entity cards for drag-and-drop.
  * Clicking highlights the matched entities in all open workspaces.
  */
-const PatternMatchRowComponent = ({ match }: Props) => {
+const PatternMatchRowComponent = ({ match, isSelected, onSelect }: Props) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { entities, relationships } = match;
-  const { setHighlightedEntityIds } = usePatternSearchActions();
 
   // Build relationship map for quick lookup
   const relationshipMap = new Map<string, { predicate: string; isForward: boolean }>();
@@ -36,17 +36,26 @@ const PatternMatchRowComponent = ({ match }: Props) => {
   }
 
   return (
-    <div className="bg-card rounded-lg border transition-colors">
-      {/* Collapsed row - clickable to expand and highlight in workspaces */}
-      <div
-        className="hover:bg-muted/50 flex cursor-pointer items-center gap-x-1 px-3 py-2"
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-          setHighlightedEntityIds(entities.map(e => e.id));
-        }}
-      >
+    <div className={cn('rounded-lg border transition-colors', isSelected ? 'bg-primary border-primary' : 'bg-card')}>
+      {/* Collapsed row - clickable to select and highlight in workspaces */}
+      <div className={cn('flex cursor-pointer items-center gap-x-1 px-3 py-2', !isSelected && 'hover:bg-muted/50')} onClick={onSelect}>
         {/* Expand/collapse indicator */}
-        <ChevronDownIcon className={cn('text-muted-foreground mr-1 h-4 w-4 transition-transform', !isExpanded && '-rotate-90')} />
+        <button
+          type="button"
+          className="hover:bg-muted/70 mr-1 rounded p-0.5"
+          onClick={e => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+        >
+          <ChevronDownIcon
+            className={cn(
+              'text-muted-foreground h-4 w-4 transition-transform',
+              isSelected && 'text-primary-foreground',
+              !isExpanded && '-rotate-90'
+            )}
+          />
+        </button>
 
         {/* Entity chain */}
         {entities.map((entity, index) => {
@@ -59,9 +68,13 @@ const PatternMatchRowComponent = ({ match }: Props) => {
           return (
             <div key={entity.id} className="flex items-center">
               {/* Entity chip */}
-              <div className="bg-muted/50 flex items-center gap-x-1.5 rounded-md px-2 py-1">
-                <i className={cn('text-muted-foreground text-sm', iconClass)} />
-                <span className="max-w-[120px] truncate text-xs font-medium">{entity.labelNormalized}</span>
+              <div
+                className={cn('flex items-center gap-x-1.5 rounded-md px-2 py-1', isSelected ? 'bg-primary-foreground/20' : 'bg-muted/50')}
+              >
+                <i className={cn('text-sm', iconClass, isSelected ? 'text-primary-foreground/70' : 'text-muted-foreground')} />
+                <span className={cn('max-w-[120px] truncate text-xs font-medium', isSelected && 'text-primary-foreground')}>
+                  {entity.labelNormalized}
+                </span>
               </div>
 
               {/* Connector arrow with predicate */}
@@ -69,11 +82,12 @@ const PatternMatchRowComponent = ({ match }: Props) => {
                 <div className="flex items-center px-1">
                   <div
                     className={cn(
-                      'text-muted-foreground flex items-center gap-x-0.5 text-[10px]',
+                      'flex items-center gap-x-0.5 text-[10px]',
+                      isSelected ? 'text-primary-foreground/70' : 'text-muted-foreground',
                       !relationshipInfo.isForward && 'flex-row-reverse'
                     )}
                   >
-                    <span className="text-muted-foreground/70 italic">{relationshipInfo.predicate}</span>
+                    <span className="italic">{relationshipInfo.predicate}</span>
                     <ChevronRightIcon className={cn('h-3 w-3', !relationshipInfo.isForward && 'rotate-180')} />
                   </div>
                 </div>

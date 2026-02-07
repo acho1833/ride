@@ -52,6 +52,9 @@ const EMPTY_IDS: string[] = [];
 export const useHighlightedEntityIds = () =>
   useAppStore((state: PatternSearchSlice) => state.patternSearch.highlightedEntityIds ?? EMPTY_IDS);
 
+/** Get currently selected pattern match ID */
+export const useSelectedMatchId = () => useAppStore((state: PatternSearchSlice) => state.patternSearch.selectedMatchId);
+
 // ============================================================================
 // Pattern Completeness Selectors
 // ============================================================================
@@ -85,6 +88,7 @@ export const usePatternSearchActions = () =>
       selectNode: state.selectNode,
       selectEdge: state.selectEdge,
       clearPattern: state.clearPattern,
-      setHighlightedEntityIds: state.setHighlightedEntityIds
+      setHighlightedEntityIds: state.setHighlightedEntityIds,
+      setSelectedMatchId: state.setSelectedMatchId
     }))
   );

@@ -23,6 +23,8 @@ export interface PatternSearchState {
     selectedEdgeId: string | null;
     /** Entity IDs to highlight in open workspaces (from clicking a pattern match) */
     highlightedEntityIds: string[];
+    /** Currently selected pattern match ID in results (null if none) */
+    selectedMatchId: string | null;
   };
 }
 
@@ -56,6 +58,8 @@ export interface PatternSearchActions {
   clearPattern: () => void;
   /** Set entity IDs to highlight in open workspaces */
   setHighlightedEntityIds: (ids: string[]) => void;
+  /** Set selected pattern match ID in results */
+  setSelectedMatchId: (id: string | null) => void;
 }
 
 /** Combined slice type */
@@ -91,7 +95,8 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
     edges: [],
     selectedNodeId: null,
     selectedEdgeId: null,
-    highlightedEntityIds: []
+    highlightedEntityIds: [],
+    selectedMatchId: null
   },
 
   setSearchMode: mode =>
@@ -237,6 +242,15 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
 
   setHighlightedEntityIds: ids =>
     set(state => ({
-      patternSearch: { ...state.patternSearch, highlightedEntityIds: ids }
+      patternSearch: {
+        ...state.patternSearch,
+        highlightedEntityIds: ids,
+        selectedMatchId: ids.length === 0 ? null : state.patternSearch.selectedMatchId
+      }
+    })),
+
+  setSelectedMatchId: id =>
+    set(state => ({
+      patternSearch: { ...state.patternSearch, selectedMatchId: id }
     }))
 });
