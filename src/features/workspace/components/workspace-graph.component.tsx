@@ -13,8 +13,8 @@ import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG, SELECTION_CONFIG } from '../const';
-import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData } from '../types';
+import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG } from '../const';
+import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData, type PreviewState } from '../types';
 import type { Workspace } from '@/models/workspace.model';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
 import type { Entity } from '@/models/entity.model';
@@ -101,6 +101,14 @@ interface Props {
   onClosePopup: (popupId: string) => void;
   /** Called to update popup position after drag */
   onUpdatePopupPosition: (popupId: string, svgX: number, svgY: number) => void;
+  /** Preview state for 1-hop preview mode */
+  previewState?: PreviewState | null;
+  /** Called when user Alt+Clicks on an entity node */
+  onAltClick?: (entityId: string, position: { x: number; y: number }) => void;
+  /** Called to add a preview entity to the graph */
+  onPreviewAddEntity?: (entityId: string, position: { x: number; y: number }) => void;
+  /** Called when a preview group is clicked (opens popup) */
+  onPreviewGroupClick?: (groupType: string, screenPosition: { x: number; y: number }) => void;
 }
 
 const WorkspaceGraphComponent = ({
@@ -117,7 +125,11 @@ const WorkspaceGraphComponent = ({
   openPopups,
   onOpenPopup,
   onClosePopup,
-  onUpdatePopupPosition
+  onUpdatePopupPosition,
+  previewState,
+  onAltClick,
+  onPreviewAddEntity,
+  onPreviewGroupClick
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -143,6 +155,16 @@ const WorkspaceGraphComponent = ({
 
   // Track previous node IDs to detect new nodes for smooth transitions
   const prevNodeIdsRef = useRef<Set<string>>(new Set());
+
+  // Preview mode refs - keep refs so D3 handlers can access latest values
+  const previewStateRef = useRef<PreviewState | null>(null);
+  previewStateRef.current = previewState ?? null;
+  const onAltClickRef = useRef(onAltClick);
+  onAltClickRef.current = onAltClick;
+  const onPreviewAddEntityRef = useRef(onPreviewAddEntity);
+  onPreviewAddEntityRef.current = onPreviewAddEntity;
+  const onPreviewGroupClickRef = useRef(onPreviewGroupClick);
+  onPreviewGroupClickRef.current = onPreviewGroupClick;
 
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
@@ -574,10 +596,14 @@ const WorkspaceGraphComponent = ({
     };
 
     // Setup drag behavior - supports group drag when node is in selection
+    // Disabled during preview mode (regular nodes shouldn't move)
     const drag = d3
       .drag<SVGGElement, WorkspaceGraphNode>()
       .clickDistance(4) // Allow clicks/dblclicks through if pointer moves less than 4px
       .on('start', function (_event, d) {
+        // Disable regular node dragging during preview mode
+        if (previewStateRef.current?.isActive) return;
+
         this.setAttribute('cursor', 'grabbing');
         // If dragging an unselected node, select it (keeps multi-selection if already selected)
         const selected = selectedEntityIdsRef.current;
@@ -586,6 +612,9 @@ const WorkspaceGraphComponent = ({
         }
       })
       .on('drag', function (event: d3.D3DragEvent<SVGGElement, WorkspaceGraphNode, WorkspaceGraphNode>, d) {
+        // Disable regular node dragging during preview mode
+        if (previewStateRef.current?.isActive) return;
+
         const selected = selectedEntityIdsRef.current;
         const isDraggedNodeSelected = selected.includes(d.id);
 
@@ -619,9 +648,19 @@ const WorkspaceGraphComponent = ({
 
     node.call(drag);
 
-    // Left-click on node: single select or ctrl+click toggle
+    // Left-click on node: single select, ctrl+click toggle, or alt+click for preview
     node.on('click', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.stopPropagation();
+
+      // Alt+Click: trigger preview mode
+      if (event.altKey && onAltClickRef.current) {
+        onAltClickRef.current(d.id, { x: d.x ?? 0, y: d.y ?? 0 });
+        return;
+      }
+
+      // If preview is active, ignore other click interactions
+      if (previewStateRef.current?.isActive) return;
+
       // Focus the editor group panel when clicking a node
       onFocusPanel?.();
       if (event.ctrlKey || event.metaKey) {
@@ -637,16 +676,18 @@ const WorkspaceGraphComponent = ({
       }
     });
 
-    // Add right-click handler for context menu
+    // Add right-click handler for context menu (disabled during preview)
     node.on('contextmenu', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.preventDefault();
+      if (previewStateRef.current?.isActive) return;
       onContextMenu(event, d.id);
     });
 
-    // Double-click on node: open entity detail popup
+    // Double-click on node: open entity detail popup (disabled during preview)
     node.on('dblclick', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.preventDefault();
       event.stopPropagation();
+      if (previewStateRef.current?.isActive) return;
       // Open popup at node's lower-right corner (use ref to avoid stale closure)
       handleOpenPopupRef.current(d.id, d.x ?? 0, d.y ?? 0);
     });
@@ -655,6 +696,9 @@ const WorkspaceGraphComponent = ({
     const svgElement = svgRef.current!;
 
     const handleMouseDown = (event: MouseEvent) => {
+      // Disable rectangle selection during preview mode
+      if (previewStateRef.current?.isActive) return;
+
       // Only handle left-click without Ctrl (Ctrl+drag is for panning)
       if (event.button !== 0 || event.ctrlKey || event.metaKey) return;
 
@@ -798,6 +842,216 @@ const WorkspaceGraphComponent = ({
       .selectAll<SVGRectElement, WorkspaceGraphNode>('.nodes g rect')
       .attr('fill', d => (selectedEntityIds.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor));
   }, [selectedEntityIds]);
+
+  // Render preview nodes/groups when previewState changes
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const g = svg.select<SVGGElement>('g');
+
+    // Remove any existing preview elements
+    g.selectAll('.preview-layer').remove();
+
+    if (!previewState?.isActive) return;
+
+    const { sourcePosition, nodes: previewNodes, groups: previewGroups } = previewState;
+    const items = previewNodes.length > 0 ? previewNodes : previewGroups;
+    if (items.length === 0) return;
+
+    // Create preview layer group
+    const previewLayer = g.append('g').attr('class', 'preview-layer');
+
+    // Calculate radial positions for preview items
+    const distance = PREVIEW_CONFIG.previewDistance;
+    const positions = items.map((_, index) => {
+      const angle = (index / items.length) * Math.PI * 2 - Math.PI / 2;
+      return {
+        x: sourcePosition.x + Math.cos(angle) * distance,
+        y: sourcePosition.y + Math.sin(angle) * distance
+      };
+    });
+
+    // Render individual preview nodes
+    if (previewNodes.length > 0) {
+      previewNodes.forEach((entity, index) => {
+        const pos = positions[index];
+        const nodeGroup = previewLayer.append('g').attr('class', 'preview-node');
+
+        // Dashed connecting line to source
+        nodeGroup
+          .append('line')
+          .attr('x1', sourcePosition.x)
+          .attr('y1', sourcePosition.y)
+          .attr('x2', pos.x)
+          .attr('y2', pos.y)
+          .attr('stroke', PREVIEW_CONFIG.borderColor)
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
+          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+        // Node group at position
+        const node = nodeGroup.append('g').attr('transform', `translate(${pos.x}, ${pos.y})`).style('cursor', 'pointer');
+
+        // Node square with dashed border
+        node
+          .append('rect')
+          .attr('x', -GRAPH_CONFIG.nodeRadius)
+          .attr('y', -GRAPH_CONFIG.nodeRadius)
+          .attr('width', GRAPH_CONFIG.nodeRadius * 2)
+          .attr('height', GRAPH_CONFIG.nodeRadius * 2)
+          .attr('rx', 4)
+          .attr('ry', 4)
+          .attr('fill', GRAPH_CONFIG.nodeColor)
+          .attr('fill-opacity', PREVIEW_CONFIG.nodeOpacity)
+          .attr('stroke', PREVIEW_CONFIG.borderColor)
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+
+        // Entity icon
+        const iconSymbolId = entity.type in ENTITY_ICON_CONFIG ? entity.type : 'unknown';
+        node
+          .append('use')
+          .attr('href', `#entity-icon-${iconSymbolId}`)
+          .attr('x', -GRAPH_CONFIG.iconSize / 2)
+          .attr('y', -GRAPH_CONFIG.iconSize / 2)
+          .attr('width', GRAPH_CONFIG.iconSize)
+          .attr('height', GRAPH_CONFIG.iconSize)
+          .attr('fill', 'white')
+          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+        // Label below node
+        const label = entity.labelNormalized.length > 15 ? entity.labelNormalized.slice(0, 15) + '...' : entity.labelNormalized;
+        node
+          .append('text')
+          .attr('y', GRAPH_CONFIG.nodeRadius + 14)
+          .attr('text-anchor', 'middle')
+          .attr('fill', 'white')
+          .attr('font-size', '12px')
+          .attr('opacity', PREVIEW_CONFIG.nodeOpacity * 0.9)
+          .text(label);
+
+        // Hover and click interactions
+        node
+          .on('mouseenter', function () {
+            d3.select(this)
+              .select('rect')
+              .attr('stroke', GRAPH_CONFIG.nodeColorSelected)
+              .attr('stroke-dasharray', 'none');
+          })
+          .on('mouseleave', function () {
+            d3.select(this)
+              .select('rect')
+              .attr('stroke', PREVIEW_CONFIG.borderColor)
+              .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+          })
+          .on('click', function (event: MouseEvent) {
+            event.stopPropagation();
+            if (onPreviewAddEntityRef.current) {
+              onPreviewAddEntityRef.current(entity.id, pos);
+            }
+          });
+      });
+    }
+
+    // Render grouped preview nodes (circles)
+    if (previewGroups.length > 0) {
+      previewGroups.forEach((group, index) => {
+        const pos = positions[index];
+        const groupEl = previewLayer.append('g').attr('class', 'preview-group');
+
+        // Dashed connecting line to source
+        groupEl
+          .append('line')
+          .attr('x1', sourcePosition.x)
+          .attr('y1', sourcePosition.y)
+          .attr('x2', pos.x)
+          .attr('y2', pos.y)
+          .attr('stroke', PREVIEW_CONFIG.borderColor)
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
+          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+        // Node group at position
+        const node = groupEl.append('g').attr('transform', `translate(${pos.x}, ${pos.y})`).style('cursor', 'pointer');
+
+        // Circle node (distinct from square regular nodes)
+        node
+          .append('circle')
+          .attr('r', GRAPH_CONFIG.nodeRadius)
+          .attr('fill', GRAPH_CONFIG.nodeColor)
+          .attr('fill-opacity', PREVIEW_CONFIG.nodeOpacity)
+          .attr('stroke', PREVIEW_CONFIG.borderColor)
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+
+        // Entity type icon
+        const iconSymbolId = group.entityType in ENTITY_ICON_CONFIG ? group.entityType : 'unknown';
+        node
+          .append('use')
+          .attr('href', `#entity-icon-${iconSymbolId}`)
+          .attr('x', -GRAPH_CONFIG.iconSize / 2 + 2)
+          .attr('y', -GRAPH_CONFIG.iconSize / 2 + 2)
+          .attr('width', GRAPH_CONFIG.iconSize - 4)
+          .attr('height', GRAPH_CONFIG.iconSize - 4)
+          .attr('fill', 'white')
+          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+        // Count badge (top-right)
+        const badge = node.append('g').attr('transform', `translate(${GRAPH_CONFIG.nodeRadius - 4}, ${-GRAPH_CONFIG.nodeRadius + 4})`);
+        badge.append('rect').attr('x', -12).attr('y', -8).attr('width', 24).attr('height', 16).attr('rx', 8).attr('fill', GRAPH_CONFIG.nodeColorSelected);
+        badge
+          .append('text')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('fill', 'white')
+          .attr('font-size', '10px')
+          .attr('font-weight', 'bold')
+          .text(group.count > 999 ? '999+' : group.count);
+
+        // Label below node
+        node
+          .append('text')
+          .attr('y', GRAPH_CONFIG.nodeRadius + 14)
+          .attr('text-anchor', 'middle')
+          .attr('fill', 'white')
+          .attr('font-size', '12px')
+          .attr('opacity', PREVIEW_CONFIG.nodeOpacity * 0.9)
+          .text(group.entityType);
+
+        // Hover and click interactions
+        node
+          .on('mouseenter', function () {
+            d3.select(this)
+              .select('circle')
+              .attr('stroke', GRAPH_CONFIG.nodeColorSelected)
+              .attr('stroke-dasharray', 'none');
+          })
+          .on('mouseleave', function () {
+            d3.select(this)
+              .select('circle')
+              .attr('stroke', PREVIEW_CONFIG.borderColor)
+              .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+          })
+          .on('click', function (event: MouseEvent) {
+            event.stopPropagation();
+            if (onPreviewGroupClickRef.current) {
+              // Convert SVG position to screen position for popup
+              const transform = transformRef.current;
+              const screenX = pos.x * transform.k + transform.x;
+              const screenY = pos.y * transform.k + transform.y;
+              onPreviewGroupClickRef.current(group.entityType, { x: screenX, y: screenY });
+            }
+          });
+      });
+    }
+
+    // Cleanup preview layer when effect re-runs
+    return () => {
+      g.selectAll('.preview-layer').remove();
+    };
+  }, [previewState]);
 
   // Zoom control handlers
   const handleZoomIn = () => {
