@@ -982,6 +982,7 @@ const WorkspaceGraphComponent = ({
     // Track DOM elements for uninitialized items so force tick can update them
     interface AnimatingItem {
       simNodeId: string;
+      sourceId: string; // ID of source entity in allSimNodes for forceLink
       nodeEl: d3.Selection<SVGGElement, unknown, null, undefined>;
       lineEl: d3.Selection<SVGLineElement, unknown, null, undefined>;
       sourcePos: { x: number; y: number };
@@ -1094,7 +1095,7 @@ const WorkspaceGraphComponent = ({
           d3.select(this).select('.add-button').attr('opacity', 0);
         })
         .on('mousedown', function (event: MouseEvent) {
-          // Shift+Click / Alt+Click: add preview node to graph and expand its connections
+          // Shift+Click / Alt+Click: expand preview node's connections (don't add to graph)
           if ((event.shiftKey || event.altKey) && event.button === 0) {
             event.preventDefault();
             event.stopPropagation();
@@ -1102,11 +1103,7 @@ const WorkspaceGraphComponent = ({
             setTimeout(() => {
               justAltClickedRef.current = false;
             }, 100);
-            // Add to graph first so the node doesn't disappear when it becomes a source
-            if (onPreviewAddEntityRef.current) {
-              onPreviewAddEntityRef.current(entity.id, pos);
-            }
-            // Then expand its connections
+            // Expand its connections as more preview nodes
             if (onAltClickRef.current) {
               onAltClickRef.current(entity.id, pos);
             }
@@ -1247,7 +1244,7 @@ const WorkspaceGraphComponent = ({
           const itemSourceId = entity.sourceEntityId;
           const srcPos = sourcePositions[itemSourceId] ?? sourcePositions[sourceEntityIds[0]] ?? { x: 0, y: 0 };
           const { node, line, pos } = createPreviewNodeDOM(entity, previewLayer, srcPos, srcPos, true);
-          animatingItems.push({ simNodeId: id, nodeEl: node, lineEl: line, sourcePos: srcPos, pos });
+          animatingItems.push({ simNodeId: id, sourceId: itemSourceId, nodeEl: node, lineEl: line, sourcePos: srcPos, pos });
         }
       });
     }
@@ -1266,7 +1263,7 @@ const WorkspaceGraphComponent = ({
           const itemSourceId = group.sourceEntityId;
           const srcPos = sourcePositions[itemSourceId] ?? sourcePositions[sourceEntityIds[0]] ?? { x: 0, y: 0 };
           const { node, line } = createPreviewGroupDOM(group, previewLayer, srcPos, srcPos, true);
-          animatingItems.push({ simNodeId: groupId, nodeEl: node, lineEl: line, sourcePos: srcPos, pos: { ...srcPos } });
+          animatingItems.push({ simNodeId: groupId, sourceId: itemSourceId, nodeEl: node, lineEl: line, sourcePos: srcPos, pos: { ...srcPos } });
         }
       });
     }
@@ -1299,9 +1296,10 @@ const WorkspaceGraphComponent = ({
       interface PreviewSimNode extends SimNode {
         sourceX: number;
         sourceY: number;
+        sourceId: string;
       }
       const initialOffset = PREVIEW_CONFIG.previewDistance * 0.3;
-      const previewSimNodes: PreviewSimNode[] = animatingItems.map(({ simNodeId, sourcePos }, i) => {
+      const previewSimNodes: PreviewSimNode[] = animatingItems.map(({ simNodeId, sourceId, sourcePos }, i) => {
         const angle = (i / animatingItems.length) * Math.PI * 2;
         return {
           id: simNodeId,
@@ -1309,7 +1307,8 @@ const WorkspaceGraphComponent = ({
           x: sourcePos.x + Math.cos(angle) * initialOffset,
           y: sourcePos.y + Math.sin(angle) * initialOffset,
           sourceX: sourcePos.x,
-          sourceY: sourcePos.y
+          sourceY: sourcePos.y,
+          sourceId
         };
       });
 
@@ -1322,9 +1321,16 @@ const WorkspaceGraphComponent = ({
       interface SimNodeWithSource extends SimNode {
         sourceX?: number;
         sourceY?: number;
+        sourceId?: string;
       }
       const allSimNodes: SimNodeWithSource[] = [...existingNodePositions, ...fixedSourcePositions, ...fixedPreviewPositions, ...previewSimNodes];
       const previewDistance = PREVIEW_CONFIG.previewDistance;
+
+      // Create links from each preview node to its source for d3.forceLink
+      const simLinks = previewSimNodes.map(simNode => ({
+        source: simNode.sourceId,
+        target: simNode.id
+      }));
 
       // Populate animating ref so cleanup can cache positions if interrupted
       previewAnimatingRef.current = new Map(
@@ -1340,25 +1346,51 @@ const WorkspaceGraphComponent = ({
       let stableTicks = 0;
       const STABLE_TICKS_REQUIRED = 3; // consecutive stable ticks before stopping
 
+      // Incrementally grow link distance so nodes spread out naturally
+      const MIN_LINK_DISTANCE = previewDistance * 0.4;
+      const MAX_LINK_DISTANCE = previewDistance;
+      let currentLinkDistance = MIN_LINK_DISTANCE;
+      const LINK_DISTANCE_STEP = (MAX_LINK_DISTANCE - MIN_LINK_DISTANCE) / 60; // grow over ~60 ticks
+      const MAX_SIM_MS = 3000; // hard cap at 3 seconds
+
+      const cacheAndStop = (sim: d3.Simulation<SimNodeWithSource, undefined>) => {
+        sim.stop();
+        for (const [id, { simNode, animItem }] of simNodeMap) {
+          cache.set(id, {
+            x: simNode.x,
+            y: simNode.y,
+            sourceX: animItem.sourcePos.x,
+            sourceY: animItem.sourcePos.y,
+            initialized: true
+          });
+        }
+        previewAnimatingRef.current.clear();
+      };
+
+      // Use d3.forceLink for proper link-distance-based positioning
+      const linkForce = d3
+        .forceLink<SimNodeWithSource, (typeof simLinks)[0]>(simLinks)
+        .id(d => d.id)
+        .distance(currentLinkDistance)
+        .strength(1);
+
       const simulation = d3
         .forceSimulation(allSimNodes)
         .alphaDecay(0.05)
-        .force('collision', d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 2.5))
+        .force('link', linkForce)
+        .force(
+          'collision',
+          d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 2.5).strength(0.8).iterations(2)
+        )
         .force(
           'charge',
           d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : -200))
         )
         .on('tick', () => {
-          // Apply per-tick force: pull preview nodes toward previewDistance from their source
-          for (const simNode of previewSimNodes) {
-            const dx = simNode.x - simNode.sourceX;
-            const dy = simNode.y - simNode.sourceY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist > 0) {
-              const factor = ((dist - previewDistance) / dist) * 0.3;
-              simNode.x -= dx * factor;
-              simNode.y -= dy * factor;
-            }
+          // Grow link distance incrementally and update the force
+          if (currentLinkDistance < MAX_LINK_DISTANCE) {
+            currentLinkDistance = Math.min(currentLinkDistance + LINK_DISTANCE_STEP, MAX_LINK_DISTANCE);
+            linkForce.distance(currentLinkDistance);
           }
 
           // Check if all movable nodes have stabilized
@@ -1393,26 +1425,19 @@ const WorkspaceGraphComponent = ({
               const ldx = simNode.x - simNode.sourceX;
               const ldy = simNode.y - simNode.sourceY;
               const linkDist = Math.sqrt(ldx * ldx + ldy * ldy);
-              maxDistanceError = Math.max(maxDistanceError, Math.abs(linkDist - previewDistance));
+              maxDistanceError = Math.max(maxDistanceError, Math.abs(linkDist - currentLinkDistance));
             }
           }
 
-          // Stop early if nodes stopped moving AND links are near target distance
-          if (maxMovement < STABILITY_THRESHOLD && maxDistanceError < GRAPH_CONFIG.nodeRadius) {
+          // Stop early if nodes stopped moving AND links are near target distance AND distance fully grown
+          if (
+            maxMovement < STABILITY_THRESHOLD &&
+            maxDistanceError < GRAPH_CONFIG.nodeRadius &&
+            currentLinkDistance >= MAX_LINK_DISTANCE
+          ) {
             stableTicks++;
             if (stableTicks >= STABLE_TICKS_REQUIRED) {
-              simulation.stop();
-              // Cache final positions
-              for (const [id, { simNode, animItem }] of simNodeMap) {
-                cache.set(id, {
-                  x: simNode.x,
-                  y: simNode.y,
-                  sourceX: animItem.sourcePos.x,
-                  sourceY: animItem.sourcePos.y,
-                  initialized: true
-                });
-              }
-              previewAnimatingRef.current.clear();
+              cacheAndStop(simulation);
             }
           } else {
             stableTicks = 0;
@@ -1432,7 +1457,20 @@ const WorkspaceGraphComponent = ({
           previewAnimatingRef.current.clear();
         });
 
+      // Hard 3-second timeout
+      const timeoutId = setTimeout(() => {
+        if (previewSimulationRef.current === simulation) {
+          cacheAndStop(simulation);
+        }
+      }, MAX_SIM_MS);
+
+      // Store simulation and cleanup timeout together
       previewSimulationRef.current = simulation;
+      const origStop = simulation.stop.bind(simulation);
+      simulation.stop = () => {
+        clearTimeout(timeoutId);
+        return origStop();
+      };
     }
 
     // Cleanup preview layer when effect re-runs

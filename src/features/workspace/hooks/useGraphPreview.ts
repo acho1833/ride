@@ -105,8 +105,9 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
       // Process all related entities from this source
       for (const [, entities] of Object.entries(entityData.relatedEntities)) {
         for (const related of entities) {
-          // Skip if already in graph, already a source, or already seen
-          if (entitiesInGraph.has(related.id) || sources.has(related.id) || seenPreviewIds.has(related.id)) {
+          // Skip if already in graph or already seen
+          // Note: sources that are NOT in the graph (expanded preview nodes) should still be visible
+          if (entitiesInGraph.has(related.id) || seenPreviewIds.has(related.id)) {
             continue;
           }
 
