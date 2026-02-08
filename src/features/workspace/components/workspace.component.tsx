@@ -15,11 +15,15 @@ import { useWorkspaceRemoveEntitiesMutation } from '../hooks/useWorkspaceRemoveE
 import { useSelectedEntityIds, useOpenPopups, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
 import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
 import { useHighlightedEntityIds, usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
+import { toast } from 'sonner';
 import WorkspaceGraphComponent from './workspace-graph.component';
 import WorkspaceContextMenuComponent from './workspace-context-menu.component';
 import DeleteEntitiesDialogComponent from './delete-entities-dialog.component';
+import GraphPreviewPopupComponent from './graph-preview-popup.component';
+import { useGraphPreview } from '../hooks/useGraphPreview';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
 import type { Entity } from '@/models/entity.model';
+import type { PreviewGroup } from '../types';
 import { isEditableElement } from '@/lib/utils';
 
 interface Props {
@@ -42,6 +46,9 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const { setFocusedPanel } = useUiActions();
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Preview mode state
+  const [previewPopup, setPreviewPopup] = useState<{ group: PreviewGroup; position: { x: number; y: number } } | null>(null);
 
   // Clear selection state when this workspace component unmounts (tab closed)
   useEffect(() => {
@@ -88,6 +95,73 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     if (!workspace) return new Map();
     return new Map(workspace.entityList.map(e => [e.id, e]));
   }, [workspace]);
+
+  // Preview mode hook
+  const handlePreviewAddEntity = useCallback(
+    (entity: Entity, position: { x: number; y: number }) => {
+      // Add entity to workspace at the specified position
+      addEntities(
+        { workspaceId, entityIds: [entity.id] },
+        {
+          onSuccess: () => {
+            setSelectedEntityIds(workspaceId, [entity.id]);
+          }
+        }
+      );
+
+      // Save position immediately
+      const currentPositions = workspace?.viewState?.entityPositions ?? {};
+      saveViewState({
+        workspaceId,
+        scale: workspace?.viewState?.scale ?? 1,
+        panX: workspace?.viewState?.panX ?? 0,
+        panY: workspace?.viewState?.panY ?? 0,
+        entityPositions: {
+          ...currentPositions,
+          [entity.id]: position
+        }
+      });
+    },
+    [addEntities, saveViewState, workspaceId, workspace?.viewState, setSelectedEntityIds]
+  );
+
+  const { previewState, handleAltClick, handleAddEntity: handlePreviewAdd, handleExit: handlePreviewExit, sourceEntityName } =
+    useGraphPreview({
+      entitiesInGraph: entityMap,
+      onAddEntity: handlePreviewAddEntity
+    });
+
+  // Show persistent toast when preview is active
+  useEffect(() => {
+    if (!previewState?.isActive || !sourceEntityName) return;
+
+    const toastId = toast.info(`Live Preview: Showing connections for "${sourceEntityName}"`, {
+      duration: Infinity,
+      action: {
+        label: 'Dismiss',
+        onClick: () => handlePreviewExit()
+      }
+    });
+
+    return () => {
+      toast.dismiss(toastId);
+    };
+  }, [previewState?.isActive, sourceEntityName, handlePreviewExit]);
+
+  // Handle Escape key to exit preview
+  useEffect(() => {
+    if (!previewState?.isActive) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handlePreviewExit();
+        setPreviewPopup(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [previewState?.isActive, handlePreviewExit]);
 
   // Listen to highlighted entity IDs from pattern search and select matching entities
   const highlightedEntityIds = useHighlightedEntityIds();
@@ -201,6 +275,45 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     );
   }, [workspaceId, selectedEntityIds, removeEntities, clearEntitySelection]);
 
+  // Preview group click handler - opens popup with entity list
+  // Note: screenPosition is already in screen coords from D3 handler
+  // We store it directly since preview popup doesn't need to persist across pan/zoom
+  // (preview mode exits on pan/zoom interactions anyway)
+  const handlePreviewGroupClick = useCallback(
+    (groupType: string, screenPosition: { x: number; y: number }) => {
+      const group = previewState?.groups.find(g => g.entityType === groupType);
+      if (group) {
+        setPreviewPopup({ group, position: screenPosition });
+      }
+    },
+    [previewState?.groups]
+  );
+
+  // Handle adding entity from preview popup
+  const handlePreviewPopupAdd = useCallback(
+    (entity: Entity) => {
+      handlePreviewAdd(entity);
+    },
+    [handlePreviewAdd]
+  );
+
+  // Handle closing preview popup
+  const handlePreviewPopupClose = useCallback(() => {
+    setPreviewPopup(null);
+  }, []);
+
+  // Handle preview popup drag end (convert screen coords to track position)
+  const handlePreviewPopupDragEnd = useCallback((containerX: number, containerY: number) => {
+    setPreviewPopup(prev => (prev ? { ...prev, position: { x: containerX, y: containerY } } : null));
+  }, []);
+
+  // Clear selection handler that also exits preview
+  const handleClearEntitySelection = useCallback(() => {
+    clearEntitySelection(workspaceId);
+    handlePreviewExit();
+    setPreviewPopup(null);
+  }, [workspaceId, clearEntitySelection, handlePreviewExit]);
+
   if (isPending) {
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -233,7 +346,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         selectedEntityIds={selectedEntityIds}
         onSetSelectedEntityIds={handleSetSelectedEntityIds}
         onToggleEntitySelection={handleToggleEntitySelection}
-        onClearEntitySelection={() => clearEntitySelection(workspaceId)}
+        onClearEntitySelection={handleClearEntitySelection}
         onSaveViewState={handleSaveViewState}
         onAddEntity={handleAddEntity}
         onContextMenu={handleContextMenu}
@@ -242,6 +355,13 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         onOpenPopup={popup => openPopup(workspaceId, popup)}
         onClosePopup={popupId => closePopup(workspaceId, popupId)}
         onUpdatePopupPosition={(popupId, svgX, svgY) => updatePopupPosition(workspaceId, popupId, svgX, svgY)}
+        previewState={previewState}
+        onAltClick={handleAltClick}
+        onPreviewAddEntity={entityId => {
+          const entity = previewState?.nodes.find(e => e.id === entityId);
+          if (entity) handlePreviewAdd(entity);
+        }}
+        onPreviewGroupClick={handlePreviewGroupClick}
       />
       <WorkspaceContextMenuComponent
         position={contextMenuPosition}
@@ -256,6 +376,19 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         onConfirm={handleDeleteConfirm}
         isPending={isDeleting}
       />
+      {/* Preview popup for grouped entities (fixed screen position) */}
+      {previewPopup && (
+        <GraphPreviewPopupComponent
+          entityType={previewPopup.group.entityType}
+          entities={previewPopup.group.entities}
+          entitiesInGraph={new Set(entityMap.keys())}
+          x={previewPopup.position.x}
+          y={previewPopup.position.y}
+          onAdd={handlePreviewPopupAdd}
+          onClose={handlePreviewPopupClose}
+          onDragEnd={handlePreviewPopupDragEnd}
+        />
+      )}
     </>
   );
 };
