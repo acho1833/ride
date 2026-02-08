@@ -103,7 +103,7 @@ interface Props {
   onUpdatePopupPosition: (popupId: string, svgX: number, svgY: number) => void;
   /** Preview state for 1-hop preview mode */
   previewState?: PreviewState | null;
-  /** Called when user Alt+Clicks on an entity node */
+  /** Called when user Shift+Clicks on an entity node */
   onAltClick?: (entityId: string, position: { x: number; y: number }) => void;
   /** Called to add a preview entity to the graph */
   onPreviewAddEntity?: (entityId: string, position: { x: number; y: number }) => void;
@@ -156,6 +156,13 @@ const WorkspaceGraphComponent = ({
 
   // Track previous node IDs to detect new nodes for smooth transitions
   const prevNodeIdsRef = useRef<Set<string>>(new Set());
+
+  // Preview force simulation ref for cleanup
+  const previewSimulationRef = useRef<d3.Simulation<d3.SimulationNodeDatum, undefined> | null>(null);
+  // Track animating items so cleanup can cache their positions before stopping
+  const previewAnimatingRef = useRef<
+    Map<string, { x: number; y: number; sourcePos: { x: number; y: number } }>
+  >(new Map());
 
   // Preview mode refs - keep refs so D3 handlers can access latest values
   const previewStateRef = useRef<PreviewState | null>(null);
@@ -611,13 +618,13 @@ const WorkspaceGraphComponent = ({
 
     // Setup drag behavior - supports group drag when node is in selection
     // Disabled during preview mode (regular nodes shouldn't move)
-    // Use .filter() to exclude Alt+Click - those go to preview handler instead
+    // Use .filter() to exclude Shift+Click - those go to preview handler instead
     const drag = d3
       .drag<SVGGElement, WorkspaceGraphNode>()
-      .filter(event => !event.altKey) // Alt+Click goes to preview, not drag
+      .filter(event => !event.shiftKey && !event.altKey) // Shift+Click or Alt+Click goes to preview, not drag
       .clickDistance(4) // Allow clicks/dblclicks through if pointer moves less than 4px
       .on('start', function (event, d) {
-        console.log('[WorkspaceGraph] drag start', { altKey: event.sourceEvent?.altKey, entityId: d.id });
+        console.log('[WorkspaceGraph] drag start', { shiftKey: event.sourceEvent?.shiftKey, entityId: d.id });
         // Disable regular node dragging during preview mode
         if (previewStateRef.current?.isActive) return;
 
@@ -664,9 +671,9 @@ const WorkspaceGraphComponent = ({
 
     node.call(drag);
 
-    // Alt+Click for preview - handle via mousedown to ensure we catch it before drag
+    // Shift+Click (or Alt+Click) for preview - handle via mousedown to ensure we catch it before drag
     node.on('mousedown.preview', function (event: MouseEvent, d: WorkspaceGraphNode) {
-      if (event.altKey && event.button === 0) {
+      if ((event.shiftKey || event.altKey) && event.button === 0) {
         event.preventDefault();
         event.stopPropagation();
         // Prevent canvas click from clearing selection
@@ -684,8 +691,8 @@ const WorkspaceGraphComponent = ({
     node.on('click', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.stopPropagation();
 
-      // Alt+Click is handled in mousedown.preview, skip here
-      if (event.altKey) {
+      // Shift+Click / Alt+Click is handled in mousedown.preview, skip here
+      if (event.shiftKey || event.altKey) {
         return;
       }
 
@@ -835,7 +842,7 @@ const WorkspaceGraphComponent = ({
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
-    // Click on empty canvas: clear selection (only if not completing a drag or Alt+click)
+    // Click on empty canvas: clear selection (only if not completing a drag or Shift+click)
     svg.on('click', function () {
       if (justCompletedDragRef.current || justAltClickedRef.current) return;
       onClearEntitySelection();
@@ -876,6 +883,24 @@ const WorkspaceGraphComponent = ({
 
   // Render preview nodes/groups when previewState changes
   useEffect(() => {
+    // Stop any running preview simulation and cache current positions
+    if (previewSimulationRef.current) {
+      // Cache positions of nodes that were still animating so they don't re-animate
+      const cache = previewCacheRef.current;
+      for (const [id, item] of previewAnimatingRef.current) {
+        cache.set(id, {
+          x: item.x,
+          y: item.y,
+          sourceX: item.sourcePos.x,
+          sourceY: item.sourcePos.y,
+          initialized: true
+        });
+      }
+      previewAnimatingRef.current.clear();
+      previewSimulationRef.current.stop();
+      previewSimulationRef.current = null;
+    }
+
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
     const g = svg.select<SVGGElement>('g');
@@ -946,35 +971,324 @@ const WorkspaceGraphComponent = ({
 
     console.log('[Preview] items:', items.length, 'uninitialized:', uninitializedItems.length, 'cache:', cache.size);
 
-    // Run force simulation only for uninitialized items
-    if (uninitializedItems.length > 0) {
+    // Track DOM elements for uninitialized items so force tick can update them
+    interface AnimatingItem {
+      simNodeId: string;
+      nodeEl: d3.Selection<SVGGElement, unknown, null, undefined>;
+      lineEl: d3.Selection<SVGLineElement, unknown, null, undefined>;
+      sourcePos: { x: number; y: number };
+      pos: { x: number; y: number }; // Mutable ref updated by tick, read by click handlers
+    }
+    const animatingItems: AnimatingItem[] = [];
+
+    // Helper to create individual preview node DOM (shared for both animated and static)
+    const createPreviewNodeDOM = (
+      entity: (typeof previewNodes)[0],
+      parentGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+      position: { x: number; y: number },
+      srcPos: { x: number; y: number },
+      isAnimating: boolean
+    ) => {
+      const nodeGroup = parentGroup.append('g').attr('class', 'preview-node');
+
+      // Dashed connecting line to source
+      const line = nodeGroup
+        .append('line')
+        .attr('x1', srcPos.x)
+        .attr('y1', srcPos.y)
+        .attr('x2', position.x)
+        .attr('y2', position.y)
+        .attr('stroke', PREVIEW_CONFIG.borderColor)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
+        .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+      // Node group
+      const node = nodeGroup
+        .append('g')
+        .attr('transform', `translate(${position.x}, ${position.y})`)
+        .style('cursor', 'pointer')
+        .style('opacity', isAnimating ? 0 : 1);
+
+      // Fade in for new nodes
+      if (isAnimating) {
+        node.transition().duration(150).style('opacity', 1);
+      }
+
+      // Node square with dashed border
+      node
+        .append('rect')
+        .attr('x', -GRAPH_CONFIG.nodeRadius)
+        .attr('y', -GRAPH_CONFIG.nodeRadius)
+        .attr('width', GRAPH_CONFIG.nodeRadius * 2)
+        .attr('height', GRAPH_CONFIG.nodeRadius * 2)
+        .attr('rx', 4)
+        .attr('ry', 4)
+        .attr('fill', GRAPH_CONFIG.nodeColor)
+        .attr('fill-opacity', PREVIEW_CONFIG.nodeOpacity)
+        .attr('stroke', PREVIEW_CONFIG.borderColor)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+
+      // Entity icon
+      const iconSymbolId = entity.type in ENTITY_ICON_CONFIG ? entity.type : 'unknown';
+      node
+        .append('use')
+        .attr('href', `#entity-icon-${iconSymbolId}`)
+        .attr('x', -GRAPH_CONFIG.iconSize / 2)
+        .attr('y', -GRAPH_CONFIG.iconSize / 2)
+        .attr('width', GRAPH_CONFIG.iconSize)
+        .attr('height', GRAPH_CONFIG.iconSize)
+        .attr('fill', 'white')
+        .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+      // Label below node
+      const label = entity.labelNormalized.length > 15 ? entity.labelNormalized.slice(0, 15) + '...' : entity.labelNormalized;
+      node
+        .append('text')
+        .attr('y', GRAPH_CONFIG.nodeRadius + 14)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'white')
+        .attr('font-size', '12px')
+        .attr('opacity', PREVIEW_CONFIG.nodeOpacity * 0.9)
+        .text(label);
+
+      // [+] button overlay (hidden by default, shown on hover)
+      const addButton = node.append('g').attr('class', 'add-button').attr('opacity', 0).style('cursor', 'pointer');
+      addButton
+        .append('circle')
+        .attr('cx', GRAPH_CONFIG.nodeRadius - 4)
+        .attr('cy', -GRAPH_CONFIG.nodeRadius + 4)
+        .attr('r', 10)
+        .attr('fill', GRAPH_CONFIG.nodeColorSelected)
+        .attr('stroke', 'white')
+        .attr('stroke-width', 1.5);
+      addButton
+        .append('text')
+        .attr('x', GRAPH_CONFIG.nodeRadius - 4)
+        .attr('y', -GRAPH_CONFIG.nodeRadius + 4)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('fill', 'white')
+        .attr('font-size', '14px')
+        .attr('font-weight', 'bold')
+        .text('+');
+
+      // Hover and click interactions - pos is mutable, updated by tick handler
+      const pos = { ...position };
+      node
+        .on('mouseenter', function () {
+          d3.select(this).select('rect').attr('stroke', GRAPH_CONFIG.nodeColorSelected).attr('stroke-dasharray', 'none');
+          d3.select(this).select('.add-button').attr('opacity', 1);
+        })
+        .on('mouseleave', function () {
+          d3.select(this).select('rect').attr('stroke', PREVIEW_CONFIG.borderColor).attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+          d3.select(this).select('.add-button').attr('opacity', 0);
+        })
+        .on('mousedown', function (event: MouseEvent) {
+          // Shift+Click / Alt+Click expands this preview node's connections (without adding to graph)
+          if ((event.shiftKey || event.altKey) && event.button === 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            justAltClickedRef.current = true;
+            setTimeout(() => {
+              justAltClickedRef.current = false;
+            }, 100);
+            if (onAltClickRef.current) {
+              onAltClickRef.current(entity.id, pos);
+            }
+          }
+        })
+        .on('click', function (event: MouseEvent) {
+          event.stopPropagation();
+          // Skip if Shift/Alt was held (handled in mousedown)
+          if (event.shiftKey || event.altKey) return;
+          // Regular click adds entity to graph
+          if (onPreviewAddEntityRef.current) {
+            onPreviewAddEntityRef.current(entity.id, pos);
+          }
+        });
+
+      return { node, line, pos };
+    };
+
+    // Helper to create grouped preview node DOM
+    const createPreviewGroupDOM = (
+      group: (typeof previewGroups)[0],
+      parentGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+      position: { x: number; y: number },
+      srcPos: { x: number; y: number },
+      isAnimating: boolean
+    ) => {
+      const groupEl = parentGroup.append('g').attr('class', 'preview-group');
+
+      // Dashed connecting line to source
+      const line = groupEl
+        .append('line')
+        .attr('x1', srcPos.x)
+        .attr('y1', srcPos.y)
+        .attr('x2', position.x)
+        .attr('y2', position.y)
+        .attr('stroke', PREVIEW_CONFIG.borderColor)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
+        .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+      const node = groupEl
+        .append('g')
+        .attr('transform', `translate(${position.x}, ${position.y})`)
+        .style('cursor', 'pointer')
+        .style('opacity', isAnimating ? 0 : 1);
+
+      if (isAnimating) {
+        node.transition().duration(150).style('opacity', 1);
+      }
+
+      // Circle node
+      node
+        .append('circle')
+        .attr('r', GRAPH_CONFIG.nodeRadius)
+        .attr('fill', GRAPH_CONFIG.nodeColor)
+        .attr('fill-opacity', PREVIEW_CONFIG.nodeOpacity)
+        .attr('stroke', PREVIEW_CONFIG.borderColor)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+
+      // Entity type icon
+      const iconSymbolId = group.entityType in ENTITY_ICON_CONFIG ? group.entityType : 'unknown';
+      node
+        .append('use')
+        .attr('href', `#entity-icon-${iconSymbolId}`)
+        .attr('x', -GRAPH_CONFIG.iconSize / 2 + 2)
+        .attr('y', -GRAPH_CONFIG.iconSize / 2 + 2)
+        .attr('width', GRAPH_CONFIG.iconSize - 4)
+        .attr('height', GRAPH_CONFIG.iconSize - 4)
+        .attr('fill', 'white')
+        .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
+
+      // Count badge
+      const badge = node.append('g').attr('transform', `translate(${GRAPH_CONFIG.nodeRadius - 4}, ${-GRAPH_CONFIG.nodeRadius + 4})`);
+      badge
+        .append('rect')
+        .attr('x', -12)
+        .attr('y', -8)
+        .attr('width', 24)
+        .attr('height', 16)
+        .attr('rx', 8)
+        .attr('fill', GRAPH_CONFIG.nodeColorSelected);
+      badge
+        .append('text')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('fill', 'white')
+        .attr('font-size', '10px')
+        .attr('font-weight', 'bold')
+        .text(group.count > 999 ? '999+' : group.count);
+
+      // Label
+      node
+        .append('text')
+        .attr('y', GRAPH_CONFIG.nodeRadius + 14)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'white')
+        .attr('font-size', '12px')
+        .attr('opacity', PREVIEW_CONFIG.nodeOpacity * 0.9)
+        .text(group.entityType);
+
+      // Hover and click
+      node
+        .on('mouseenter', function () {
+          d3.select(this).select('circle').attr('stroke', GRAPH_CONFIG.nodeColorSelected).attr('stroke-dasharray', 'none');
+        })
+        .on('mouseleave', function () {
+          d3.select(this).select('circle').attr('stroke', PREVIEW_CONFIG.borderColor).attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+        })
+        .on('click', function (event: MouseEvent) {
+          event.stopPropagation();
+          if (onPreviewGroupClickRef.current) {
+            onPreviewGroupClickRef.current(group.entityType, { x: event.clientX, y: event.clientY });
+          }
+        });
+
+      return { node, line };
+    };
+
+    // Render all items - initialized at cached positions, uninitialized at source positions
+    if (previewNodes.length > 0) {
+      previewNodes.forEach(entity => {
+        const id = entity.id;
+        const cached = cache.get(id);
+        const isInitialized = cached?.initialized;
+
+        if (isInitialized && cached) {
+          // Already settled - render at cached position
+          const pos = { x: cached.x, y: cached.y };
+          const srcPos = { x: cached.sourceX, y: cached.sourceY };
+          createPreviewNodeDOM(entity, previewLayer, pos, srcPos, false);
+        } else {
+          // Uninitialized - render at source position, force simulation will move it
+          const itemSourceId = entity.sourceEntityId;
+          const srcPos = sourcePositions[itemSourceId] ?? sourcePositions[sourceEntityIds[0]] ?? { x: 0, y: 0 };
+          const { node, line, pos } = createPreviewNodeDOM(entity, previewLayer, srcPos, srcPos, true);
+          animatingItems.push({ simNodeId: id, nodeEl: node, lineEl: line, sourcePos: srcPos, pos });
+        }
+      });
+    }
+
+    if (previewGroups.length > 0) {
+      previewGroups.forEach(group => {
+        const groupId = `group-${group.entityType}`;
+        const cached = cache.get(groupId);
+        const isInitialized = cached?.initialized;
+
+        if (isInitialized && cached) {
+          const pos = { x: cached.x, y: cached.y };
+          const srcPos = { x: cached.sourceX, y: cached.sourceY };
+          createPreviewGroupDOM(group, previewLayer, pos, srcPos, false);
+        } else {
+          const itemSourceId = group.sourceEntityId;
+          const srcPos = sourcePositions[itemSourceId] ?? sourcePositions[sourceEntityIds[0]] ?? { x: 0, y: 0 };
+          const { node, line } = createPreviewGroupDOM(group, previewLayer, srcPos, srcPos, true);
+          animatingItems.push({ simNodeId: groupId, nodeEl: node, lineEl: line, sourcePos: srcPos, pos: { ...srcPos } });
+        }
+      });
+    }
+
+    // Run async force simulation for uninitialized items
+    if (animatingItems.length > 0) {
       // Include already-positioned preview items as fixed nodes
       const fixedPreviewPositions: SimNode[] = [];
       items.forEach(item => {
         const id = 'id' in item ? item.id : `group-${item.entityType}`;
         const cached = cache.get(id);
         if (cached?.initialized) {
-          fixedPreviewPositions.push({
-            id,
-            x: cached.x,
-            y: cached.y,
-            fx: cached.x,
-            fy: cached.y
-          });
+          fixedPreviewPositions.push({ id, x: cached.x, y: cached.y, fx: cached.x, fy: cached.y });
         }
       });
+
+      // Add source positions as fixed nodes
+      const existingIds = new Set(existingNodePositions.map(n => n.id));
+      const fixedSourcePositions: SimNode[] = [];
+      for (const sourceId of sourceEntityIds) {
+        if (!existingIds.has(sourceId)) {
+          const pos = sourcePositions[sourceId];
+          if (pos) {
+            fixedSourcePositions.push({ id: sourceId, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y });
+          }
+        }
+      }
 
       // Create simulation nodes for uninitialized items
       interface PreviewSimNode extends SimNode {
         sourceX: number;
         sourceY: number;
       }
-      const previewSimNodes: PreviewSimNode[] = uninitializedItems.map(({ item, sourcePos }, i) => {
-        const id = 'id' in item ? item.id : `group-${item.entityType}`;
-        // Small offset to break symmetry
-        const angle = (i / uninitializedItems.length) * Math.PI * 2;
+      const previewSimNodes: PreviewSimNode[] = animatingItems.map(({ simNodeId, sourcePos }, i) => {
+        const angle = (i / animatingItems.length) * Math.PI * 2;
         return {
-          id,
+          id: simNodeId,
           index: i,
           x: sourcePos.x + Math.cos(angle) * 5,
           y: sourcePos.y + Math.sin(angle) * 5,
@@ -983,15 +1297,34 @@ const WorkspaceGraphComponent = ({
         };
       });
 
-      // Run force simulation to calculate positions
+      // Build lookup from simNode id to animating item
+      const simNodeMap = new Map<string, { simNode: PreviewSimNode; animItem: AnimatingItem }>();
+      previewSimNodes.forEach((simNode, i) => {
+        simNodeMap.set(simNode.id, { simNode, animItem: animatingItems[i] });
+      });
+
       interface SimNodeWithSource extends SimNode {
         sourceX?: number;
         sourceY?: number;
       }
-      const allSimNodes: SimNodeWithSource[] = [...existingNodePositions, ...fixedPreviewPositions, ...previewSimNodes];
+      const allSimNodes: SimNodeWithSource[] = [...existingNodePositions, ...fixedSourcePositions, ...fixedPreviewPositions, ...previewSimNodes];
       const previewDistance = PREVIEW_CONFIG.previewDistance;
 
-      const previewSimulation = d3
+      // Populate animating ref so cleanup can cache positions if interrupted
+      previewAnimatingRef.current = new Map(
+        previewSimNodes.map((simNode, i) => [
+          simNode.id,
+          { x: simNode.x, y: simNode.y, sourcePos: animatingItems[i].sourcePos }
+        ])
+      );
+
+      // Track previous positions to detect stability
+      const prevPositions = new Map<string, { x: number; y: number }>();
+      const STABILITY_THRESHOLD = 0.5; // px - stop if no node moved more than this
+      let stableTicks = 0;
+      const STABLE_TICKS_REQUIRED = 3; // consecutive stable ticks before stopping
+
+      const simulation = d3
         .forceSimulation(allSimNodes)
         .force('collision', d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 1.5))
         .force(
@@ -1016,306 +1349,99 @@ const WorkspaceGraphComponent = ({
           'charge',
           d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : -100))
         )
-        .stop();
+        .on('tick', () => {
+          // Check if all movable nodes have stabilized
+          let maxMovement = 0;
+          for (const [id, { simNode }] of simNodeMap) {
+            const prev = prevPositions.get(id);
+            if (prev) {
+              const dx = simNode.x - prev.x;
+              const dy = simNode.y - prev.y;
+              maxMovement = Math.max(maxMovement, Math.abs(dx), Math.abs(dy));
+            }
+            prevPositions.set(id, { x: simNode.x, y: simNode.y });
+          }
 
-      // Run simulation synchronously
-      for (let i = 0; i < 100; i++) previewSimulation.tick();
+          // Update DOM positions
+          for (const [id, { simNode, animItem }] of simNodeMap) {
+            animItem.nodeEl.attr('transform', `translate(${simNode.x}, ${simNode.y})`);
+            animItem.lineEl.attr('x2', simNode.x).attr('y2', simNode.y);
+            animItem.pos.x = simNode.x;
+            animItem.pos.y = simNode.y;
+            const entry = previewAnimatingRef.current.get(id);
+            if (entry) {
+              entry.x = simNode.x;
+              entry.y = simNode.y;
+            }
+          }
 
-      // Cache positions for uninitialized items (initialized=false, will be set true after animation)
-      previewSimNodes.forEach((n, i) => {
-        cache.set(n.id, {
-          x: n.x,
-          y: n.y,
-          sourceX: uninitializedItems[i].sourcePos.x,
-          sourceY: uninitializedItems[i].sourcePos.y,
-          initialized: false
+          // Check if links are close to target distance
+          let maxDistanceError = 0;
+          for (const [, { simNode }] of simNodeMap) {
+            if (simNode.sourceX !== undefined && simNode.sourceY !== undefined) {
+              const ldx = simNode.x - simNode.sourceX;
+              const ldy = simNode.y - simNode.sourceY;
+              const linkDist = Math.sqrt(ldx * ldx + ldy * ldy);
+              maxDistanceError = Math.max(maxDistanceError, Math.abs(linkDist - previewDistance));
+            }
+          }
+
+          // Stop early if nodes stopped moving AND links are near target distance
+          if (maxMovement < STABILITY_THRESHOLD && maxDistanceError < GRAPH_CONFIG.nodeRadius) {
+            stableTicks++;
+            if (stableTicks >= STABLE_TICKS_REQUIRED) {
+              simulation.stop();
+              // Cache final positions
+              for (const [id, { simNode, animItem }] of simNodeMap) {
+                cache.set(id, {
+                  x: simNode.x,
+                  y: simNode.y,
+                  sourceX: animItem.sourcePos.x,
+                  sourceY: animItem.sourcePos.y,
+                  initialized: true
+                });
+              }
+              previewAnimatingRef.current.clear();
+            }
+          } else {
+            stableTicks = 0;
+          }
+        })
+        .on('end', () => {
+          // Cache final positions when simulation settles naturally
+          for (const [id, { simNode, animItem }] of simNodeMap) {
+            cache.set(id, {
+              x: simNode.x,
+              y: simNode.y,
+              sourceX: animItem.sourcePos.x,
+              sourceY: animItem.sourcePos.y,
+              initialized: true
+            });
+          }
+          previewAnimatingRef.current.clear();
         });
-      });
-    }
 
-    // Build set of items that need animation (not yet initialized)
-    // Render individual preview nodes
-    if (previewNodes.length > 0) {
-      previewNodes.forEach(entity => {
-        const id = entity.id;
-        const cached = cache.get(id);
-        if (!cached) return; // Should not happen, but guard
-
-        const finalPos = { x: cached.x, y: cached.y };
-        const srcPos = { x: cached.sourceX, y: cached.sourceY };
-        const needsAnimation = !cached.initialized;
-
-        const nodeGroup = previewLayer.append('g').attr('class', 'preview-node');
-
-        // Dashed connecting line to source
-        const line = nodeGroup
-          .append('line')
-          .attr('x1', srcPos.x)
-          .attr('y1', srcPos.y)
-          .attr('x2', needsAnimation ? srcPos.x : finalPos.x)
-          .attr('y2', needsAnimation ? srcPos.y : finalPos.y)
-          .attr('stroke', PREVIEW_CONFIG.borderColor)
-          .attr('stroke-width', 1.5)
-          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
-          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
-
-        // Animate line endpoint only for new nodes
-        if (needsAnimation) {
-          line.transition().duration(300).ease(d3.easeCubicOut).attr('x2', finalPos.x).attr('y2', finalPos.y);
-        }
-
-        // Node group - new nodes start at source and animate, existing nodes appear at final position
-        const node = nodeGroup
-          .append('g')
-          .attr('transform', needsAnimation ? `translate(${srcPos.x}, ${srcPos.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
-          .style('cursor', 'pointer')
-          .style('opacity', needsAnimation ? 0 : 1);
-
-        // Animate node to final position only for new nodes
-        if (needsAnimation) {
-          node
-            .transition()
-            .duration(300)
-            .ease(d3.easeCubicOut)
-            .attr('transform', `translate(${finalPos.x}, ${finalPos.y})`)
-            .style('opacity', 1);
-
-          // Mark as initialized after animation starts
-          cache.set(id, { ...cached, initialized: true });
-        }
-
-        // Store final position for click handler
-        const pos = finalPos;
-
-        // Node square with dashed border
-        node
-          .append('rect')
-          .attr('x', -GRAPH_CONFIG.nodeRadius)
-          .attr('y', -GRAPH_CONFIG.nodeRadius)
-          .attr('width', GRAPH_CONFIG.nodeRadius * 2)
-          .attr('height', GRAPH_CONFIG.nodeRadius * 2)
-          .attr('rx', 4)
-          .attr('ry', 4)
-          .attr('fill', GRAPH_CONFIG.nodeColor)
-          .attr('fill-opacity', PREVIEW_CONFIG.nodeOpacity)
-          .attr('stroke', PREVIEW_CONFIG.borderColor)
-          .attr('stroke-width', 2)
-          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
-
-        // Entity icon
-        const iconSymbolId = entity.type in ENTITY_ICON_CONFIG ? entity.type : 'unknown';
-        node
-          .append('use')
-          .attr('href', `#entity-icon-${iconSymbolId}`)
-          .attr('x', -GRAPH_CONFIG.iconSize / 2)
-          .attr('y', -GRAPH_CONFIG.iconSize / 2)
-          .attr('width', GRAPH_CONFIG.iconSize)
-          .attr('height', GRAPH_CONFIG.iconSize)
-          .attr('fill', 'white')
-          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
-
-        // Label below node
-        const label = entity.labelNormalized.length > 15 ? entity.labelNormalized.slice(0, 15) + '...' : entity.labelNormalized;
-        node
-          .append('text')
-          .attr('y', GRAPH_CONFIG.nodeRadius + 14)
-          .attr('text-anchor', 'middle')
-          .attr('fill', 'white')
-          .attr('font-size', '12px')
-          .attr('opacity', PREVIEW_CONFIG.nodeOpacity * 0.9)
-          .text(label);
-
-        // [+] button overlay (hidden by default, shown on hover)
-        const addButton = node.append('g').attr('class', 'add-button').attr('opacity', 0).style('cursor', 'pointer');
-
-        // Button background circle
-        addButton
-          .append('circle')
-          .attr('cx', GRAPH_CONFIG.nodeRadius - 4)
-          .attr('cy', -GRAPH_CONFIG.nodeRadius + 4)
-          .attr('r', 10)
-          .attr('fill', GRAPH_CONFIG.nodeColorSelected)
-          .attr('stroke', 'white')
-          .attr('stroke-width', 1.5);
-
-        // Plus icon
-        addButton
-          .append('text')
-          .attr('x', GRAPH_CONFIG.nodeRadius - 4)
-          .attr('y', -GRAPH_CONFIG.nodeRadius + 4)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .attr('fill', 'white')
-          .attr('font-size', '14px')
-          .attr('font-weight', 'bold')
-          .text('+');
-
-        // Hover and click interactions
-        node
-          .on('mouseenter', function () {
-            d3.select(this).select('rect').attr('stroke', GRAPH_CONFIG.nodeColorSelected).attr('stroke-dasharray', 'none');
-            d3.select(this).select('.add-button').attr('opacity', 1);
-          })
-          .on('mouseleave', function () {
-            d3.select(this).select('rect').attr('stroke', PREVIEW_CONFIG.borderColor).attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
-            d3.select(this).select('.add-button').attr('opacity', 0);
-          })
-          .on('mousedown', function (event: MouseEvent) {
-            // Alt+Click expands this preview node's connections
-            // Handle on mousedown (not click) so Alt key state is reliable
-            if (event.altKey && event.button === 0) {
-              event.preventDefault();
-              event.stopPropagation();
-              // Prevent canvas click from clearing selection
-              justAltClickedRef.current = true;
-              setTimeout(() => {
-                justAltClickedRef.current = false;
-              }, 100);
-              // First add the preview node to the graph (so it doesn't disappear)
-              if (onPreviewAddEntityRef.current) {
-                onPreviewAddEntityRef.current(entity.id, pos);
-              }
-              // Then expand its connections
-              if (onAltClickRef.current) {
-                onAltClickRef.current(entity.id, pos);
-              }
-            }
-          })
-          .on('click', function (event: MouseEvent) {
-            event.stopPropagation();
-            // Skip if Alt was held (handled in mousedown)
-            if (event.altKey) return;
-            // Regular click adds entity to graph
-            if (onPreviewAddEntityRef.current) {
-              onPreviewAddEntityRef.current(entity.id, pos);
-            }
-          });
-      });
-    }
-
-    // Render grouped preview nodes (circles)
-    if (previewGroups.length > 0) {
-      previewGroups.forEach(group => {
-        const groupId = `group-${group.entityType}`;
-        const cached = cache.get(groupId);
-        if (!cached) return; // Should not happen, but guard
-
-        const finalPos = { x: cached.x, y: cached.y };
-        const srcPos = { x: cached.sourceX, y: cached.sourceY };
-        const needsAnimation = !cached.initialized;
-
-        const groupEl = previewLayer.append('g').attr('class', 'preview-group');
-
-        // Dashed connecting line to source
-        const line = groupEl
-          .append('line')
-          .attr('x1', srcPos.x)
-          .attr('y1', srcPos.y)
-          .attr('x2', needsAnimation ? srcPos.x : finalPos.x)
-          .attr('y2', needsAnimation ? srcPos.y : finalPos.y)
-          .attr('stroke', PREVIEW_CONFIG.borderColor)
-          .attr('stroke-width', 1.5)
-          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
-          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
-
-        // Animate line endpoint only for new nodes
-        if (needsAnimation) {
-          line.transition().duration(300).ease(d3.easeCubicOut).attr('x2', finalPos.x).attr('y2', finalPos.y);
-        }
-
-        // Node group - new nodes start at source and animate, existing nodes appear at final position
-        const node = groupEl
-          .append('g')
-          .attr('transform', needsAnimation ? `translate(${srcPos.x}, ${srcPos.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
-          .style('cursor', 'pointer')
-          .style('opacity', needsAnimation ? 0 : 1);
-
-        // Animate node to final position only for new nodes
-        if (needsAnimation) {
-          node
-            .transition()
-            .duration(300)
-            .ease(d3.easeCubicOut)
-            .attr('transform', `translate(${finalPos.x}, ${finalPos.y})`)
-            .style('opacity', 1);
-
-          // Mark as initialized after animation starts
-          cache.set(groupId, { ...cached, initialized: true });
-        }
-
-        // Circle node (distinct from square regular nodes)
-        node
-          .append('circle')
-          .attr('r', GRAPH_CONFIG.nodeRadius)
-          .attr('fill', GRAPH_CONFIG.nodeColor)
-          .attr('fill-opacity', PREVIEW_CONFIG.nodeOpacity)
-          .attr('stroke', PREVIEW_CONFIG.borderColor)
-          .attr('stroke-width', 2)
-          .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
-
-        // Entity type icon
-        const iconSymbolId = group.entityType in ENTITY_ICON_CONFIG ? group.entityType : 'unknown';
-        node
-          .append('use')
-          .attr('href', `#entity-icon-${iconSymbolId}`)
-          .attr('x', -GRAPH_CONFIG.iconSize / 2 + 2)
-          .attr('y', -GRAPH_CONFIG.iconSize / 2 + 2)
-          .attr('width', GRAPH_CONFIG.iconSize - 4)
-          .attr('height', GRAPH_CONFIG.iconSize - 4)
-          .attr('fill', 'white')
-          .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
-
-        // Count badge (top-right)
-        const badge = node.append('g').attr('transform', `translate(${GRAPH_CONFIG.nodeRadius - 4}, ${-GRAPH_CONFIG.nodeRadius + 4})`);
-        badge
-          .append('rect')
-          .attr('x', -12)
-          .attr('y', -8)
-          .attr('width', 24)
-          .attr('height', 16)
-          .attr('rx', 8)
-          .attr('fill', GRAPH_CONFIG.nodeColorSelected);
-        badge
-          .append('text')
-          .attr('x', 0)
-          .attr('y', 0)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .attr('fill', 'white')
-          .attr('font-size', '10px')
-          .attr('font-weight', 'bold')
-          .text(group.count > 999 ? '999+' : group.count);
-
-        // Label below node
-        node
-          .append('text')
-          .attr('y', GRAPH_CONFIG.nodeRadius + 14)
-          .attr('text-anchor', 'middle')
-          .attr('fill', 'white')
-          .attr('font-size', '12px')
-          .attr('opacity', PREVIEW_CONFIG.nodeOpacity * 0.9)
-          .text(group.entityType);
-
-        // Hover and click interactions
-        node
-          .on('mouseenter', function () {
-            d3.select(this).select('circle').attr('stroke', GRAPH_CONFIG.nodeColorSelected).attr('stroke-dasharray', 'none');
-          })
-          .on('mouseleave', function () {
-            d3.select(this).select('circle').attr('stroke', PREVIEW_CONFIG.borderColor).attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
-          })
-          .on('click', function (event: MouseEvent) {
-            event.stopPropagation();
-            if (onPreviewGroupClickRef.current) {
-              // Use the actual click event coordinates (already in screen/viewport coords)
-              onPreviewGroupClickRef.current(group.entityType, { x: event.clientX, y: event.clientY });
-            }
-          });
-      });
+      previewSimulationRef.current = simulation;
     }
 
     // Cleanup preview layer when effect re-runs
     return () => {
+      if (previewSimulationRef.current) {
+        // Cache positions of nodes still animating so they don't re-animate
+        const cleanupCache = previewCacheRef.current;
+        for (const [id, item] of previewAnimatingRef.current) {
+          cleanupCache.set(id, {
+            x: item.x,
+            y: item.y,
+            sourceX: item.sourcePos.x,
+            sourceY: item.sourcePos.y,
+            initialized: true
+          });
+        }
+        previewAnimatingRef.current.clear();
+        previewSimulationRef.current.stop();
+        previewSimulationRef.current = null;
+      }
       g.selectAll('.preview-layer').remove();
     };
   }, [previewState, dimensions]); // Include dimensions so preview re-renders after resize

@@ -63,3 +63,6 @@ tasks/
 .upstream-commit-msg
 
 bun.lock
+
+# Mock data runtime state
+src/lib/mock-data/workspaceState.json

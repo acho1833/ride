@@ -20,6 +20,7 @@ import { RELATIONSHIP_PREDICATES } from '@/lib/mock-data/entities';
 
 const FAKER_SEED = 12345;
 const OUTPUT_PATH = path.join(__dirname, '../src/lib/mock-data/dummyData.json');
+const WORKSPACE_STATE_PATH = path.join(__dirname, '../src/lib/mock-data/workspaceState.json');
 
 // Entity counts by prefix
 const ENTITY_COUNTS = {
@@ -40,6 +41,14 @@ const RELATIONSHIP_TARGETS = {
 };
 
 function generateData() {
+  // Delete existing data files first
+  for (const filePath of [OUTPUT_PATH, WORKSPACE_STATE_PATH]) {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`Deleted ${path.basename(filePath)}`);
+    }
+  }
+
   console.log('Generating dummy data with fixed seed...');
   faker.seed(FAKER_SEED);
 

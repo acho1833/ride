@@ -58,7 +58,7 @@ export async function deleteViewState(workspaceId: string, sid: string): Promise
  * Get workspace by ID with merged view state.
  */
 export async function getWorkspaceById(id: string, sid: string): Promise<Workspace> {
-  const response = await mockService.getWorkspaceById(id);
+  const response = await mockService.getWorkspaceById(id, sid);
   const workspace = toWorkspace(response);
   const viewState = await getViewStateByWorkspaceId(id, sid);
   return { ...workspace, viewState };
@@ -69,7 +69,7 @@ export async function getWorkspaceById(id: string, sid: string): Promise<Workspa
  */
 export async function deleteWorkspace(id: string, sid: string): Promise<void> {
   // Delete from external API (mock for now - just verify it exists)
-  await mockService.getWorkspaceById(id);
+  await mockService.getWorkspaceById(id, sid);
   // Clean up view state from MongoDB
   await deleteViewState(id, sid);
 }
@@ -78,7 +78,7 @@ export async function deleteWorkspace(id: string, sid: string): Promise<void> {
  * Add entities to workspace.
  */
 export async function addEntitiesToWorkspace(workspaceId: string, entityIds: string[], sid: string): Promise<Workspace> {
-  await mockService.addEntitiesToWorkspace(workspaceId, entityIds);
+  await mockService.addEntitiesToWorkspace(workspaceId, entityIds, sid);
   return getWorkspaceById(workspaceId, sid);
 }
 
@@ -86,7 +86,7 @@ export async function addEntitiesToWorkspace(workspaceId: string, entityIds: str
  * Remove entities from workspace.
  */
 export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds: string[], sid: string): Promise<Workspace> {
-  await mockService.removeEntitiesFromWorkspace(workspaceId, entityIds);
+  await mockService.removeEntitiesFromWorkspace(workspaceId, entityIds, sid);
   return getWorkspaceById(workspaceId, sid);
 }
 
@@ -100,6 +100,6 @@ export async function createWorkspaceWithData(
   relationships: { relationshipId: string; predicate: string; sourceEntityId: string; relatedEntityId: string }[],
   sid: string
 ): Promise<Workspace> {
-  await mockService.setWorkspaceData(workspaceId, entities, relationships);
+  await mockService.setWorkspaceData(workspaceId, entities, relationships, sid);
   return getWorkspaceById(workspaceId, sid);
 }

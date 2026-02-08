@@ -17,7 +17,7 @@ interface UseGraphPreviewReturn {
   previewState: PreviewState | null;
   /** Whether preview is currently loading */
   isLoading: boolean;
-  /** Handle Alt+Click on an entity node (graph or preview) */
+  /** Handle Shift+Click on an entity node (graph or preview) */
   handleAltClick: (entityId: string, position: { x: number; y: number }) => void;
   /** Add a preview entity to the graph */
   handleAddEntity: (entity: Entity) => void;

@@ -1,11 +1,13 @@
 import 'server-only';
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { EntityResponse } from '@/models/entity-response.model';
 import type { WorkspaceResponse, RelationshipResponse } from '@/models/workspace-response.model';
 import { getMockEntities, getMockRelationships } from '@/lib/mock-data';
 
 // ============================================================================
-// Per-workspace state (hashmap of workspace ID -> entities + relationships)
+// Per-workspace state persisted to JSON file
 // ============================================================================
 
 interface WorkspaceState {
@@ -13,20 +15,49 @@ interface WorkspaceState {
   relationshipList: RelationshipResponse[];
 }
 
-const workspaceStateMap = new Map<string, WorkspaceState>();
+const STATE_FILE_PATH = path.join(process.cwd(), 'src/lib/mock-data/workspaceState.json');
+
+/** Load all workspace states from JSON file */
+function loadStateFromFile(): Record<string, WorkspaceState> {
+  try {
+    if (fs.existsSync(STATE_FILE_PATH)) {
+      return JSON.parse(fs.readFileSync(STATE_FILE_PATH, 'utf-8'));
+    }
+  } catch {
+    // File doesn't exist or is invalid - start fresh
+  }
+  return {};
+}
+
+/** Save all workspace states to JSON file */
+function saveStateToFile(states: Record<string, WorkspaceState>): void {
+  fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(states, null, 2));
+}
+
+/** Build a storage key scoped by user and workspace */
+function stateKey(sid: string, workspaceId: string): string {
+  return `${sid}:${workspaceId}`;
+}
 
 /**
  * Get or initialize workspace state.
  * New workspaces start empty - entities are added via drag-drop or expand.
  */
-function getWorkspaceState(workspaceId: string): WorkspaceState {
-  if (!workspaceStateMap.has(workspaceId)) {
-    workspaceStateMap.set(workspaceId, {
-      entityList: [],
-      relationshipList: []
-    });
+function getWorkspaceState(sid: string, workspaceId: string): WorkspaceState {
+  const states = loadStateFromFile();
+  const key = stateKey(sid, workspaceId);
+  if (!states[key]) {
+    states[key] = { entityList: [], relationshipList: [] };
+    saveStateToFile(states);
   }
-  return workspaceStateMap.get(workspaceId)!;
+  return states[key];
+}
+
+/** Update workspace state and persist */
+function setWorkspaceState(sid: string, workspaceId: string, state: WorkspaceState): void {
+  const states = loadStateFromFile();
+  states[stateKey(sid, workspaceId)] = state;
+  saveStateToFile(states);
 }
 
 /**
@@ -49,8 +80,8 @@ function findConnectingRelationships(entityId: string, existingEntityIds: Set<st
 /**
  * Get workspace by ID.
  */
-export async function getWorkspaceById(id: string): Promise<WorkspaceResponse> {
-  const state = getWorkspaceState(id);
+export async function getWorkspaceById(id: string, sid: string): Promise<WorkspaceResponse> {
+  const state = getWorkspaceState(sid, id);
   return {
     id,
     name: `Workspace ${id}`,
@@ -63,8 +94,8 @@ export async function getWorkspaceById(id: string): Promise<WorkspaceResponse> {
  * Add entities to workspace by IDs.
  * Automatically adds relationships that connect new entities to existing entities.
  */
-export async function addEntitiesToWorkspace(workspaceId: string, entityIds: string[]): Promise<WorkspaceResponse> {
-  const state = getWorkspaceState(workspaceId);
+export async function addEntitiesToWorkspace(workspaceId: string, entityIds: string[], sid: string): Promise<WorkspaceResponse> {
+  const state = getWorkspaceState(sid, workspaceId);
   const entities = getMockEntities();
 
   const existingEntityIds = new Set(state.entityList.map(e => e.id));
@@ -88,15 +119,16 @@ export async function addEntitiesToWorkspace(workspaceId: string, entityIds: str
     }
   }
 
-  return getWorkspaceById(workspaceId);
+  setWorkspaceState(sid, workspaceId, state);
+  return getWorkspaceById(workspaceId, sid);
 }
 
 /**
  * Remove entities from workspace by IDs.
  * Automatically removes relationships where either endpoint is removed.
  */
-export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds: string[]): Promise<WorkspaceResponse> {
-  const state = getWorkspaceState(workspaceId);
+export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds: string[], sid: string): Promise<WorkspaceResponse> {
+  const state = getWorkspaceState(sid, workspaceId);
   const entityIdsToRemove = new Set(entityIds);
 
   state.entityList = state.entityList.filter(e => !entityIdsToRemove.has(e.id));
@@ -104,7 +136,8 @@ export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds
     r => !entityIdsToRemove.has(r.sourceEntityId) && !entityIdsToRemove.has(r.relatedEntityId)
   );
 
-  return getWorkspaceById(workspaceId);
+  setWorkspaceState(sid, workspaceId, state);
+  return getWorkspaceById(workspaceId, sid);
 }
 
 /**
@@ -114,11 +147,12 @@ export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds
 export async function setWorkspaceData(
   workspaceId: string,
   entities: EntityResponse[],
-  relationships: RelationshipResponse[]
+  relationships: RelationshipResponse[],
+  sid: string
 ): Promise<WorkspaceResponse> {
-  workspaceStateMap.set(workspaceId, {
+  setWorkspaceState(sid, workspaceId, {
     entityList: entities,
     relationshipList: relationships
   });
-  return getWorkspaceById(workspaceId);
+  return getWorkspaceById(workspaceId, sid);
 }
