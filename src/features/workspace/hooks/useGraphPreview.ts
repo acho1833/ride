@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useEntityQuery } from '@/features/entity-search/hooks/useEntityQuery';
 import type { Entity } from '@/models/entity.model';
 import type { PreviewState, PreviewGroup } from '../types';
@@ -33,6 +33,12 @@ interface UseGraphPreviewReturn {
 export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPreviewOptions): UseGraphPreviewReturn {
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
   const [sourcePosition, setSourcePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Keep a ref to activeEntityId for stable callback access
+  const activeEntityIdRef = useRef(activeEntityId);
+  useEffect(() => {
+    activeEntityIdRef.current = activeEntityId;
+  }, [activeEntityId]);
 
   // Fetch entity with related entities when preview is active
   const { data: entityData, isLoading } = useEntityQuery(activeEntityId ?? '', 'type');
@@ -107,15 +113,19 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
 
   const handleAltClick = useCallback(
     (entityId: string, position: { x: number; y: number }) => {
-      if (activeEntityId === entityId) {
+      const currentActiveId = activeEntityIdRef.current;
+      console.log('[useGraphPreview] handleAltClick called', { entityId, position, currentActiveId });
+      if (currentActiveId === entityId) {
         // Toggle off if clicking same entity
+        console.log('[useGraphPreview] toggling off preview');
         setActiveEntityId(null);
       } else {
+        console.log('[useGraphPreview] activating preview for', entityId);
         setActiveEntityId(entityId);
         setSourcePosition(position);
       }
     },
-    [activeEntityId]
+    [] // Empty deps - uses ref for current value
   );
 
   const handleAddEntity = useCallback(

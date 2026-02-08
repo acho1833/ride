@@ -33,16 +33,7 @@ interface Props {
   onDragEnd: (containerX: number, containerY: number) => void;
 }
 
-const GraphPreviewPopupComponent = ({
-  entityType,
-  entities,
-  entitiesInGraph,
-  x,
-  y,
-  onAdd,
-  onClose,
-  onDragEnd
-}: Props) => {
+const GraphPreviewPopupComponent = ({ entityType, entities, entitiesInGraph, x, y, onAdd, onClose, onDragEnd }: Props) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const iconClass = getEntityIconClass(entityType);
@@ -115,13 +106,7 @@ const GraphPreviewPopupComponent = ({
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 border-t pt-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => p - 1)}
-          >
+          <Button variant="ghost" size="icon" className="h-5 w-5" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
             <i className="ri-arrow-left-s-line text-xs" />
           </Button>
           <span className="text-muted-foreground text-xs">

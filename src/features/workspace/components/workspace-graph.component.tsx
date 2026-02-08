@@ -166,6 +166,10 @@ const WorkspaceGraphComponent = ({
   const onPreviewGroupClickRef = useRef(onPreviewGroupClick);
   onPreviewGroupClickRef.current = onPreviewGroupClick;
 
+  // Cache calculated preview positions so they don't shift when other nodes are added
+  const previewPositionsCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const lastPreviewSourceIdRef = useRef<string | null>(null);
+
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
 
@@ -597,10 +601,13 @@ const WorkspaceGraphComponent = ({
 
     // Setup drag behavior - supports group drag when node is in selection
     // Disabled during preview mode (regular nodes shouldn't move)
+    // Use .filter() to exclude Alt+Click - those go to preview handler instead
     const drag = d3
       .drag<SVGGElement, WorkspaceGraphNode>()
+      .filter(event => !event.altKey) // Alt+Click goes to preview, not drag
       .clickDistance(4) // Allow clicks/dblclicks through if pointer moves less than 4px
-      .on('start', function (_event, d) {
+      .on('start', function (event, d) {
+        console.log('[WorkspaceGraph] drag start', { altKey: event.sourceEvent?.altKey, entityId: d.id });
         // Disable regular node dragging during preview mode
         if (previewStateRef.current?.isActive) return;
 
@@ -648,13 +655,24 @@ const WorkspaceGraphComponent = ({
 
     node.call(drag);
 
-    // Left-click on node: single select, ctrl+click toggle, or alt+click for preview
+    // Alt+Click for preview - handle via mousedown to ensure we catch it before drag
+    node.on('mousedown.preview', function (event: MouseEvent, d: WorkspaceGraphNode) {
+      if (event.altKey && event.button === 0) {
+        console.log('[WorkspaceGraph] mousedown.preview detected', d.id);
+        event.preventDefault();
+        event.stopPropagation();
+        if (onAltClickRef.current) {
+          onAltClickRef.current(d.id, { x: d.x ?? 0, y: d.y ?? 0 });
+        }
+      }
+    });
+
+    // Left-click on node: single select, ctrl+click toggle
     node.on('click', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.stopPropagation();
 
-      // Alt+Click: trigger preview mode
-      if (event.altKey && onAltClickRef.current) {
-        onAltClickRef.current(d.id, { x: d.x ?? 0, y: d.y ?? 0 });
+      // Alt+Click is handled in mousedown.preview, skip here
+      if (event.altKey) {
         return;
       }
 
@@ -852,45 +870,165 @@ const WorkspaceGraphComponent = ({
     // Remove any existing preview elements
     g.selectAll('.preview-layer').remove();
 
-    if (!previewState?.isActive) return;
+    if (!previewState?.isActive) {
+      // Clear position cache when preview is deactivated
+      previewPositionsCacheRef.current.clear();
+      lastPreviewSourceIdRef.current = null;
+      return;
+    }
 
-    const { sourcePosition, nodes: previewNodes, groups: previewGroups } = previewState;
+    const { sourcePosition, sourceEntityId, nodes: previewNodes, groups: previewGroups } = previewState;
     const items = previewNodes.length > 0 ? previewNodes : previewGroups;
     if (items.length === 0) return;
+
+    // Clear cache if source entity changed (different preview session)
+    if (lastPreviewSourceIdRef.current !== sourceEntityId) {
+      previewPositionsCacheRef.current.clear();
+      lastPreviewSourceIdRef.current = sourceEntityId;
+    }
 
     // Create preview layer group
     const previewLayer = g.append('g').attr('class', 'preview-layer');
 
-    // Calculate radial positions for preview items
-    const distance = PREVIEW_CONFIG.previewDistance;
-    const positions = items.map((_, index) => {
-      const angle = (index / items.length) * Math.PI * 2 - Math.PI / 2;
-      return {
-        x: sourcePosition.x + Math.cos(angle) * distance,
-        y: sourcePosition.y + Math.sin(angle) * distance
-      };
+    // Build force simulation data for preview nodes
+    // Include existing graph nodes as fixed positions to avoid overlap
+    interface SimNode {
+      id: string;
+      x: number;
+      y: number;
+      fx?: number;
+      fy?: number;
+      index?: number;
+    }
+
+    const existingNodePositions: SimNode[] = nodesRef.current.map((n: WorkspaceGraphNode) => ({
+      id: n.id,
+      x: n.x ?? 0,
+      y: n.y ?? 0,
+      fx: n.x ?? 0, // Fixed position
+      fy: n.y ?? 0
+    }));
+
+    // Check which items need new positions calculated
+    const itemsNeedingPositions: { item: (typeof items)[0]; index: number }[] = [];
+    const cachedPositions = previewPositionsCacheRef.current;
+
+    items.forEach((item, index) => {
+      const id = 'id' in item ? item.id : `group-${item.entityType}`;
+      if (!cachedPositions.has(id)) {
+        itemsNeedingPositions.push({ item, index });
+      }
+    });
+
+    // Only run force simulation for items that need new positions
+    if (itemsNeedingPositions.length > 0) {
+      // Include already-positioned preview items as fixed nodes
+      const fixedPreviewPositions: SimNode[] = [];
+      items.forEach(item => {
+        const id = 'id' in item ? item.id : `group-${item.entityType}`;
+        const cached = cachedPositions.get(id);
+        if (cached) {
+          fixedPreviewPositions.push({
+            id,
+            x: cached.x,
+            y: cached.y,
+            fx: cached.x,
+            fy: cached.y
+          });
+        }
+      });
+
+      // Create simulation nodes for items needing positions
+      const previewSimNodes: SimNode[] = itemsNeedingPositions.map(({ item }, i) => {
+        const id = 'id' in item ? item.id : `group-${item.entityType}`;
+        // Small offset to break symmetry
+        const angle = (i / itemsNeedingPositions.length) * Math.PI * 2;
+        return {
+          id,
+          index: i,
+          x: sourcePosition.x + Math.cos(angle) * 5,
+          y: sourcePosition.y + Math.sin(angle) * 5
+        };
+      });
+
+      // Run force simulation to calculate positions
+      const allSimNodes: SimNode[] = [...existingNodePositions, ...fixedPreviewPositions, ...previewSimNodes];
+      const previewDistance = PREVIEW_CONFIG.previewDistance;
+
+      const previewSimulation = d3
+        .forceSimulation(allSimNodes)
+        .force('collision', d3.forceCollide<SimNode>().radius(GRAPH_CONFIG.nodeRadius * 1.5))
+        .force(
+          'radial',
+          d3.forceRadial<SimNode>(previewDistance, sourcePosition.x, sourcePosition.y).strength(node => (node.fx !== undefined ? 0 : 0.8))
+        )
+        .force(
+          'charge',
+          d3.forceManyBody<SimNode>().strength(node => (node.fx !== undefined ? 0 : -100))
+        )
+        .stop();
+
+      // Run simulation synchronously
+      for (let i = 0; i < 100; i++) previewSimulation.tick();
+
+      // Cache the new positions
+      previewSimNodes.forEach(n => {
+        cachedPositions.set(n.id, { x: n.x, y: n.y });
+      });
+    }
+
+    // Track which items are new (need animation) vs already positioned
+    const newItemIds = new Set(itemsNeedingPositions.map(({ item }) => ('id' in item ? item.id : `group-${item.entityType}`)));
+
+    // Get final positions from cache (all items should now be cached)
+    const finalPositions = items.map(item => {
+      const id = 'id' in item ? item.id : `group-${item.entityType}`;
+      return cachedPositions.get(id) ?? { x: sourcePosition.x, y: sourcePosition.y };
     });
 
     // Render individual preview nodes
     if (previewNodes.length > 0) {
       previewNodes.forEach((entity, index) => {
-        const pos = positions[index];
+        const finalPos = finalPositions[index];
+        const isNew = newItemIds.has(entity.id);
         const nodeGroup = previewLayer.append('g').attr('class', 'preview-node');
 
         // Dashed connecting line to source
-        nodeGroup
+        const line = nodeGroup
           .append('line')
           .attr('x1', sourcePosition.x)
           .attr('y1', sourcePosition.y)
-          .attr('x2', pos.x)
-          .attr('y2', pos.y)
+          .attr('x2', isNew ? sourcePosition.x : finalPos.x)
+          .attr('y2', isNew ? sourcePosition.y : finalPos.y)
           .attr('stroke', PREVIEW_CONFIG.borderColor)
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
           .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
 
-        // Node group at position
-        const node = nodeGroup.append('g').attr('transform', `translate(${pos.x}, ${pos.y})`).style('cursor', 'pointer');
+        // Animate line endpoint only for new nodes
+        if (isNew) {
+          line.transition().duration(300).ease(d3.easeCubicOut).attr('x2', finalPos.x).attr('y2', finalPos.y);
+        }
+
+        // Node group - new nodes start at source and animate, existing nodes appear at final position
+        const node = nodeGroup
+          .append('g')
+          .attr('transform', isNew ? `translate(${sourcePosition.x}, ${sourcePosition.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
+          .style('cursor', 'pointer')
+          .style('opacity', isNew ? 0 : 1);
+
+        // Animate node to final position only for new nodes
+        if (isNew) {
+          node
+            .transition()
+            .duration(300)
+            .ease(d3.easeCubicOut)
+            .attr('transform', `translate(${finalPos.x}, ${finalPos.y})`)
+            .style('opacity', 1);
+        }
+
+        // Store final position for click handler
+        const pos = finalPos;
 
         // Node square with dashed border
         node
@@ -930,19 +1068,40 @@ const WorkspaceGraphComponent = ({
           .attr('opacity', PREVIEW_CONFIG.nodeOpacity * 0.9)
           .text(label);
 
+        // [+] button overlay (hidden by default, shown on hover)
+        const addButton = node.append('g').attr('class', 'add-button').attr('opacity', 0).style('cursor', 'pointer');
+
+        // Button background circle
+        addButton
+          .append('circle')
+          .attr('cx', GRAPH_CONFIG.nodeRadius - 4)
+          .attr('cy', -GRAPH_CONFIG.nodeRadius + 4)
+          .attr('r', 10)
+          .attr('fill', GRAPH_CONFIG.nodeColorSelected)
+          .attr('stroke', 'white')
+          .attr('stroke-width', 1.5);
+
+        // Plus icon
+        addButton
+          .append('text')
+          .attr('x', GRAPH_CONFIG.nodeRadius - 4)
+          .attr('y', -GRAPH_CONFIG.nodeRadius + 4)
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('fill', 'white')
+          .attr('font-size', '14px')
+          .attr('font-weight', 'bold')
+          .text('+');
+
         // Hover and click interactions
         node
           .on('mouseenter', function () {
-            d3.select(this)
-              .select('rect')
-              .attr('stroke', GRAPH_CONFIG.nodeColorSelected)
-              .attr('stroke-dasharray', 'none');
+            d3.select(this).select('rect').attr('stroke', GRAPH_CONFIG.nodeColorSelected).attr('stroke-dasharray', 'none');
+            d3.select(this).select('.add-button').attr('opacity', 1);
           })
           .on('mouseleave', function () {
-            d3.select(this)
-              .select('rect')
-              .attr('stroke', PREVIEW_CONFIG.borderColor)
-              .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+            d3.select(this).select('rect').attr('stroke', PREVIEW_CONFIG.borderColor).attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+            d3.select(this).select('.add-button').attr('opacity', 0);
           })
           .on('click', function (event: MouseEvent) {
             event.stopPropagation();
@@ -956,23 +1115,47 @@ const WorkspaceGraphComponent = ({
     // Render grouped preview nodes (circles)
     if (previewGroups.length > 0) {
       previewGroups.forEach((group, index) => {
-        const pos = positions[index];
+        const finalPos = finalPositions[index];
+        const groupId = `group-${group.entityType}`;
+        const isNew = newItemIds.has(groupId);
         const groupEl = previewLayer.append('g').attr('class', 'preview-group');
 
         // Dashed connecting line to source
-        groupEl
+        const line = groupEl
           .append('line')
           .attr('x1', sourcePosition.x)
           .attr('y1', sourcePosition.y)
-          .attr('x2', pos.x)
-          .attr('y2', pos.y)
+          .attr('x2', isNew ? sourcePosition.x : finalPos.x)
+          .attr('y2', isNew ? sourcePosition.y : finalPos.y)
           .attr('stroke', PREVIEW_CONFIG.borderColor)
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
           .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
 
-        // Node group at position
-        const node = groupEl.append('g').attr('transform', `translate(${pos.x}, ${pos.y})`).style('cursor', 'pointer');
+        // Animate line endpoint only for new nodes
+        if (isNew) {
+          line.transition().duration(300).ease(d3.easeCubicOut).attr('x2', finalPos.x).attr('y2', finalPos.y);
+        }
+
+        // Node group - new nodes start at source and animate, existing nodes appear at final position
+        const node = groupEl
+          .append('g')
+          .attr('transform', isNew ? `translate(${sourcePosition.x}, ${sourcePosition.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
+          .style('cursor', 'pointer')
+          .style('opacity', isNew ? 0 : 1);
+
+        // Animate node to final position only for new nodes
+        if (isNew) {
+          node
+            .transition()
+            .duration(300)
+            .ease(d3.easeCubicOut)
+            .attr('transform', `translate(${finalPos.x}, ${finalPos.y})`)
+            .style('opacity', 1);
+        }
+
+        // Store final position for click handler
+        const pos = finalPos;
 
         // Circle node (distinct from square regular nodes)
         node
@@ -998,7 +1181,14 @@ const WorkspaceGraphComponent = ({
 
         // Count badge (top-right)
         const badge = node.append('g').attr('transform', `translate(${GRAPH_CONFIG.nodeRadius - 4}, ${-GRAPH_CONFIG.nodeRadius + 4})`);
-        badge.append('rect').attr('x', -12).attr('y', -8).attr('width', 24).attr('height', 16).attr('rx', 8).attr('fill', GRAPH_CONFIG.nodeColorSelected);
+        badge
+          .append('rect')
+          .attr('x', -12)
+          .attr('y', -8)
+          .attr('width', 24)
+          .attr('height', 16)
+          .attr('rx', 8)
+          .attr('fill', GRAPH_CONFIG.nodeColorSelected);
         badge
           .append('text')
           .attr('x', 0)
@@ -1023,16 +1213,10 @@ const WorkspaceGraphComponent = ({
         // Hover and click interactions
         node
           .on('mouseenter', function () {
-            d3.select(this)
-              .select('circle')
-              .attr('stroke', GRAPH_CONFIG.nodeColorSelected)
-              .attr('stroke-dasharray', 'none');
+            d3.select(this).select('circle').attr('stroke', GRAPH_CONFIG.nodeColorSelected).attr('stroke-dasharray', 'none');
           })
           .on('mouseleave', function () {
-            d3.select(this)
-              .select('circle')
-              .attr('stroke', PREVIEW_CONFIG.borderColor)
-              .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
+            d3.select(this).select('circle').attr('stroke', PREVIEW_CONFIG.borderColor).attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
           })
           .on('click', function (event: MouseEvent) {
             event.stopPropagation();

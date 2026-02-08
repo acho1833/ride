@@ -125,11 +125,16 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     [addEntities, saveViewState, workspaceId, workspace?.viewState, setSelectedEntityIds]
   );
 
-  const { previewState, handleAltClick, handleAddEntity: handlePreviewAdd, handleExit: handlePreviewExit, sourceEntityName } =
-    useGraphPreview({
-      entitiesInGraph: entityMap,
-      onAddEntity: handlePreviewAddEntity
-    });
+  const {
+    previewState,
+    handleAltClick,
+    handleAddEntity: handlePreviewAdd,
+    handleExit: handlePreviewExit,
+    sourceEntityName
+  } = useGraphPreview({
+    entitiesInGraph: entityMap,
+    onAddEntity: handlePreviewAddEntity
+  });
 
   // Show persistent toast when preview is active
   useEffect(() => {
@@ -357,9 +362,9 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         onUpdatePopupPosition={(popupId, svgX, svgY) => updatePopupPosition(workspaceId, popupId, svgX, svgY)}
         previewState={previewState}
         onAltClick={handleAltClick}
-        onPreviewAddEntity={entityId => {
+        onPreviewAddEntity={(entityId, position) => {
           const entity = previewState?.nodes.find(e => e.id === entityId);
-          if (entity) handlePreviewAdd(entity);
+          if (entity) handlePreviewAddEntity(entity, position);
         }}
         onPreviewGroupClick={handlePreviewGroupClick}
       />
