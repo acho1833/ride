@@ -622,11 +622,10 @@ const WorkspaceGraphComponent = ({
         if (previewStateRef.current?.isActive) return;
 
         this.setAttribute('cursor', 'grabbing');
-        // If dragging an unselected node, select it (keeps multi-selection if already selected)
-        const selected = selectedEntityIdsRef.current;
-        if (!selected.includes(d.id)) {
-          onSetSelectedEntityIds([d.id]);
-        }
+        // Note: We intentionally do NOT select the node here.
+        // Selecting triggers a React state update which causes a re-render,
+        // interrupting the D3 drag sequence. Selection is handled by the click handler,
+        // and .clickDistance(4) ensures short drags are treated as clicks.
       })
       .on('drag', function (event: d3.D3DragEvent<SVGGElement, WorkspaceGraphNode, WorkspaceGraphNode>, d) {
         // Disable regular node dragging during preview mode
@@ -672,7 +671,9 @@ const WorkspaceGraphComponent = ({
         event.stopPropagation();
         // Prevent canvas click from clearing selection
         justAltClickedRef.current = true;
-        setTimeout(() => { justAltClickedRef.current = false; }, 100);
+        setTimeout(() => {
+          justAltClickedRef.current = false;
+        }, 100);
         if (onAltClickRef.current) {
           onAltClickRef.current(d.id, { x: d.x ?? 0, y: d.y ?? 0 });
         }
@@ -898,9 +899,7 @@ const WorkspaceGraphComponent = ({
     const cache = previewCacheRef.current;
 
     // Build set of current item IDs
-    const currentItemIds = new Set(
-      items.map(item => ('id' in item ? item.id : `group-${item.entityType}`))
-    );
+    const currentItemIds = new Set(items.map(item => ('id' in item ? item.id : `group-${item.entityType}`)));
 
     // Clean up stale cache entries (items no longer in preview)
     for (const cachedId of cache.keys()) {
@@ -995,21 +994,24 @@ const WorkspaceGraphComponent = ({
       const previewSimulation = d3
         .forceSimulation(allSimNodes)
         .force('collision', d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 1.5))
-        .force('radial', d3.forceRadial<SimNodeWithSource>(previewDistance, 0, 0).strength((node: SimNodeWithSource) => {
-          if (node.fx !== undefined) return 0;
-          if (node.sourceX !== undefined && node.sourceY !== undefined) {
-            const dx = node.x - node.sourceX;
-            const dy = node.y - node.sourceY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const targetDist = previewDistance;
-            if (dist > 0) {
-              const force = (dist - targetDist) / dist * 0.1;
-              node.x -= dx * force;
-              node.y -= dy * force;
+        .force(
+          'radial',
+          d3.forceRadial<SimNodeWithSource>(previewDistance, 0, 0).strength((node: SimNodeWithSource) => {
+            if (node.fx !== undefined) return 0;
+            if (node.sourceX !== undefined && node.sourceY !== undefined) {
+              const dx = node.x - node.sourceX;
+              const dy = node.y - node.sourceY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              const targetDist = previewDistance;
+              if (dist > 0) {
+                const force = ((dist - targetDist) / dist) * 0.1;
+                node.x -= dx * force;
+                node.y -= dy * force;
+              }
             }
-          }
-          return 0;
-        }))
+            return 0;
+          })
+        )
         .force(
           'charge',
           d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : -100))
@@ -1034,7 +1036,7 @@ const WorkspaceGraphComponent = ({
     // Build set of items that need animation (not yet initialized)
     // Render individual preview nodes
     if (previewNodes.length > 0) {
-      previewNodes.forEach((entity) => {
+      previewNodes.forEach(entity => {
         const id = entity.id;
         const cached = cache.get(id);
         if (!cached) return; // Should not happen, but guard
@@ -1166,7 +1168,9 @@ const WorkspaceGraphComponent = ({
               event.stopPropagation();
               // Prevent canvas click from clearing selection
               justAltClickedRef.current = true;
-              setTimeout(() => { justAltClickedRef.current = false; }, 100);
+              setTimeout(() => {
+                justAltClickedRef.current = false;
+              }, 100);
               // First add the preview node to the graph (so it doesn't disappear)
               if (onPreviewAddEntityRef.current) {
                 onPreviewAddEntityRef.current(entity.id, pos);
@@ -1191,7 +1195,7 @@ const WorkspaceGraphComponent = ({
 
     // Render grouped preview nodes (circles)
     if (previewGroups.length > 0) {
-      previewGroups.forEach((group) => {
+      previewGroups.forEach(group => {
         const groupId = `group-${group.entityType}`;
         const cached = cache.get(groupId);
         if (!cached) return; // Should not happen, but guard
@@ -1238,9 +1242,6 @@ const WorkspaceGraphComponent = ({
           // Mark as initialized after animation starts
           cache.set(groupId, { ...cached, initialized: true });
         }
-
-        // Store final position for click handler
-        const pos = finalPos;
 
         // Circle node (distinct from square regular nodes)
         node
@@ -1306,11 +1307,8 @@ const WorkspaceGraphComponent = ({
           .on('click', function (event: MouseEvent) {
             event.stopPropagation();
             if (onPreviewGroupClickRef.current) {
-              // Convert SVG position to screen position for popup
-              const transform = transformRef.current;
-              const screenX = pos.x * transform.k + transform.x;
-              const screenY = pos.y * transform.k + transform.y;
-              onPreviewGroupClickRef.current(group.entityType, { x: screenX, y: screenY });
+              // Use the actual click event coordinates (already in screen/viewport coords)
+              onPreviewGroupClickRef.current(group.entityType, { x: event.clientX, y: event.clientY });
             }
           });
       });

@@ -70,8 +70,8 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
       sourcePositions[id] = pos;
     }
 
-    // Collect all preview nodes and track which source they came from
-    const allPreviewNodes: PreviewNode[] = [];
+    // Track nodes per source for per-source threshold logic
+    const nodesBySource: Record<string, PreviewNode[]> = {};
     const seenPreviewIds = new Set<string>();
     const previewLinks: PreviewLink[] = [];
 
@@ -97,6 +97,11 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
         continue;
       }
 
+      // Initialize array for this source
+      if (!nodesBySource[sourceId]) {
+        nodesBySource[sourceId] = [];
+      }
+
       // Process all related entities from this source
       for (const [, entities] of Object.entries(entityData.relatedEntities)) {
         for (const related of entities) {
@@ -107,7 +112,7 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
 
           // Add as preview node attributed to this source
           seenPreviewIds.add(related.id);
-          allPreviewNodes.push({
+          nodesBySource[sourceId].push({
             id: related.id,
             labelNormalized: related.labelNormalized,
             type: related.type,
@@ -120,77 +125,65 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
     // Note: Links between preview nodes and graph entities would require extra API calls
     // to fetch each preview node's relationships. Skipping for now - only source->preview links shown.
 
-    // Determine display mode based on count
-    const totalCount = allPreviewNodes.length;
+    // Apply per-source threshold logic:
+    // - Sources with <= threshold entities: show as individual nodes
+    // - Sources with > threshold entities: group those entities by type
+    const individualNodes: PreviewNode[] = [];
+    const groups: PreviewGroup[] = [];
 
-    if (totalCount === 0) {
-      return {
-        isActive: true,
-        sourceEntityIds: sourceIds,
-        sourcePositions,
-        nodes: [],
-        groups: [],
-        links: []
-      };
-    }
-
-    if (totalCount <= PREVIEW_CONFIG.threshold) {
-      // Individual nodes mode
-      return {
-        isActive: true,
-        sourceEntityIds: sourceIds,
-        sourcePositions,
-        nodes: allPreviewNodes,
-        groups: [],
-        links: previewLinks
-      };
-    }
-
-    // Grouped mode - group by entity type, keeping source info
-    // For groups, we need to track which source each entity came from
-    const groupedByType: Record<string, PreviewNode[]> = {};
-    for (const node of allPreviewNodes) {
-      if (!groupedByType[node.type]) {
-        groupedByType[node.type] = [];
+    for (const [sourceId, sourceNodes] of Object.entries(nodesBySource)) {
+      if (sourceNodes.length === 0) {
+        continue;
       }
-      groupedByType[node.type].push(node);
-    }
 
-    // Create groups - use the first entity's source as the group source
-    // (groups may contain entities from multiple sources)
-    const groups: PreviewGroup[] = Object.entries(groupedByType).map(([entityType, entities]) => ({
-      entityType,
-      entities,
-      count: entities.length,
-      sourceEntityId: entities[0].sourceEntityId
-    }));
+      if (sourceNodes.length <= PREVIEW_CONFIG.threshold) {
+        // Show as individual nodes
+        individualNodes.push(...sourceNodes);
+      } else {
+        // Group this source's nodes by entity type
+        const groupedByType: Record<string, PreviewNode[]> = {};
+        for (const node of sourceNodes) {
+          if (!groupedByType[node.type]) {
+            groupedByType[node.type] = [];
+          }
+          groupedByType[node.type].push(node);
+        }
+
+        // Create groups for this source
+        for (const [entityType, entities] of Object.entries(groupedByType)) {
+          groups.push({
+            entityType,
+            entities,
+            count: entities.length,
+            sourceEntityId: sourceId
+          });
+        }
+      }
+    }
 
     return {
       isActive: true,
       sourceEntityIds: sourceIds,
       sourcePositions,
-      nodes: [],
+      nodes: individualNodes,
       groups,
       links: previewLinks
     };
   }, [sources, sourceIds, queries, entitiesInGraph]);
 
-  const handleAltClick = useCallback(
-    (entityId: string, position: { x: number; y: number }) => {
-      setSources(prev => {
-        const next = new Map(prev);
-        if (next.has(entityId)) {
-          // Toggle off - remove this source
-          next.delete(entityId);
-        } else {
-          // Add new source with its position
-          next.set(entityId, position);
-        }
-        return next;
-      });
-    },
-    []
-  );
+  const handleAltClick = useCallback((entityId: string, position: { x: number; y: number }) => {
+    setSources(prev => {
+      const next = new Map(prev);
+      if (next.has(entityId)) {
+        // Toggle off - remove this source
+        next.delete(entityId);
+      } else {
+        // Add new source with its position
+        next.set(entityId, position);
+      }
+      return next;
+    });
+  }, []);
 
   const handleAddEntity = useCallback(
     (entity: Entity) => {
@@ -217,9 +210,7 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
   }, []);
 
   const sourceEntityNames = useMemo(() => {
-    return sourceIds
-      .map(id => entitiesInGraph.get(id)?.labelNormalized)
-      .filter((name): name is string => !!name);
+    return sourceIds.map(id => entitiesInGraph.get(id)?.labelNormalized).filter((name): name is string => !!name);
   }, [sourceIds, entitiesInGraph]);
 
   return {
