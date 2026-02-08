@@ -926,13 +926,13 @@ const WorkspaceGraphComponent = ({
     }
 
     const { sourceEntityIds, sourcePositions, nodes: previewNodes, groups: previewGroups } = previewState;
-    const items = previewNodes.length > 0 ? previewNodes : previewGroups;
+    const items = [...previewNodes, ...previewGroups];
     if (items.length === 0) return;
 
     const cache = previewCacheRef.current;
 
     // Build set of current item IDs
-    const currentItemIds = new Set(items.map(item => ('id' in item ? item.id : `group-${item.entityType}`)));
+    const currentItemIds = new Set(items.map(item => ('id' in item ? item.id : `group-${item.sourceEntityId}-${item.entityType}`)));
 
     // Clean up stale cache entries (items no longer in preview)
     for (const cachedId of cache.keys()) {
@@ -968,7 +968,7 @@ const WorkspaceGraphComponent = ({
     const uninitializedItems: { item: (typeof items)[0]; index: number; sourcePos: { x: number; y: number } }[] = [];
 
     items.forEach((item, index) => {
-      const id = 'id' in item ? item.id : `group-${item.entityType}`;
+      const id = 'id' in item ? item.id : `group-${item.sourceEntityId}-${item.entityType}`;
       const cached = cache.get(id);
       if (!cached || !cached.initialized) {
         const itemSourceId = item.sourceEntityId;
@@ -1251,7 +1251,7 @@ const WorkspaceGraphComponent = ({
 
     if (previewGroups.length > 0) {
       previewGroups.forEach(group => {
-        const groupId = `group-${group.entityType}`;
+        const groupId = `group-${group.sourceEntityId}-${group.entityType}`;
         const cached = cache.get(groupId);
         const isInitialized = cached?.initialized;
 
@@ -1273,7 +1273,7 @@ const WorkspaceGraphComponent = ({
       // Include already-positioned preview items as fixed nodes
       const fixedPreviewPositions: SimNode[] = [];
       items.forEach(item => {
-        const id = 'id' in item ? item.id : `group-${item.entityType}`;
+        const id = 'id' in item ? item.id : `group-${item.sourceEntityId}-${item.entityType}`;
         const cached = cache.get(id);
         if (cached?.initialized) {
           fixedPreviewPositions.push({ id, x: cached.x, y: cached.y, fx: cached.x, fy: cached.y });
@@ -1298,7 +1298,11 @@ const WorkspaceGraphComponent = ({
         sourceY: number;
         sourceId: string;
       }
-      const initialOffset = PREVIEW_CONFIG.previewDistance * 0.3;
+      // Scale preview distance gently with sqrt so nodes stay near source
+      // Collision force will push overflow into concentric rings naturally
+      const scaledPreviewDistance =
+        PREVIEW_CONFIG.previewDistance * Math.max(1, Math.sqrt(animatingItems.length / 8));
+      const initialOffset = scaledPreviewDistance * 0.3;
       const previewSimNodes: PreviewSimNode[] = animatingItems.map(({ simNodeId, sourceId, sourcePos }, i) => {
         const angle = (i / animatingItems.length) * Math.PI * 2;
         return {
@@ -1324,7 +1328,7 @@ const WorkspaceGraphComponent = ({
         sourceId?: string;
       }
       const allSimNodes: SimNodeWithSource[] = [...existingNodePositions, ...fixedSourcePositions, ...fixedPreviewPositions, ...previewSimNodes];
-      const previewDistance = PREVIEW_CONFIG.previewDistance;
+      const previewDistance = scaledPreviewDistance;
 
       // Create links from each preview node to its source for d3.forceLink
       const simLinks = previewSimNodes.map(simNode => ({

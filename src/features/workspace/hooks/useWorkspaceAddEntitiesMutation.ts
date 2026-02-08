@@ -20,7 +20,7 @@ export const useWorkspaceAddEntitiesMutation = () => {
     orpc.workspace.addEntities.mutationOptions({
       onMutate: () => ({ toastId: toast.loading('Adding entity...') }),
       onSuccess: async (data, _variables, context) => {
-        await queryClient.invalidateQueries({ queryKey: orpc.workspace.getById.key({ input: { id: data.id } }) });
+        await queryClient.invalidateQueries({ queryKey: orpc.workspace.getById.queryKey({ input: { id: data.id } }) });
         toast.success('Entity added', { id: context?.toastId });
       },
       onError: (_error, _variables, context) => {
