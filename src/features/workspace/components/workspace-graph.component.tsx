@@ -383,7 +383,8 @@ const WorkspaceGraphComponent = ({
       .selectAll<SVGGElement, WorkspaceGraphNode>('g')
       .data(nodes)
       .join('g')
-      .attr('cursor', 'grab');
+      .attr('cursor', 'grab')
+      .attr('data-entity-id', d => d.id);
 
     // Add squares to nodes
     node
@@ -885,15 +886,22 @@ const WorkspaceGraphComponent = ({
   useEffect(() => {
     // Stop any running preview simulation and cache current positions
     if (previewSimulationRef.current) {
-      // Cache positions of nodes that were still animating so they don't re-animate
+      // Cache positions of nodes that were still animating
+      // Only mark as initialized if they've moved close to the target distance
+      // This prevents interrupted animations from freezing nodes near their source
       const cache = previewCacheRef.current;
+      const targetDist = PREVIEW_CONFIG.previewDistance;
       for (const [id, item] of previewAnimatingRef.current) {
+        const dx = item.x - item.sourcePos.x;
+        const dy = item.y - item.sourcePos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const reachedTarget = dist > targetDist * 0.5;
         cache.set(id, {
           x: item.x,
           y: item.y,
           sourceX: item.sourcePos.x,
           sourceY: item.sourcePos.y,
-          initialized: true
+          initialized: reachedTarget
         });
       }
       previewAnimatingRef.current.clear();
@@ -989,7 +997,7 @@ const WorkspaceGraphComponent = ({
       srcPos: { x: number; y: number },
       isAnimating: boolean
     ) => {
-      const nodeGroup = parentGroup.append('g').attr('class', 'preview-node');
+      const nodeGroup = parentGroup.append('g').attr('class', 'preview-node').attr('data-preview-id', entity.id);
 
       // Dashed connecting line to source
       const line = nodeGroup
@@ -1086,7 +1094,7 @@ const WorkspaceGraphComponent = ({
           d3.select(this).select('.add-button').attr('opacity', 0);
         })
         .on('mousedown', function (event: MouseEvent) {
-          // Shift+Click / Alt+Click expands this preview node's connections (without adding to graph)
+          // Shift+Click / Alt+Click: add preview node to graph and expand its connections
           if ((event.shiftKey || event.altKey) && event.button === 0) {
             event.preventDefault();
             event.stopPropagation();
@@ -1094,17 +1102,24 @@ const WorkspaceGraphComponent = ({
             setTimeout(() => {
               justAltClickedRef.current = false;
             }, 100);
+            // Add to graph first so the node doesn't disappear when it becomes a source
+            if (onPreviewAddEntityRef.current) {
+              onPreviewAddEntityRef.current(entity.id, pos);
+            }
+            // Then expand its connections
             if (onAltClickRef.current) {
               onAltClickRef.current(entity.id, pos);
             }
           }
         })
         .on('click', function (event: MouseEvent) {
+          console.log('[PreviewNode] click', { shiftKey: event.shiftKey, altKey: event.altKey, entityId: entity.id });
           event.stopPropagation();
           // Skip if Shift/Alt was held (handled in mousedown)
           if (event.shiftKey || event.altKey) return;
           // Regular click adds entity to graph
           if (onPreviewAddEntityRef.current) {
+            console.log('[PreviewNode] adding entity to graph', entity.id);
             onPreviewAddEntityRef.current(entity.id, pos);
           }
         });
@@ -1120,7 +1135,7 @@ const WorkspaceGraphComponent = ({
       srcPos: { x: number; y: number },
       isAnimating: boolean
     ) => {
-      const groupEl = parentGroup.append('g').attr('class', 'preview-group');
+      const groupEl = parentGroup.append('g').attr('class', 'preview-group').attr('data-preview-group', group.entityType);
 
       // Dashed connecting line to source
       const line = groupEl
@@ -1285,13 +1300,14 @@ const WorkspaceGraphComponent = ({
         sourceX: number;
         sourceY: number;
       }
+      const initialOffset = PREVIEW_CONFIG.previewDistance * 0.3;
       const previewSimNodes: PreviewSimNode[] = animatingItems.map(({ simNodeId, sourcePos }, i) => {
         const angle = (i / animatingItems.length) * Math.PI * 2;
         return {
           id: simNodeId,
           index: i,
-          x: sourcePos.x + Math.cos(angle) * 5,
-          y: sourcePos.y + Math.sin(angle) * 5,
+          x: sourcePos.x + Math.cos(angle) * initialOffset,
+          y: sourcePos.y + Math.sin(angle) * initialOffset,
           sourceX: sourcePos.x,
           sourceY: sourcePos.y
         };
@@ -1326,30 +1342,25 @@ const WorkspaceGraphComponent = ({
 
       const simulation = d3
         .forceSimulation(allSimNodes)
-        .force('collision', d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 1.5))
-        .force(
-          'radial',
-          d3.forceRadial<SimNodeWithSource>(previewDistance, 0, 0).strength((node: SimNodeWithSource) => {
-            if (node.fx !== undefined) return 0;
-            if (node.sourceX !== undefined && node.sourceY !== undefined) {
-              const dx = node.x - node.sourceX;
-              const dy = node.y - node.sourceY;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              const targetDist = previewDistance;
-              if (dist > 0) {
-                const force = ((dist - targetDist) / dist) * 0.1;
-                node.x -= dx * force;
-                node.y -= dy * force;
-              }
-            }
-            return 0;
-          })
-        )
+        .alphaDecay(0.05)
+        .force('collision', d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 2.5))
         .force(
           'charge',
-          d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : -100))
+          d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : -200))
         )
         .on('tick', () => {
+          // Apply per-tick force: pull preview nodes toward previewDistance from their source
+          for (const simNode of previewSimNodes) {
+            const dx = simNode.x - simNode.sourceX;
+            const dy = simNode.y - simNode.sourceY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0) {
+              const factor = ((dist - previewDistance) / dist) * 0.3;
+              simNode.x -= dx * factor;
+              simNode.y -= dy * factor;
+            }
+          }
+
           // Check if all movable nodes have stabilized
           let maxMovement = 0;
           for (const [id, { simNode }] of simNodeMap) {
@@ -1427,15 +1438,21 @@ const WorkspaceGraphComponent = ({
     // Cleanup preview layer when effect re-runs
     return () => {
       if (previewSimulationRef.current) {
-        // Cache positions of nodes still animating so they don't re-animate
+        // Cache positions of nodes still animating
+        // Only mark as initialized if they've moved close to target distance
         const cleanupCache = previewCacheRef.current;
+        const cleanupTargetDist = PREVIEW_CONFIG.previewDistance;
         for (const [id, item] of previewAnimatingRef.current) {
+          const dx = item.x - item.sourcePos.x;
+          const dy = item.y - item.sourcePos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const reachedTarget = dist > cleanupTargetDist * 0.5;
           cleanupCache.set(id, {
             x: item.x,
             y: item.y,
             sourceX: item.sourcePos.x,
             sourceY: item.sourcePos.y,
-            initialized: true
+            initialized: reachedTarget
           });
         }
         previewAnimatingRef.current.clear();
