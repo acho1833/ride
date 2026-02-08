@@ -130,7 +130,8 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     handleAltClick,
     handleAddEntity: handlePreviewAdd,
     handleExit: handlePreviewExit,
-    sourceEntityName
+    sourceEntityNames,
+    sourceCount
   } = useGraphPreview({
     entitiesInGraph: entityMap,
     onAddEntity: handlePreviewAddEntity
@@ -138,9 +139,14 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
 
   // Show persistent toast when preview is active
   useEffect(() => {
-    if (!previewState?.isActive || !sourceEntityName) return;
+    if (!previewState?.isActive || sourceCount === 0) return;
 
-    const toastId = toast.info(`Live Preview: Showing connections for "${sourceEntityName}"`, {
+    const message =
+      sourceCount === 1
+        ? `Live Preview: Showing connections for "${sourceEntityNames[0]}"`
+        : `Live Preview: Showing connections for ${sourceCount} entities`;
+
+    const toastId = toast.info(message, {
       duration: Infinity,
       action: {
         label: 'Dismiss',
@@ -151,7 +157,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     return () => {
       toast.dismiss(toastId);
     };
-  }, [previewState?.isActive, sourceEntityName, handlePreviewExit]);
+  }, [previewState?.isActive, sourceEntityNames, sourceCount, handlePreviewExit]);
 
   // Handle Escape key to exit preview
   useEffect(() => {

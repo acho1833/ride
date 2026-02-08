@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useEntityQuery } from '@/features/entity-search/hooks/useEntityQuery';
+import { useQueries } from '@tanstack/react-query';
+import { orpc } from '@/lib/orpc/orpc';
 import type { Entity } from '@/models/entity.model';
-import type { PreviewState, PreviewGroup } from '../types';
+import type { PreviewState, PreviewNode, PreviewGroup, PreviewLink } from '../types';
 import { PREVIEW_CONFIG } from '../const';
 
 interface UseGraphPreviewOptions {
@@ -16,63 +17,120 @@ interface UseGraphPreviewReturn {
   previewState: PreviewState | null;
   /** Whether preview is currently loading */
   isLoading: boolean;
-  /** Handle Alt+Click on an entity node */
+  /** Handle Alt+Click on an entity node (graph or preview) */
   handleAltClick: (entityId: string, position: { x: number; y: number }) => void;
   /** Add a preview entity to the graph */
   handleAddEntity: (entity: Entity) => void;
   /** Exit preview mode */
   handleExit: () => void;
-  /** Source entity name (for toast display) */
-  sourceEntityName: string | null;
+  /** Source entity names (for toast display) */
+  sourceEntityNames: string[];
+  /** Number of active sources */
+  sourceCount: number;
 }
 
 /**
- * Hook to manage live 1-hop preview state.
- * Fetches related entities and determines display mode (individual vs grouped).
+ * Hook to manage multi-source preview state.
+ * Fetches related entities for multiple sources and aggregates them.
+ * Supports expanding preview from both graph nodes and preview nodes.
  */
 export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPreviewOptions): UseGraphPreviewReturn {
-  const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
-  const [sourcePosition, setSourcePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // Track multiple source entities with their positions
+  const [sources, setSources] = useState<Map<string, { x: number; y: number }>>(new Map());
 
-  // Keep a ref to activeEntityId for stable callback access
-  const activeEntityIdRef = useRef(activeEntityId);
+  // Keep a ref for stable callback access
+  const sourcesRef = useRef(sources);
   useEffect(() => {
-    activeEntityIdRef.current = activeEntityId;
-  }, [activeEntityId]);
+    sourcesRef.current = sources;
+  }, [sources]);
 
-  // Fetch entity with related entities when preview is active
-  const { data: entityData, isLoading } = useEntityQuery(activeEntityId ?? '', 'type');
+  // Get array of source IDs for queries
+  const sourceIds = useMemo(() => Array.from(sources.keys()), [sources]);
 
-  // Calculate preview state from fetched data
+  // Fetch entity data for all sources in parallel
+  const queries = useQueries({
+    queries: sourceIds.map(id => ({
+      ...orpc.entity.getById.queryOptions({ input: { id, groupRelatedEntitiesBy: 'type' } }),
+      enabled: !!id
+    }))
+  });
+
+  // Check if any query is loading
+  const isLoading = queries.some(q => q.isLoading);
+
+  // Calculate preview state from all fetched data
   const previewState = useMemo<PreviewState | null>(() => {
-    if (!activeEntityId || !entityData?.relatedEntities) {
+    if (sources.size === 0) {
       return null;
     }
 
-    // Flatten all related entities and filter out those already in graph
-    const allRelated: Entity[] = [];
-    for (const [, entities] of Object.entries(entityData.relatedEntities)) {
-      for (const related of entities) {
-        if (!entitiesInGraph.has(related.id)) {
-          allRelated.push({
+    // Build source positions map
+    const sourcePositions: Record<string, { x: number; y: number }> = {};
+    for (const [id, pos] of sources) {
+      sourcePositions[id] = pos;
+    }
+
+    // Collect all preview nodes and track which source they came from
+    const allPreviewNodes: PreviewNode[] = [];
+    const seenPreviewIds = new Set<string>();
+    const previewLinks: PreviewLink[] = [];
+
+    // Process sources in REVERSE order (newest first) so that when user clicks
+    // a preview node, its related entities are attributed to it, not to older sources.
+    //
+    // KEY INSIGHT: Only process sources that have finished loading. This prevents
+    // the race condition where older sources "claim" entities before the newest
+    // source's query completes.
+    const reversedSourceIds = [...sourceIds].reverse();
+
+    for (const sourceId of reversedSourceIds) {
+      const index = sourceIds.indexOf(sourceId);
+      const queryResult = queries[index];
+
+      // Skip sources still loading - their entities will be processed once loaded
+      if (queryResult?.isLoading) {
+        continue;
+      }
+
+      const entityData = queryResult?.data;
+      if (!entityData?.relatedEntities) {
+        continue;
+      }
+
+      // Process all related entities from this source
+      for (const [, entities] of Object.entries(entityData.relatedEntities)) {
+        for (const related of entities) {
+          // Skip if already in graph, already a source, or already seen
+          if (entitiesInGraph.has(related.id) || sources.has(related.id) || seenPreviewIds.has(related.id)) {
+            continue;
+          }
+
+          // Add as preview node attributed to this source
+          seenPreviewIds.add(related.id);
+          allPreviewNodes.push({
             id: related.id,
             labelNormalized: related.labelNormalized,
-            type: related.type
+            type: related.type,
+            sourceEntityId: sourceId
           });
         }
       }
     }
 
+    // Note: Links between preview nodes and graph entities would require extra API calls
+    // to fetch each preview node's relationships. Skipping for now - only source->preview links shown.
+
     // Determine display mode based on count
-    const totalCount = allRelated.length;
+    const totalCount = allPreviewNodes.length;
 
     if (totalCount === 0) {
       return {
         isActive: true,
-        sourceEntityId: activeEntityId,
-        sourcePosition,
+        sourceEntityIds: sourceIds,
+        sourcePositions,
         nodes: [],
-        groups: []
+        groups: [],
+        links: []
       };
     }
 
@@ -80,77 +138,89 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
       // Individual nodes mode
       return {
         isActive: true,
-        sourceEntityId: activeEntityId,
-        sourcePosition,
-        nodes: allRelated,
-        groups: []
+        sourceEntityIds: sourceIds,
+        sourcePositions,
+        nodes: allPreviewNodes,
+        groups: [],
+        links: previewLinks
       };
     }
 
-    // Grouped mode - group by entity type
-    const groupedByType: Record<string, Entity[]> = {};
-    for (const entity of allRelated) {
-      if (!groupedByType[entity.type]) {
-        groupedByType[entity.type] = [];
+    // Grouped mode - group by entity type, keeping source info
+    // For groups, we need to track which source each entity came from
+    const groupedByType: Record<string, PreviewNode[]> = {};
+    for (const node of allPreviewNodes) {
+      if (!groupedByType[node.type]) {
+        groupedByType[node.type] = [];
       }
-      groupedByType[entity.type].push(entity);
+      groupedByType[node.type].push(node);
     }
 
+    // Create groups - use the first entity's source as the group source
+    // (groups may contain entities from multiple sources)
     const groups: PreviewGroup[] = Object.entries(groupedByType).map(([entityType, entities]) => ({
       entityType,
       entities,
-      count: entities.length
+      count: entities.length,
+      sourceEntityId: entities[0].sourceEntityId
     }));
 
     return {
       isActive: true,
-      sourceEntityId: activeEntityId,
-      sourcePosition,
+      sourceEntityIds: sourceIds,
+      sourcePositions,
       nodes: [],
-      groups
+      groups,
+      links: previewLinks
     };
-  }, [activeEntityId, entityData, entitiesInGraph, sourcePosition]);
+  }, [sources, sourceIds, queries, entitiesInGraph]);
 
   const handleAltClick = useCallback(
     (entityId: string, position: { x: number; y: number }) => {
-      const currentActiveId = activeEntityIdRef.current;
-      console.log('[useGraphPreview] handleAltClick called', { entityId, position, currentActiveId });
-      if (currentActiveId === entityId) {
-        // Toggle off if clicking same entity
-        console.log('[useGraphPreview] toggling off preview');
-        setActiveEntityId(null);
-      } else {
-        console.log('[useGraphPreview] activating preview for', entityId);
-        setActiveEntityId(entityId);
-        setSourcePosition(position);
-      }
+      setSources(prev => {
+        const next = new Map(prev);
+        if (next.has(entityId)) {
+          // Toggle off - remove this source
+          next.delete(entityId);
+        } else {
+          // Add new source with its position
+          next.set(entityId, position);
+        }
+        return next;
+      });
     },
-    [] // Empty deps - uses ref for current value
+    []
   );
 
   const handleAddEntity = useCallback(
     (entity: Entity) => {
-      // Calculate position near source (simple offset for now)
+      // Find the source position for this entity
+      // Use the entity's sourceEntityId if it's a PreviewNode, otherwise use first source
+      const previewNode = previewState?.nodes.find(n => n.id === entity.id);
+      const sourceId = previewNode?.sourceEntityId ?? sourceIds[0];
+      const sourcePos = sources.get(sourceId) ?? { x: 0, y: 0 };
+
+      // Calculate position near source
       const angle = Math.random() * Math.PI * 2;
       const distance = PREVIEW_CONFIG.previewDistance;
       const position = {
-        x: sourcePosition.x + Math.cos(angle) * distance,
-        y: sourcePosition.y + Math.sin(angle) * distance
+        x: sourcePos.x + Math.cos(angle) * distance,
+        y: sourcePos.y + Math.sin(angle) * distance
       };
       onAddEntity(entity, position);
     },
-    [sourcePosition, onAddEntity]
+    [sources, sourceIds, previewState?.nodes, onAddEntity]
   );
 
   const handleExit = useCallback(() => {
-    setActiveEntityId(null);
+    setSources(new Map());
   }, []);
 
-  const sourceEntityName = useMemo(() => {
-    if (!activeEntityId) return null;
-    const entity = entitiesInGraph.get(activeEntityId);
-    return entity?.labelNormalized ?? null;
-  }, [activeEntityId, entitiesInGraph]);
+  const sourceEntityNames = useMemo(() => {
+    return sourceIds
+      .map(id => entitiesInGraph.get(id)?.labelNormalized)
+      .filter((name): name is string => !!name);
+  }, [sourceIds, entitiesInGraph]);
 
   return {
     previewState,
@@ -158,6 +228,7 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
     handleAltClick,
     handleAddEntity,
     handleExit,
-    sourceEntityName
+    sourceEntityNames,
+    sourceCount: sources.size
   };
 }

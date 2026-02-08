@@ -54,23 +54,50 @@ export function toGraphData(workspace: {
 }
 
 /**
+ * Preview node with source tracking.
+ * Extends Entity with the source entity that revealed this node.
+ */
+export type PreviewNode = Entity & {
+  /** The source entity ID that revealed this preview node */
+  sourceEntityId: string;
+};
+
+/**
+ * Link between a preview entity and a graph entity.
+ * Used to render connections from preview nodes to existing graph entities.
+ */
+export interface PreviewLink {
+  /** Preview entity ID (source of the link) */
+  previewEntityId: string;
+  /** Graph entity ID (target of the link) */
+  graphEntityId: string;
+}
+
+/**
  * Grouped preview data for entities exceeding threshold.
  */
 export interface PreviewGroup {
   entityType: string;
-  entities: Entity[];
+  entities: PreviewNode[];
   count: number;
+  /** The source entity ID for this group */
+  sourceEntityId: string;
 }
 
 /**
  * Preview state passed from workspace to graph components.
+ * Supports multiple source entities for accumulated preview expansion.
  */
 export interface PreviewState {
   isActive: boolean;
-  sourceEntityId: string;
-  sourcePosition: { x: number; y: number };
+  /** All source entity IDs that have been expanded */
+  sourceEntityIds: string[];
+  /** Position of each source entity (keyed by entity ID) */
+  sourcePositions: Record<string, { x: number; y: number }>;
   /** Individual preview entities (when count <= threshold) */
-  nodes: Entity[];
+  nodes: PreviewNode[];
   /** Grouped by type (when count > threshold) */
   groups: PreviewGroup[];
+  /** Links from preview entities to existing graph entities */
+  links: PreviewLink[];
 }

@@ -152,6 +152,7 @@ const WorkspaceGraphComponent = ({
   const isDraggingSelectionRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; screenX: number; screenY: number } | null>(null);
   const justCompletedDragRef = useRef(false);
+  const justAltClickedRef = useRef(false);
 
   // Track previous node IDs to detect new nodes for smooth transitions
   const prevNodeIdsRef = useRef<Set<string>>(new Set());
@@ -166,9 +167,9 @@ const WorkspaceGraphComponent = ({
   const onPreviewGroupClickRef = useRef(onPreviewGroupClick);
   onPreviewGroupClickRef.current = onPreviewGroupClick;
 
-  // Cache calculated preview positions so they don't shift when other nodes are added
-  const previewPositionsCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-  const lastPreviewSourceIdRef = useRef<string | null>(null);
+  // Cache for preview items: position + initialized flag
+  // Once initialized (force layout run + animated), item won't be re-processed
+  const previewCacheRef = useRef<Map<string, { x: number; y: number; sourceX: number; sourceY: number; initialized: boolean }>>(new Map());
 
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
@@ -265,22 +266,31 @@ const WorkspaceGraphComponent = ({
     };
   }, [debouncedSave]);
 
-  // Observe container size
+  // Observe container size (debounced to avoid rebuilding graph during resize drag)
   useEffect(() => {
     if (!containerRef.current) return;
+
+    let resizeTimeout: NodeJS.Timeout | null = null;
 
     const resizeObserver = new ResizeObserver(entries => {
       const entry = entries[0];
       if (entry) {
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
-          setDimensions({ width, height });
+          // Debounce dimension updates to avoid rapid rebuilds during resize
+          if (resizeTimeout) clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => {
+            setDimensions({ width, height });
+          }, 100);
         }
       }
     });
 
     resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+    };
   }, []);
 
   // Initialize D3 graph when dimensions are available
@@ -658,9 +668,11 @@ const WorkspaceGraphComponent = ({
     // Alt+Click for preview - handle via mousedown to ensure we catch it before drag
     node.on('mousedown.preview', function (event: MouseEvent, d: WorkspaceGraphNode) {
       if (event.altKey && event.button === 0) {
-        console.log('[WorkspaceGraph] mousedown.preview detected', d.id);
         event.preventDefault();
         event.stopPropagation();
+        // Prevent canvas click from clearing selection
+        justAltClickedRef.current = true;
+        setTimeout(() => { justAltClickedRef.current = false; }, 100);
         if (onAltClickRef.current) {
           onAltClickRef.current(d.id, { x: d.x ?? 0, y: d.y ?? 0 });
         }
@@ -822,9 +834,9 @@ const WorkspaceGraphComponent = ({
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
-    // Click on empty canvas: clear selection (only if not completing a drag)
+    // Click on empty canvas: clear selection (only if not completing a drag or Alt+click)
     svg.on('click', function () {
-      if (justCompletedDragRef.current) return;
+      if (justCompletedDragRef.current || justAltClickedRef.current) return;
       onClearEntitySelection();
     });
 
@@ -867,24 +879,34 @@ const WorkspaceGraphComponent = ({
     const svg = d3.select(svgRef.current);
     const g = svg.select<SVGGElement>('g');
 
+    // If main graph group doesn't exist yet, skip (will re-run when it does)
+    if (g.empty()) return;
+
     // Remove any existing preview elements
     g.selectAll('.preview-layer').remove();
 
     if (!previewState?.isActive) {
-      // Clear position cache when preview is deactivated
-      previewPositionsCacheRef.current.clear();
-      lastPreviewSourceIdRef.current = null;
+      // Clear cache when preview is deactivated
+      previewCacheRef.current.clear();
       return;
     }
 
-    const { sourcePosition, sourceEntityId, nodes: previewNodes, groups: previewGroups } = previewState;
+    const { sourceEntityIds, sourcePositions, nodes: previewNodes, groups: previewGroups } = previewState;
     const items = previewNodes.length > 0 ? previewNodes : previewGroups;
     if (items.length === 0) return;
 
-    // Clear cache if source entity changed (different preview session)
-    if (lastPreviewSourceIdRef.current !== sourceEntityId) {
-      previewPositionsCacheRef.current.clear();
-      lastPreviewSourceIdRef.current = sourceEntityId;
+    const cache = previewCacheRef.current;
+
+    // Build set of current item IDs
+    const currentItemIds = new Set(
+      items.map(item => ('id' in item ? item.id : `group-${item.entityType}`))
+    );
+
+    // Clean up stale cache entries (items no longer in preview)
+    for (const cachedId of cache.keys()) {
+      if (!currentItemIds.has(cachedId)) {
+        cache.delete(cachedId);
+      }
     }
 
     // Create preview layer group
@@ -909,25 +931,30 @@ const WorkspaceGraphComponent = ({
       fy: n.y ?? 0
     }));
 
-    // Check which items need new positions calculated
-    const itemsNeedingPositions: { item: (typeof items)[0]; index: number }[] = [];
-    const cachedPositions = previewPositionsCacheRef.current;
+    // Check which items need initialization (force layout + animation)
+    // Items with initialized=true keep their cached position and don't animate
+    const uninitializedItems: { item: (typeof items)[0]; index: number; sourcePos: { x: number; y: number } }[] = [];
 
     items.forEach((item, index) => {
       const id = 'id' in item ? item.id : `group-${item.entityType}`;
-      if (!cachedPositions.has(id)) {
-        itemsNeedingPositions.push({ item, index });
+      const cached = cache.get(id);
+      if (!cached || !cached.initialized) {
+        const itemSourceId = item.sourceEntityId;
+        const sourcePos = sourcePositions[itemSourceId] ?? sourcePositions[sourceEntityIds[0]] ?? { x: 0, y: 0 };
+        uninitializedItems.push({ item, index, sourcePos });
       }
     });
 
-    // Only run force simulation for items that need new positions
-    if (itemsNeedingPositions.length > 0) {
+    console.log('[Preview] items:', items.length, 'uninitialized:', uninitializedItems.length, 'cache:', cache.size);
+
+    // Run force simulation only for uninitialized items
+    if (uninitializedItems.length > 0) {
       // Include already-positioned preview items as fixed nodes
       const fixedPreviewPositions: SimNode[] = [];
       items.forEach(item => {
         const id = 'id' in item ? item.id : `group-${item.entityType}`;
-        const cached = cachedPositions.get(id);
-        if (cached) {
+        const cached = cache.get(id);
+        if (cached?.initialized) {
           fixedPreviewPositions.push({
             id,
             x: cached.x,
@@ -938,93 +965,121 @@ const WorkspaceGraphComponent = ({
         }
       });
 
-      // Create simulation nodes for items needing positions
-      const previewSimNodes: SimNode[] = itemsNeedingPositions.map(({ item }, i) => {
+      // Create simulation nodes for uninitialized items
+      interface PreviewSimNode extends SimNode {
+        sourceX: number;
+        sourceY: number;
+      }
+      const previewSimNodes: PreviewSimNode[] = uninitializedItems.map(({ item, sourcePos }, i) => {
         const id = 'id' in item ? item.id : `group-${item.entityType}`;
         // Small offset to break symmetry
-        const angle = (i / itemsNeedingPositions.length) * Math.PI * 2;
+        const angle = (i / uninitializedItems.length) * Math.PI * 2;
         return {
           id,
           index: i,
-          x: sourcePosition.x + Math.cos(angle) * 5,
-          y: sourcePosition.y + Math.sin(angle) * 5
+          x: sourcePos.x + Math.cos(angle) * 5,
+          y: sourcePos.y + Math.sin(angle) * 5,
+          sourceX: sourcePos.x,
+          sourceY: sourcePos.y
         };
       });
 
       // Run force simulation to calculate positions
-      const allSimNodes: SimNode[] = [...existingNodePositions, ...fixedPreviewPositions, ...previewSimNodes];
+      interface SimNodeWithSource extends SimNode {
+        sourceX?: number;
+        sourceY?: number;
+      }
+      const allSimNodes: SimNodeWithSource[] = [...existingNodePositions, ...fixedPreviewPositions, ...previewSimNodes];
       const previewDistance = PREVIEW_CONFIG.previewDistance;
 
       const previewSimulation = d3
         .forceSimulation(allSimNodes)
-        .force('collision', d3.forceCollide<SimNode>().radius(GRAPH_CONFIG.nodeRadius * 1.5))
-        .force(
-          'radial',
-          d3.forceRadial<SimNode>(previewDistance, sourcePosition.x, sourcePosition.y).strength(node => (node.fx !== undefined ? 0 : 0.8))
-        )
+        .force('collision', d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 1.5))
+        .force('radial', d3.forceRadial<SimNodeWithSource>(previewDistance, 0, 0).strength((node: SimNodeWithSource) => {
+          if (node.fx !== undefined) return 0;
+          if (node.sourceX !== undefined && node.sourceY !== undefined) {
+            const dx = node.x - node.sourceX;
+            const dy = node.y - node.sourceY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const targetDist = previewDistance;
+            if (dist > 0) {
+              const force = (dist - targetDist) / dist * 0.1;
+              node.x -= dx * force;
+              node.y -= dy * force;
+            }
+          }
+          return 0;
+        }))
         .force(
           'charge',
-          d3.forceManyBody<SimNode>().strength(node => (node.fx !== undefined ? 0 : -100))
+          d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : -100))
         )
         .stop();
 
       // Run simulation synchronously
       for (let i = 0; i < 100; i++) previewSimulation.tick();
 
-      // Cache the new positions
-      previewSimNodes.forEach(n => {
-        cachedPositions.set(n.id, { x: n.x, y: n.y });
+      // Cache positions for uninitialized items (initialized=false, will be set true after animation)
+      previewSimNodes.forEach((n, i) => {
+        cache.set(n.id, {
+          x: n.x,
+          y: n.y,
+          sourceX: uninitializedItems[i].sourcePos.x,
+          sourceY: uninitializedItems[i].sourcePos.y,
+          initialized: false
+        });
       });
     }
 
-    // Track which items are new (need animation) vs already positioned
-    const newItemIds = new Set(itemsNeedingPositions.map(({ item }) => ('id' in item ? item.id : `group-${item.entityType}`)));
-
-    // Get final positions from cache (all items should now be cached)
-    const finalPositions = items.map(item => {
-      const id = 'id' in item ? item.id : `group-${item.entityType}`;
-      return cachedPositions.get(id) ?? { x: sourcePosition.x, y: sourcePosition.y };
-    });
-
+    // Build set of items that need animation (not yet initialized)
     // Render individual preview nodes
     if (previewNodes.length > 0) {
-      previewNodes.forEach((entity, index) => {
-        const finalPos = finalPositions[index];
-        const isNew = newItemIds.has(entity.id);
+      previewNodes.forEach((entity) => {
+        const id = entity.id;
+        const cached = cache.get(id);
+        if (!cached) return; // Should not happen, but guard
+
+        const finalPos = { x: cached.x, y: cached.y };
+        const srcPos = { x: cached.sourceX, y: cached.sourceY };
+        const needsAnimation = !cached.initialized;
+
         const nodeGroup = previewLayer.append('g').attr('class', 'preview-node');
 
         // Dashed connecting line to source
         const line = nodeGroup
           .append('line')
-          .attr('x1', sourcePosition.x)
-          .attr('y1', sourcePosition.y)
-          .attr('x2', isNew ? sourcePosition.x : finalPos.x)
-          .attr('y2', isNew ? sourcePosition.y : finalPos.y)
+          .attr('x1', srcPos.x)
+          .attr('y1', srcPos.y)
+          .attr('x2', needsAnimation ? srcPos.x : finalPos.x)
+          .attr('y2', needsAnimation ? srcPos.y : finalPos.y)
           .attr('stroke', PREVIEW_CONFIG.borderColor)
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
           .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
 
         // Animate line endpoint only for new nodes
-        if (isNew) {
+        if (needsAnimation) {
           line.transition().duration(300).ease(d3.easeCubicOut).attr('x2', finalPos.x).attr('y2', finalPos.y);
         }
 
         // Node group - new nodes start at source and animate, existing nodes appear at final position
         const node = nodeGroup
           .append('g')
-          .attr('transform', isNew ? `translate(${sourcePosition.x}, ${sourcePosition.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
+          .attr('transform', needsAnimation ? `translate(${srcPos.x}, ${srcPos.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
           .style('cursor', 'pointer')
-          .style('opacity', isNew ? 0 : 1);
+          .style('opacity', needsAnimation ? 0 : 1);
 
         // Animate node to final position only for new nodes
-        if (isNew) {
+        if (needsAnimation) {
           node
             .transition()
             .duration(300)
             .ease(d3.easeCubicOut)
             .attr('transform', `translate(${finalPos.x}, ${finalPos.y})`)
             .style('opacity', 1);
+
+          // Mark as initialized after animation starts
+          cache.set(id, { ...cached, initialized: true });
         }
 
         // Store final position for click handler
@@ -1103,8 +1158,30 @@ const WorkspaceGraphComponent = ({
             d3.select(this).select('rect').attr('stroke', PREVIEW_CONFIG.borderColor).attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
             d3.select(this).select('.add-button').attr('opacity', 0);
           })
+          .on('mousedown', function (event: MouseEvent) {
+            // Alt+Click expands this preview node's connections
+            // Handle on mousedown (not click) so Alt key state is reliable
+            if (event.altKey && event.button === 0) {
+              event.preventDefault();
+              event.stopPropagation();
+              // Prevent canvas click from clearing selection
+              justAltClickedRef.current = true;
+              setTimeout(() => { justAltClickedRef.current = false; }, 100);
+              // First add the preview node to the graph (so it doesn't disappear)
+              if (onPreviewAddEntityRef.current) {
+                onPreviewAddEntityRef.current(entity.id, pos);
+              }
+              // Then expand its connections
+              if (onAltClickRef.current) {
+                onAltClickRef.current(entity.id, pos);
+              }
+            }
+          })
           .on('click', function (event: MouseEvent) {
             event.stopPropagation();
+            // Skip if Alt was held (handled in mousedown)
+            if (event.altKey) return;
+            // Regular click adds entity to graph
             if (onPreviewAddEntityRef.current) {
               onPreviewAddEntityRef.current(entity.id, pos);
             }
@@ -1114,44 +1191,52 @@ const WorkspaceGraphComponent = ({
 
     // Render grouped preview nodes (circles)
     if (previewGroups.length > 0) {
-      previewGroups.forEach((group, index) => {
-        const finalPos = finalPositions[index];
+      previewGroups.forEach((group) => {
         const groupId = `group-${group.entityType}`;
-        const isNew = newItemIds.has(groupId);
+        const cached = cache.get(groupId);
+        if (!cached) return; // Should not happen, but guard
+
+        const finalPos = { x: cached.x, y: cached.y };
+        const srcPos = { x: cached.sourceX, y: cached.sourceY };
+        const needsAnimation = !cached.initialized;
+
         const groupEl = previewLayer.append('g').attr('class', 'preview-group');
 
         // Dashed connecting line to source
         const line = groupEl
           .append('line')
-          .attr('x1', sourcePosition.x)
-          .attr('y1', sourcePosition.y)
-          .attr('x2', isNew ? sourcePosition.x : finalPos.x)
-          .attr('y2', isNew ? sourcePosition.y : finalPos.y)
+          .attr('x1', srcPos.x)
+          .attr('y1', srcPos.y)
+          .attr('x2', needsAnimation ? srcPos.x : finalPos.x)
+          .attr('y2', needsAnimation ? srcPos.y : finalPos.y)
           .attr('stroke', PREVIEW_CONFIG.borderColor)
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash)
           .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
 
         // Animate line endpoint only for new nodes
-        if (isNew) {
+        if (needsAnimation) {
           line.transition().duration(300).ease(d3.easeCubicOut).attr('x2', finalPos.x).attr('y2', finalPos.y);
         }
 
         // Node group - new nodes start at source and animate, existing nodes appear at final position
         const node = groupEl
           .append('g')
-          .attr('transform', isNew ? `translate(${sourcePosition.x}, ${sourcePosition.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
+          .attr('transform', needsAnimation ? `translate(${srcPos.x}, ${srcPos.y})` : `translate(${finalPos.x}, ${finalPos.y})`)
           .style('cursor', 'pointer')
-          .style('opacity', isNew ? 0 : 1);
+          .style('opacity', needsAnimation ? 0 : 1);
 
         // Animate node to final position only for new nodes
-        if (isNew) {
+        if (needsAnimation) {
           node
             .transition()
             .duration(300)
             .ease(d3.easeCubicOut)
             .attr('transform', `translate(${finalPos.x}, ${finalPos.y})`)
             .style('opacity', 1);
+
+          // Mark as initialized after animation starts
+          cache.set(groupId, { ...cached, initialized: true });
         }
 
         // Store final position for click handler
@@ -1235,7 +1320,7 @@ const WorkspaceGraphComponent = ({
     return () => {
       g.selectAll('.preview-layer').remove();
     };
-  }, [previewState]);
+  }, [previewState, dimensions]); // Include dimensions so preview re-renders after resize
 
   // Zoom control handlers
   const handleZoomIn = () => {
