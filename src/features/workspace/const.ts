@@ -81,6 +81,29 @@ export const CULLING_CONFIG = {
   viewportPadding: 200
 } as const;
 
+/**
+ * Minimap configuration.
+ * Canvas-based overview showing all nodes as dots with a viewport rectangle.
+ */
+export const MINIMAP_CONFIG = {
+  /** Minimap canvas width in pixels */
+  width: 180,
+  /** Minimap canvas height in pixels */
+  height: 120,
+  /** Dot radius for each node in minimap */
+  dotRadius: 2,
+  /** Padding around node bounds in world coordinates */
+  padding: 50,
+  /** Viewport rectangle stroke color */
+  viewportStroke: 'rgba(59, 130, 246, 0.8)',
+  /** Viewport rectangle fill color */
+  viewportFill: 'rgba(59, 130, 246, 0.1)',
+  /** Minimap background color */
+  background: 'hsl(0, 0%, 90%)',
+  /** Minimap border color */
+  borderColor: 'rgba(0, 0, 0, 0.15)'
+} as const;
+
 export const PREVIEW_CONFIG = {
   /** Maximum entities to show as individual nodes before grouping */
   threshold: 50,

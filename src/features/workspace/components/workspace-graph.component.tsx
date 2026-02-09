@@ -13,7 +13,7 @@ import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG, PLACEMENT_CONFIG, CULLING_CONFIG } from '../const';
+import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG, PLACEMENT_CONFIG, CULLING_CONFIG, MINIMAP_CONFIG } from '../const';
 import { calculateEntityPositions } from '../utils/coordinate-placement.utils';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData, type PreviewState } from '../types';
 import type { Workspace } from '@/models/workspace.model';
@@ -134,13 +134,14 @@ const WorkspaceGraphComponent = ({
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const minimapCanvasRef = useRef<HTMLCanvasElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const simulationRef = useRef<d3.Simulation<WorkspaceGraphNode, WorkspaceGraphLink> | null>(null);
   const nodesRef = useRef<WorkspaceGraphNode[]>([]);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
-  // Counter to trigger re-renders for popup position updates on zoom/pan
-  const [, setRenderTrigger] = useState(0);
+  // Counter to trigger re-renders for popup position updates on zoom/pan and minimap
+  const [renderTrigger, setRenderTrigger] = useState(0);
 
   // Keep a ref of selectedEntityIds so D3 drag handlers always read the latest value
   const selectedEntityIdsRef = useRef<string[]>(selectedEntityIds);
@@ -1736,6 +1737,129 @@ const WorkspaceGraphComponent = ({
     };
   }, [previewState, dimensions]); // Include dimensions so preview re-renders after resize
 
+  // -----------------------------------------------------------------------
+  // Minimap: Canvas rendering + click-to-pan
+  // -----------------------------------------------------------------------
+
+  // Render minimap whenever nodes move or viewport changes
+  useEffect(() => {
+    const canvas = minimapCanvasRef.current;
+    if (!canvas || !dimensions) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const nodes = nodesRef.current;
+    const mw = MINIMAP_CONFIG.width;
+    const mh = MINIMAP_CONFIG.height;
+    const pad = MINIMAP_CONFIG.padding;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, mw, mh);
+    ctx.fillStyle = MINIMAP_CONFIG.background;
+    ctx.fillRect(0, 0, mw, mh);
+
+    if (nodes.length === 0) return;
+
+    // Compute node bounds
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    for (const n of nodes) {
+      const nx = n.x ?? 0;
+      const ny = n.y ?? 0;
+      if (nx < minX) minX = nx;
+      if (nx > maxX) maxX = nx;
+      if (ny < minY) minY = ny;
+      if (ny > maxY) maxY = ny;
+    }
+
+    // Add padding to bounds
+    minX -= pad;
+    minY -= pad;
+    maxX += pad;
+    maxY += pad;
+
+    const boundsW = maxX - minX || 1;
+    const boundsH = maxY - minY || 1;
+
+    // Scale to fit minimap
+    const scale = Math.min(mw / boundsW, mh / boundsH);
+    const offsetX = (mw - boundsW * scale) / 2;
+    const offsetY = (mh - boundsH * scale) / 2;
+
+    // Draw nodes as dots
+    ctx.fillStyle = GRAPH_CONFIG.nodeColor;
+    const r = MINIMAP_CONFIG.dotRadius;
+    for (const n of nodes) {
+      const x = ((n.x ?? 0) - minX) * scale + offsetX;
+      const y = ((n.y ?? 0) - minY) * scale + offsetY;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw viewport rectangle
+    const t = transformRef.current;
+    // Viewport corners in world coords
+    const vpMinX = -t.x / t.k;
+    const vpMinY = -t.y / t.k;
+    const vpMaxX = (dimensions.width - t.x) / t.k;
+    const vpMaxY = (dimensions.height - t.y) / t.k;
+
+    // Convert to minimap coords
+    const rx = (vpMinX - minX) * scale + offsetX;
+    const ry = (vpMinY - minY) * scale + offsetY;
+    const rw = (vpMaxX - vpMinX) * scale;
+    const rh = (vpMaxY - vpMinY) * scale;
+
+    ctx.fillStyle = MINIMAP_CONFIG.viewportFill;
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeStyle = MINIMAP_CONFIG.viewportStroke;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(rx, ry, rw, rh);
+
+    // Store bounds on canvas dataset for click-to-pan calculations
+    canvas.dataset.boundsMinX = String(minX);
+    canvas.dataset.boundsMinY = String(minY);
+    canvas.dataset.boundsScale = String(scale);
+    canvas.dataset.boundsOffsetX = String(offsetX);
+    canvas.dataset.boundsOffsetY = String(offsetY);
+  }, [dimensions, renderTrigger]);
+
+  // Click/drag on minimap to pan the main graph
+  const handleMinimapInteraction = useCallback(
+    (event: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = minimapCanvasRef.current;
+      if (!canvas || !svgRef.current || !zoomRef.current || !dimensions) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mx = event.clientX - rect.left;
+      const my = event.clientY - rect.top;
+
+      // Read stored bounds from canvas dataset
+      const boundsMinX = Number(canvas.dataset.boundsMinX ?? 0);
+      const boundsMinY = Number(canvas.dataset.boundsMinY ?? 0);
+      const scale = Number(canvas.dataset.boundsScale ?? 1);
+      const offsetX = Number(canvas.dataset.boundsOffsetX ?? 0);
+      const offsetY = Number(canvas.dataset.boundsOffsetY ?? 0);
+
+      // Convert minimap pixel to world coordinate
+      const worldX = (mx - offsetX) / scale + boundsMinX;
+      const worldY = (my - offsetY) / scale + boundsMinY;
+
+      // Pan so this world point is at the center of the viewport
+      const t = transformRef.current;
+      const newX = dimensions.width / 2 - worldX * t.k;
+      const newY = dimensions.height / 2 - worldY * t.k;
+
+      const newTransform = d3.zoomIdentity.translate(newX, newY).scale(t.k);
+      d3.select(svgRef.current).transition().duration(200).call(zoomRef.current.transform, newTransform);
+    },
+    [dimensions]
+  );
+
   // Zoom control handlers
   const handleZoomIn = () => {
     if (!svgRef.current || !zoomRef.current) return;
@@ -1829,6 +1953,29 @@ const WorkspaceGraphComponent = ({
           />
         );
       })}
+
+      {/* Minimap - upper right */}
+      <canvas
+        ref={minimapCanvasRef}
+        width={MINIMAP_CONFIG.width}
+        height={MINIMAP_CONFIG.height}
+        className="absolute top-4 right-4 cursor-crosshair rounded"
+        style={{ border: `1px solid ${MINIMAP_CONFIG.borderColor}` }}
+        onClick={handleMinimapInteraction}
+        onMouseDown={e => {
+          if (e.button !== 0) return;
+          handleMinimapInteraction(e);
+          const onMouseMove = (moveEvent: MouseEvent) => {
+            handleMinimapInteraction(moveEvent as unknown as React.MouseEvent<HTMLCanvasElement>);
+          };
+          const onMouseUp = () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+          };
+          window.addEventListener('mousemove', onMouseMove);
+          window.addEventListener('mouseup', onMouseUp);
+        }}
+      />
 
       {/* Control buttons - lower right */}
       <div className="absolute right-4 bottom-4 flex flex-col gap-2">
