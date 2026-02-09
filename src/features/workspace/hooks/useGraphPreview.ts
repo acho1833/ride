@@ -176,10 +176,8 @@ export function useGraphPreview({ entitiesInGraph, onAddEntity }: UseGraphPrevie
     setSources(prev => {
       const next = new Map(prev);
       if (next.has(entityId)) {
-        // Toggle off - remove this source
         next.delete(entityId);
       } else {
-        // Add new source with its position
         next.set(entityId, position);
       }
       return next;

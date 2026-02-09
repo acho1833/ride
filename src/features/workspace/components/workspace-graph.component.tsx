@@ -13,7 +13,7 @@ import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG, PLACEMENT_CONFIG } from '../const';
+import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG, PLACEMENT_CONFIG, CULLING_CONFIG } from '../const';
 import { calculateEntityPositions } from '../utils/coordinate-placement.utils';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData, type PreviewState } from '../types';
 import type { Workspace } from '@/models/workspace.model';
@@ -347,6 +347,7 @@ const WorkspaceGraphComponent = ({
         debouncedSave();
         // Force re-render to update popup screen positions
         setRenderTrigger(n => n + 1);
+        scheduleViewportCulling();
       });
 
     svg.call(zoom);
@@ -418,6 +419,47 @@ const WorkspaceGraphComponent = ({
       .attr('font-size', '12px')
       .attr('pointer-events', 'none');
 
+    // Compute relationship counts per node (for culling badges)
+    const nodeRelCounts = new Map<string, number>();
+    for (const l of links) {
+      const srcId = typeof l.source === 'string' ? l.source : l.source.id;
+      const tgtId = typeof l.target === 'string' ? l.target : l.target.id;
+      nodeRelCounts.set(srcId, (nodeRelCounts.get(srcId) ?? 0) + 1);
+      nodeRelCounts.set(tgtId, (nodeRelCounts.get(tgtId) ?? 0) + 1);
+    }
+
+    // Append culling badge to each node (hidden by default, shown when links are culled)
+    node
+      .append('g')
+      .attr('class', 'cull-badge')
+      .attr('display', 'none')
+      .each(function () {
+        const badge = d3.select(this);
+        badge
+          .append('circle')
+          .attr('cx', GRAPH_CONFIG.nodeRadius)
+          .attr('cy', -GRAPH_CONFIG.nodeRadius)
+          .attr('r', 7)
+          .attr('fill', GRAPH_CONFIG.nodeColor)
+          .attr('stroke', 'white')
+          .attr('stroke-width', 1.5);
+        badge
+          .append('text')
+          .attr('x', GRAPH_CONFIG.nodeRadius)
+          .attr('y', -GRAPH_CONFIG.nodeRadius)
+          .attr('text-anchor', 'middle')
+          .attr('dy', '3')
+          .attr('fill', 'white')
+          .attr('font-size', '9px')
+          .attr('font-weight', 'bold');
+      });
+
+    // Set badge text (total relationship count)
+    node.select('.cull-badge text').text(d => {
+      const count = nodeRelCounts.get(d.id) ?? 0;
+      return count > 1000 ? '1k+' : String(count);
+    });
+
     // Create selection rectangle (initially hidden, rendered on top of nodes)
     const selectionRect = g
       .append('rect')
@@ -428,6 +470,157 @@ const WorkspaceGraphComponent = ({
       .attr('stroke-dasharray', SELECTION_CONFIG.rectStrokeDash)
       .attr('pointer-events', 'none')
       .attr('visibility', 'hidden');
+
+    // --- Viewport culling (quadtree + diff-based) ---
+    const cullingEnabled = nodes.length >= CULLING_CONFIG.nodeThreshold;
+    let cullingRafId: number | null = null;
+
+    // Build node element map early for culling (also used later for drag)
+    const cullingNodeElements = new Map<string, SVGGElement>();
+    node.each(function (d) {
+      cullingNodeElements.set(d.id, this);
+    });
+
+    // Spatial index for O(log n) viewport queries
+    const quadtree = d3
+      .quadtree<WorkspaceGraphNode>()
+      .x(d => d.x ?? 0)
+      .y(d => d.y ?? 0)
+      .addAll(nodes);
+
+    // Track previous visible sets for diff-based updates
+    // Initialize prevVisibleNodeIds with ALL nodes so the first diff pass
+    // correctly hides off-screen nodes (treats them as "newly hidden")
+    const prevVisibleNodeIds = new Set<string>(nodes.map(n => n.id));
+    const visibleNodeIds = new Set<string>();
+
+    const updateViewportCulling = () => {
+      if (!cullingEnabled) return;
+
+      const t = transformRef.current;
+      const pad = CULLING_CONFIG.viewportPadding;
+      const minX = -t.x / t.k - pad;
+      const minY = -t.y / t.k - pad;
+      const maxX = (width - t.x) / t.k + pad;
+      const maxY = (height - t.y) / t.k + pad;
+
+      // Query quadtree for visible nodes — O(log n + visible)
+      visibleNodeIds.clear();
+      quadtree.visit((quadNode, x0, y0, x1, y1) => {
+        // If this quadrant doesn't overlap viewport, skip entire subtree
+        if (x0 > maxX || x1 < minX || y0 > maxY || y1 < minY) return true;
+        // Check leaf nodes
+        if (!quadNode.length) {
+          let leaf: d3.QuadtreeLeaf<WorkspaceGraphNode> | undefined = quadNode as d3.QuadtreeLeaf<WorkspaceGraphNode>;
+          do {
+            const d = leaf.data;
+            const x = d.x ?? 0;
+            const y = d.y ?? 0;
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+              visibleNodeIds.add(d.id);
+            }
+          } while ((leaf = (leaf as any).next));
+        }
+        return false;
+      });
+
+      // Diff: only touch DOM elements that changed state
+      // Newly visible nodes
+      for (const id of visibleNodeIds) {
+        if (!prevVisibleNodeIds.has(id)) {
+          cullingNodeElements.get(id)?.setAttribute('display', '');
+        }
+      }
+      // Newly hidden nodes
+      for (const id of prevVisibleNodeIds) {
+        if (!visibleNodeIds.has(id)) {
+          cullingNodeElements.get(id)?.setAttribute('display', 'none');
+        }
+      }
+
+      // Update links only for nodes that changed visibility
+      const changedNodeIds = new Set<string>();
+      for (const id of visibleNodeIds) {
+        if (!prevVisibleNodeIds.has(id)) changedNodeIds.add(id);
+      }
+      for (const id of prevVisibleNodeIds) {
+        if (!visibleNodeIds.has(id)) changedNodeIds.add(id);
+      }
+
+      for (const nodeId of changedNodeIds) {
+        const connectedLinks = nodeLinkMap.get(nodeId) ?? [];
+        for (const linkEl of connectedLinks) {
+          const linkData = d3.select<SVGLineElement, WorkspaceGraphLink>(linkEl).datum();
+          const srcId = typeof linkData.source === 'string' ? linkData.source : (linkData.source as WorkspaceGraphNode).id;
+          const tgtId = typeof linkData.target === 'string' ? linkData.target : (linkData.target as WorkspaceGraphNode).id;
+          linkEl.setAttribute('display', visibleNodeIds.has(srcId) && visibleNodeIds.has(tgtId) ? '' : 'none');
+        }
+      }
+
+      // Update badges only for nodes that changed visibility
+      for (const nodeId of changedNodeIds) {
+        if (!visibleNodeIds.has(nodeId)) continue; // Hidden nodes don't need badge updates
+        const totalRels = nodeRelCounts.get(nodeId) ?? 0;
+        if (totalRels === 0) continue;
+
+        const el = cullingNodeElements.get(nodeId);
+        if (!el) continue;
+
+        const connectedLinks = nodeLinkMap.get(nodeId) ?? [];
+        let visibleLinkCount = 0;
+        for (const linkEl of connectedLinks) {
+          if (linkEl.getAttribute('display') !== 'none') visibleLinkCount++;
+        }
+
+        d3.select(el)
+          .select('.cull-badge')
+          .attr('display', visibleLinkCount < totalRels ? '' : 'none');
+      }
+
+      // Also update badges for visible nodes whose neighbors changed
+      for (const nodeId of changedNodeIds) {
+        const connectedLinks = nodeLinkMap.get(nodeId) ?? [];
+        for (const linkEl of connectedLinks) {
+          const linkData = d3.select<SVGLineElement, WorkspaceGraphLink>(linkEl).datum();
+          const srcId = typeof linkData.source === 'string' ? linkData.source : (linkData.source as WorkspaceGraphNode).id;
+          const tgtId = typeof linkData.target === 'string' ? linkData.target : (linkData.target as WorkspaceGraphNode).id;
+          const neighborId = srcId === nodeId ? tgtId : srcId;
+
+          if (visibleNodeIds.has(neighborId) && !changedNodeIds.has(neighborId)) {
+            const totalRels = nodeRelCounts.get(neighborId) ?? 0;
+            if (totalRels === 0) continue;
+            const el = cullingNodeElements.get(neighborId);
+            if (!el) continue;
+            const neighborLinks = nodeLinkMap.get(neighborId) ?? [];
+            let visibleLinkCount = 0;
+            for (const nl of neighborLinks) {
+              if (nl.getAttribute('display') !== 'none') visibleLinkCount++;
+            }
+            d3.select(el)
+              .select('.cull-badge')
+              .attr('display', visibleLinkCount < totalRels ? '' : 'none');
+          }
+        }
+      }
+
+      // Swap: save current as previous for next frame
+      prevVisibleNodeIds.clear();
+      for (const id of visibleNodeIds) prevVisibleNodeIds.add(id);
+    };
+
+    // Rebuild quadtree after node positions change
+    const rebuildQuadtree = () => {
+      quadtree.removeAll(nodes);
+      quadtree.addAll(nodes);
+    };
+
+    const scheduleViewportCulling = () => {
+      if (cullingRafId !== null) return;
+      cullingRafId = requestAnimationFrame(() => {
+        cullingRafId = null;
+        updateViewportCulling();
+      });
+    };
 
     // Setup force simulation
     const simulation = d3
@@ -478,6 +671,9 @@ const WorkspaceGraphComponent = ({
 
     node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
 
+    // Initial viewport culling pass
+    updateViewportCulling();
+
     // Detect new nodes for smooth position transitions
     const currentNodeIds = new Set(nodes.map(n => n.id));
     const newNodeIds = nodes.filter(n => !prevNodeIdsRef.current.has(n.id)).map(n => n.id);
@@ -520,6 +716,8 @@ const WorkspaceGraphComponent = ({
           .attr('y2', d => (d.target as WorkspaceGraphNode).y ?? 0);
 
         debouncedSave();
+        rebuildQuadtree();
+        updateViewportCulling();
       } else {
         // Small batch: use D3 force layout animation
         const nodeMap = new Map(nodes.map(n => [n.id, n]));
@@ -596,6 +794,8 @@ const WorkspaceGraphComponent = ({
               n.fy = null;
             }
             debouncedSave();
+            rebuildQuadtree();
+            updateViewportCulling();
           });
       }
     }
@@ -614,11 +814,8 @@ const WorkspaceGraphComponent = ({
       node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
-    // Build node ID → <g> element map for group drag updates
-    const nodeElementMap = new Map<string, SVGGElement>();
-    node.each(function (d) {
-      nodeElementMap.set(d.id, this);
-    });
+    // Reuse cullingNodeElements as nodeElementMap for group drag updates
+    const nodeElementMap = cullingNodeElements;
 
     // Helper: update connected links for a given node
     const updateLinksForNode = (nodeId: string) => {
@@ -687,6 +884,8 @@ const WorkspaceGraphComponent = ({
       .on('end', function () {
         this.setAttribute('cursor', 'grab');
         debouncedSave();
+        rebuildQuadtree();
+        updateViewportCulling();
       });
 
     node.call(drag);
@@ -696,7 +895,6 @@ const WorkspaceGraphComponent = ({
       if ((event.shiftKey || event.altKey) && event.button === 0) {
         event.preventDefault();
         event.stopPropagation();
-        // Prevent canvas click from clearing selection
         justAltClickedRef.current = true;
         setTimeout(() => {
           justAltClickedRef.current = false;
@@ -877,6 +1075,7 @@ const WorkspaceGraphComponent = ({
     // Cleanup - note: we don't clear popups here because dimension changes shouldn't close them
     return () => {
       simulation.stop();
+      if (cullingRafId !== null) cancelAnimationFrame(cullingRafId);
       svgElement.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -896,8 +1095,13 @@ const WorkspaceGraphComponent = ({
   // Update node colors when selection changes (driven by prop from parent/store)
   useEffect(() => {
     if (!svgRef.current) return;
-    d3.select(svgRef.current)
+    const svg = d3.select(svgRef.current);
+    svg
       .selectAll<SVGRectElement, WorkspaceGraphNode>('.nodes g rect')
+      .attr('fill', d => (selectedEntityIds.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor));
+    // Update badge circle color to match selected state
+    svg
+      .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g .cull-badge circle')
       .attr('fill', d => (selectedEntityIds.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor));
   }, [selectedEntityIds]);
 

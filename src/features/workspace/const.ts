@@ -70,6 +70,17 @@ export const PLACEMENT_CONFIG = {
   forceLayoutThreshold: 500
 } as const;
 
+/**
+ * Viewport culling configuration.
+ * Hides off-screen nodes/links via display:none to reduce paint cost.
+ */
+export const CULLING_CONFIG = {
+  /** Minimum node count to activate viewport culling */
+  nodeThreshold: 500,
+  /** Extra padding around viewport in world coordinates (prevents pop-in) */
+  viewportPadding: 200
+} as const;
+
 export const PREVIEW_CONFIG = {
   /** Maximum entities to show as individual nodes before grouping */
   threshold: 50,
