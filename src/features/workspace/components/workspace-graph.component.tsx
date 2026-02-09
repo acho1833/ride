@@ -13,7 +13,8 @@ import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG } from '../const';
+import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG, PLACEMENT_CONFIG } from '../const';
+import { calculateEntityPositions } from '../utils/coordinate-placement.utils';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData, type PreviewState } from '../types';
 import type { Workspace } from '@/models/workspace.model';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
@@ -158,11 +159,9 @@ const WorkspaceGraphComponent = ({
   const prevNodeIdsRef = useRef<Set<string>>(new Set());
 
   // Preview force simulation ref for cleanup
-  const previewSimulationRef = useRef<d3.Simulation<d3.SimulationNodeDatum, undefined> | null>(null);
+  const previewSimulationRef = useRef<d3.Simulation<any, undefined> | null>(null);
   // Track animating items so cleanup can cache their positions before stopping
-  const previewAnimatingRef = useRef<
-    Map<string, { x: number; y: number; sourcePos: { x: number; y: number } }>
-  >(new Map());
+  const previewAnimatingRef = useRef<Map<string, { x: number; y: number; sourcePos: { x: number; y: number } }>>(new Map());
 
   // Preview mode refs - keep refs so D3 handlers can access latest values
   const previewStateRef = useRef<PreviewState | null>(null);
@@ -485,100 +484,120 @@ const WorkspaceGraphComponent = ({
     const hasNewNodes = newNodeIds.length > 0 && prevNodeIdsRef.current.size > 0;
 
     if (hasNewNodes) {
-      // Build a map of node ID to node for quick lookups
-      const nodeMap = new Map(nodes.map(n => [n.id, n]));
+      const usePlacementAlgorithm = newNodeIds.length >= PLACEMENT_CONFIG.forceLayoutThreshold;
 
-      // Find a related existing node for a given new node ID
-      const findRelatedExistingNode = (newNodeId: string): WorkspaceGraphNode | undefined => {
-        for (const link of links) {
-          const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-          const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+      if (usePlacementAlgorithm) {
+        // Large batch: use synchronous placement algorithm (no force simulation)
+        const newNodesNeedingPositions = nodes.filter(n => newNodeIds.includes(n.id) && !workspace.viewState?.entityPositions[n.id]);
 
-          // Check if this link connects the new node to an existing node
-          if (sourceId === newNodeId && prevNodeIdsRef.current.has(targetId)) {
-            return nodeMap.get(targetId);
-          }
-          if (targetId === newNodeId && prevNodeIdsRef.current.has(sourceId)) {
-            return nodeMap.get(sourceId);
+        if (newNodesNeedingPositions.length > 0) {
+          const existingEntities = nodes
+            .filter(n => prevNodeIdsRef.current.has(n.id) && n.x !== undefined && n.y !== undefined)
+            .map(n => ({ id: n.id, x: n.x!, y: n.y! }));
+
+          const { positions } = calculateEntityPositions({
+            existingEntities,
+            newEntities: newNodesNeedingPositions.map(n => ({ id: n.id, type: n.type })),
+            relationships: workspace.relationshipList,
+            nodeRadius: GRAPH_CONFIG.nodeRadius
+          });
+
+          for (const n of newNodesNeedingPositions) {
+            const pos = positions[n.id];
+            if (pos) {
+              n.x = pos.x;
+              n.y = pos.y;
+            }
           }
         }
-        return undefined;
-      };
 
-      // Fallback: any existing node or center
-      const fallbackNode = nodes.find(n => prevNodeIdsRef.current.has(n.id));
-      const fallbackX = fallbackNode?.x ?? width / 2;
-      const fallbackY = fallbackNode?.y ?? height / 2;
+        // Update DOM
+        node.filter(d => newNodeIds.includes(d.id)).attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+        link
+          .attr('x1', d => (d.source as WorkspaceGraphNode).x ?? 0)
+          .attr('y1', d => (d.source as WorkspaceGraphNode).y ?? 0)
+          .attr('x2', d => (d.target as WorkspaceGraphNode).x ?? 0)
+          .attr('y2', d => (d.target as WorkspaceGraphNode).y ?? 0);
 
-      // Position each new node at its related existing node (or fallback)
-      // Skip nodes that already have a saved position (e.g., from drag/drop)
-      for (const n of nodes) {
-        if (newNodeIds.includes(n.id)) {
+        debouncedSave();
+      } else {
+        // Small batch: use D3 force layout animation
+        const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+        const findRelatedExistingNode = (newNodeId: string): WorkspaceGraphNode | undefined => {
+          for (const l of links) {
+            const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
+            const targetId = typeof l.target === 'string' ? l.target : l.target.id;
+            if (sourceId === newNodeId && prevNodeIdsRef.current.has(targetId)) return nodeMap.get(targetId);
+            if (targetId === newNodeId && prevNodeIdsRef.current.has(sourceId)) return nodeMap.get(sourceId);
+          }
+          return undefined;
+        };
+
+        const fallbackNode = nodes.find(n => prevNodeIdsRef.current.has(n.id));
+        const fallbackX = fallbackNode?.x ?? width / 2;
+        const fallbackY = fallbackNode?.y ?? height / 2;
+
+        for (const n of nodes) {
+          if (newNodeIds.includes(n.id)) {
+            const savedPos = workspace.viewState?.entityPositions[n.id];
+            if (!savedPos) {
+              const relatedNode = findRelatedExistingNode(n.id);
+              n.x = relatedNode?.x ?? fallbackX;
+              n.y = relatedNode?.y ?? fallbackY;
+            }
+          }
+        }
+
+        node.filter(d => newNodeIds.includes(d.id)).attr('transform', d => `translate(${d.x},${d.y})`);
+
+        for (const n of nodes) {
           const savedPos = workspace.viewState?.entityPositions[n.id];
-          if (!savedPos) {
-            const relatedNode = findRelatedExistingNode(n.id);
-            n.x = relatedNode?.x ?? fallbackX;
-            n.y = relatedNode?.y ?? fallbackY;
+          if (prevNodeIdsRef.current.has(n.id) || savedPos) {
+            n.fx = n.x;
+            n.fy = n.y;
           }
         }
-      }
 
-      // Update DOM to reflect spawn positions
-      node.filter(d => newNodeIds.includes(d.id)).attr('transform', d => `translate(${d.x},${d.y})`);
+        const expandSim = d3
+          .forceSimulation<WorkspaceGraphNode>(nodes)
+          .force(
+            'link',
+            d3
+              .forceLink<WorkspaceGraphNode, WorkspaceGraphLink>(links)
+              .id(d => d.id)
+              .distance(GRAPH_CONFIG.linkDistance)
+              .strength(0.5)
+          )
+          .force('collide', d3.forceCollide(GRAPH_CONFIG.nodeRadius * 2))
+          .force('charge', d3.forceManyBody().strength(-50))
+          .alpha(0.4)
+          .alphaDecay(0.06)
+          .on('tick', () => {
+            link
+              .attr('x1', d => (d.source as WorkspaceGraphNode).x ?? 0)
+              .attr('y1', d => (d.source as WorkspaceGraphNode).y ?? 0)
+              .attr('x2', d => (d.target as WorkspaceGraphNode).x ?? 0)
+              .attr('y2', d => (d.target as WorkspaceGraphNode).y ?? 0);
+            node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
 
-      // Fix existing nodes and nodes with saved positions in place
-      // Only new nodes without saved positions should move during simulation
-      for (const n of nodes) {
-        const savedPos = workspace.viewState?.entityPositions[n.id];
-        if (prevNodeIdsRef.current.has(n.id) || savedPos) {
-          n.fx = n.x;
-          n.fy = n.y;
-        }
-      }
-
-      // Create a gentle force simulation just for spreading new nodes
-      const expandSim = d3
-        .forceSimulation<WorkspaceGraphNode>(nodes)
-        .force(
-          'link',
-          d3
-            .forceLink<WorkspaceGraphNode, WorkspaceGraphLink>(links)
-            .id(d => d.id)
-            .distance(GRAPH_CONFIG.linkDistance)
-            .strength(0.5)
-        )
-        .force('collide', d3.forceCollide(GRAPH_CONFIG.nodeRadius * 2))
-        .force('charge', d3.forceManyBody().strength(-50))
-        .alpha(0.4)
-        .alphaDecay(0.06)
-        .on('tick', () => {
-          // Update positions during animation
-          link
-            .attr('x1', d => (d.source as WorkspaceGraphNode).x ?? 0)
-            .attr('y1', d => (d.source as WorkspaceGraphNode).y ?? 0)
-            .attr('x2', d => (d.target as WorkspaceGraphNode).x ?? 0)
-            .attr('y2', d => (d.target as WorkspaceGraphNode).y ?? 0);
-          node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
-
-          // Stop early when nearly stabilized
-          if (expandSim.alpha() < 0.002) {
-            expandSim.stop();
-            // Unfix existing nodes and save
+            if (expandSim.alpha() < 0.002) {
+              expandSim.stop();
+              for (const n of nodes) {
+                n.fx = null;
+                n.fy = null;
+              }
+              debouncedSave();
+            }
+          })
+          .on('end', () => {
             for (const n of nodes) {
               n.fx = null;
               n.fy = null;
             }
             debouncedSave();
-          }
-        })
-        .on('end', () => {
-          // Unfix existing nodes and save
-          for (const n of nodes) {
-            n.fx = null;
-            n.fy = null;
-          }
-          debouncedSave();
-        });
+          });
+      }
     }
 
     // Update previous node IDs for next render
@@ -1263,7 +1282,14 @@ const WorkspaceGraphComponent = ({
           const itemSourceId = group.sourceEntityId;
           const srcPos = sourcePositions[itemSourceId] ?? sourcePositions[sourceEntityIds[0]] ?? { x: 0, y: 0 };
           const { node, line } = createPreviewGroupDOM(group, previewLayer, srcPos, srcPos, true);
-          animatingItems.push({ simNodeId: groupId, sourceId: itemSourceId, nodeEl: node, lineEl: line, sourcePos: srcPos, pos: { ...srcPos } });
+          animatingItems.push({
+            simNodeId: groupId,
+            sourceId: itemSourceId,
+            nodeEl: node,
+            lineEl: line,
+            sourcePos: srcPos,
+            pos: { ...srcPos }
+          });
         }
       });
     }
@@ -1300,8 +1326,7 @@ const WorkspaceGraphComponent = ({
       }
       // Scale preview distance gently with sqrt so nodes stay near source
       // Collision force will push overflow into concentric rings naturally
-      const scaledPreviewDistance =
-        PREVIEW_CONFIG.previewDistance * Math.max(1, Math.sqrt(animatingItems.length / 8));
+      const scaledPreviewDistance = PREVIEW_CONFIG.previewDistance * Math.max(1, Math.sqrt(animatingItems.length / 8));
       const initialOffset = scaledPreviewDistance * 0.3;
       const previewSimNodes: PreviewSimNode[] = animatingItems.map(({ simNodeId, sourceId, sourcePos }, i) => {
         const angle = (i / animatingItems.length) * Math.PI * 2;
@@ -1327,7 +1352,12 @@ const WorkspaceGraphComponent = ({
         sourceY?: number;
         sourceId?: string;
       }
-      const allSimNodes: SimNodeWithSource[] = [...existingNodePositions, ...fixedSourcePositions, ...fixedPreviewPositions, ...previewSimNodes];
+      const allSimNodes: SimNodeWithSource[] = [
+        ...existingNodePositions,
+        ...fixedSourcePositions,
+        ...fixedPreviewPositions,
+        ...previewSimNodes
+      ];
       const previewDistance = scaledPreviewDistance;
 
       // Create links from each preview node to its source for d3.forceLink
@@ -1338,10 +1368,7 @@ const WorkspaceGraphComponent = ({
 
       // Populate animating ref so cleanup can cache positions if interrupted
       previewAnimatingRef.current = new Map(
-        previewSimNodes.map((simNode, i) => [
-          simNode.id,
-          { x: simNode.x, y: simNode.y, sourcePos: animatingItems[i].sourcePos }
-        ])
+        previewSimNodes.map((simNode, i) => [simNode.id, { x: simNode.x, y: simNode.y, sourcePos: animatingItems[i].sourcePos }])
       );
 
       // Track previous positions to detect stability
@@ -1384,7 +1411,11 @@ const WorkspaceGraphComponent = ({
         .force('link', linkForce)
         .force(
           'collision',
-          d3.forceCollide<SimNodeWithSource>().radius(GRAPH_CONFIG.nodeRadius * 2.5).strength(0.8).iterations(2)
+          d3
+            .forceCollide<SimNodeWithSource>()
+            .radius(GRAPH_CONFIG.nodeRadius * 2.5)
+            .strength(0.8)
+            .iterations(2)
         )
         .force(
           'charge',
@@ -1434,11 +1465,7 @@ const WorkspaceGraphComponent = ({
           }
 
           // Stop early if nodes stopped moving AND links are near target distance AND distance fully grown
-          if (
-            maxMovement < STABILITY_THRESHOLD &&
-            maxDistanceError < GRAPH_CONFIG.nodeRadius &&
-            currentLinkDistance >= MAX_LINK_DISTANCE
-          ) {
+          if (maxMovement < STABILITY_THRESHOLD && maxDistanceError < GRAPH_CONFIG.nodeRadius && currentLinkDistance >= MAX_LINK_DISTANCE) {
             stableTicks++;
             if (stableTicks >= STABLE_TICKS_REQUIRED) {
               cacheAndStop(simulation);

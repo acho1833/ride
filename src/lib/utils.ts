@@ -47,7 +47,7 @@ export function getEntityIconClass(type: string): string {
  */
 export function isEditableElement(event: KeyboardEvent): boolean {
   const target = event.target as HTMLElement | null;
-  if (!target) return false;
+  if (!target?.tagName) return false;
 
   const tagName = target.tagName.toLowerCase();
   return tagName === 'input' || tagName === 'textarea' || target.isContentEditable;

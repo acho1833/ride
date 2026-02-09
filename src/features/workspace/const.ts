@@ -51,6 +51,25 @@ export const SELECTION_CONFIG = {
 /**
  * Preview mode configuration.
  */
+/**
+ * Smart coordinate placement configuration.
+ * Used for placing large numbers of entities without force simulation.
+ */
+export const PLACEMENT_CONFIG = {
+  /** Cell size multiplier applied to nodeRadius for occupancy grid */
+  cellSizeMultiplier: 5,
+  /** Maximum time for placement algorithm (ms) */
+  maxTimeMs: 500,
+  /** Check timeout every N entities */
+  timeoutCheckInterval: 50,
+  /** Gap between clusters (in grid cells) */
+  clusterPadding: 1,
+  /** Max spiral iterations per entity before giving up */
+  maxSpiralIterations: 300,
+  /** Min new entities to use placement algorithm instead of force layout */
+  forceLayoutThreshold: 500
+} as const;
+
 export const PREVIEW_CONFIG = {
   /** Maximum entities to show as individual nodes before grouping */
   threshold: 50,
