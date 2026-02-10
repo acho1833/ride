@@ -22,6 +22,8 @@ import {
   useHiddenFilterCount
 } from '@/stores/workspace-graph/workspace-graph.selector';
 import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
+import { useTypeTabActions } from '@/stores/type-tabs/type-tabs.selector';
+import type { DashboardData } from '@/stores/type-tabs/type-tabs.store';
 import { useHighlightedEntityIds, usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
 import { toast } from 'sonner';
 import WorkspaceGraphComponent from './workspace-graph.component';
@@ -67,7 +69,8 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const isFilterPanelOpen = useIsFilterPanelOpen(workspaceId);
   const hiddenFilterCount = useHiddenFilterCount(workspaceId);
   const isEditorGroupFocused = useIsEditorGroupFocused(groupId);
-  const { setFocusedPanel } = useUiActions();
+  const { setFocusedPanel, toggleToolbar } = useUiActions();
+  const { openChartTab } = useTypeTabActions();
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -318,6 +321,17 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     setFilterPanelOpen(workspaceId, !isFilterPanelOpen);
   }, [workspaceId, isFilterPanelOpen, setFilterPanelOpen]);
 
+  const handleOpenDashboard = useCallback(() => {
+    const tab = {
+      id: `dashboard-${workspaceId}`,
+      name: `Dashboard: ${workspace?.name ?? 'Workspace'}`,
+      type: 'DASHBOARD' as const,
+      data: { workspaceId, workspaceName: workspace?.name ?? 'Workspace' } satisfies DashboardData
+    };
+    openChartTab(tab);
+    toggleToolbar('bottom', 'CHARTS');
+  }, [workspaceId, workspace?.name, openChartTab, toggleToolbar]);
+
   const handleContextMenuClose = useCallback(() => {
     setContextMenuPosition(null);
   }, []);
@@ -411,6 +425,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         hiddenCount={hiddenFilterCount}
         isFilterPanelOpen={isFilterPanelOpen}
         onToggleFilterPanel={handleToggleFilterPanel}
+        onOpenDashboard={handleOpenDashboard}
       />
       <div className="relative min-h-0 flex-1">
         <WorkspaceGraphComponent
