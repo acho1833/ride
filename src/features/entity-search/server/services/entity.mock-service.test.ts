@@ -182,7 +182,7 @@ describe('entity.mock-service', () => {
 
       expect(types).toContain('Person');
       expect(types).toContain('Organization');
-      expect(types.length).toBe(2);
+      expect(types.length).toBeGreaterThanOrEqual(2);
     });
   });
 });

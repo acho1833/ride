@@ -51,9 +51,16 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const selectedEntityIds = useSelectedEntityIds(workspaceId);
   const openPopups = useOpenPopups(workspaceId);
   const {
-    setSelectedEntityIds, toggleEntitySelection, clearEntitySelection,
-    openPopup, closePopup, updatePopupPosition,
-    toggleEntityTypeVisibility, togglePredicateVisibility, resetFilters, setFilterPanelOpen
+    setSelectedEntityIds,
+    toggleEntitySelection,
+    clearEntitySelection,
+    openPopup,
+    closePopup,
+    updatePopupPosition,
+    toggleEntityTypeVisibility,
+    togglePredicateVisibility,
+    resetFilters,
+    setFilterPanelOpen
   } = useWorkspaceGraphActions();
   const hiddenEntityTypes = useHiddenEntityTypes(workspaceId);
   const hiddenPredicates = useHiddenPredicates(workspaceId);
@@ -81,31 +88,35 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     }
   }, [isEditorGroupFocused, workspaceId, clearEntitySelection]);
 
-  // Handle Delete key to open delete confirmation dialog
+  // Handle keyboard shortcuts: Ctrl+A (select all), Delete/Backspace (delete selected)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Ignore if user is typing in an input field
       if (isEditableElement(event)) return;
 
-      // Only handle Delete or Backspace key
-      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      // Only act when this editor group is focused
+      if (!isEditorGroupFocused) return;
 
-      // Don't trigger if dialog is already open
-      if (deleteDialogOpen) return;
+      // Ctrl+A / Cmd+A — select all entities
+      if ((event.ctrlKey || event.metaKey) && event.key === 'a' && workspace) {
+        event.preventDefault();
+        const allIds = workspace.entityList.map(e => e.id);
+        setSelectedEntityIds(workspaceId, allIds);
+        return;
+      }
 
-      // Only act if this editor group is focused and entities are selected
-      if (!isEditorGroupFocused || selectedEntityIds.length === 0) return;
-
-      // Prevent default browser behavior (e.g., navigating back on Backspace)
-      event.preventDefault();
-
-      // Open the delete confirmation dialog
-      setDeleteDialogOpen(true);
+      // Delete or Backspace — open delete confirmation dialog
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (deleteDialogOpen) return;
+        if (selectedEntityIds.length === 0) return;
+        event.preventDefault();
+        setDeleteDialogOpen(true);
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isEditorGroupFocused, selectedEntityIds.length, deleteDialogOpen]);
+  }, [isEditorGroupFocused, selectedEntityIds.length, deleteDialogOpen, workspace, workspaceId, setSelectedEntityIds]);
 
   // Create entity map for O(1) lookups
   const entityMap = useMemo<Map<string, Entity>>(() => {
@@ -144,10 +155,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     if (hiddenEntityTypes.length === 0 && hiddenPredicates.length === 0) return relationshipList;
     const hiddenPredSet = new Set(hiddenPredicates);
     return relationshipList.filter(
-      r =>
-        !hiddenPredSet.has(r.predicate) &&
-        filteredEntityMap.has(r.sourceEntityId) &&
-        filteredEntityMap.has(r.relatedEntityId)
+      r => !hiddenPredSet.has(r.predicate) && filteredEntityMap.has(r.sourceEntityId) && filteredEntityMap.has(r.relatedEntityId)
     );
   }, [workspace, hiddenEntityTypes.length, hiddenPredicates, filteredEntityMap]);
 

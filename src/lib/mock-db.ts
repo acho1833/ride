@@ -1,18 +1,7 @@
 import 'server-only';
 
 import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
 import { resolve } from 'path';
-
-interface MockDataFile {
-  entities: { id: string; labelNormalized: string; type: string }[];
-  relationships: {
-    relationshipId: string;
-    predicate: string;
-    sourceEntityId: string;
-    relatedEntityId: string;
-  }[];
-}
 
 let db: Database.Database | null = null;
 
@@ -25,7 +14,7 @@ export function getDb(): Database.Database {
   // Enable WAL mode for better read performance
   db.pragma('journal_mode = WAL');
 
-  // Create tables
+  // Create tables if they don't exist (safety net)
   db.exec(`
     CREATE TABLE IF NOT EXISTS entity (
       id TEXT PRIMARY KEY,
@@ -44,29 +33,6 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_rel_related ON relationship(related_entity_id);
     CREATE INDEX IF NOT EXISTS idx_rel_predicate ON relationship(predicate);
   `);
-
-  // Seed if empty
-  const count = db.prepare('SELECT COUNT(*) as count FROM entity').get() as { count: number };
-  if (count.count === 0) {
-    const dummyData: MockDataFile = JSON.parse(readFileSync(resolve(process.cwd(), 'src/lib/mock-data/dummyData.json'), 'utf-8'));
-    const googleData: MockDataFile = JSON.parse(readFileSync(resolve(process.cwd(), 'src/lib/mock-data/googleOrgData.json'), 'utf-8'));
-
-    const insertEntity = db.prepare('INSERT OR IGNORE INTO entity (id, label_normalized, type) VALUES (?, ?, ?)');
-    const insertRel = db.prepare(
-      'INSERT OR IGNORE INTO relationship (relationship_id, predicate, source_entity_id, related_entity_id) VALUES (?, ?, ?, ?)'
-    );
-
-    const seedAll = db.transaction(() => {
-      for (const e of [...dummyData.entities, ...googleData.entities]) {
-        insertEntity.run(e.id, e.labelNormalized, e.type);
-      }
-      for (const r of [...dummyData.relationships, ...googleData.relationships]) {
-        insertRel.run(r.relationshipId, r.predicate, r.sourceEntityId, r.relatedEntityId);
-      }
-    });
-
-    seedAll();
-  }
 
   return db;
 }

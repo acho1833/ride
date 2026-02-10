@@ -53,7 +53,11 @@ export function getFileIcon(fileName: string): LucideIcon {
  */
 export const ENTITY_ICON_CONFIG: Record<string, { cssClass: string; unicode: string }> = {
   Person: { cssClass: 'ri-user-line', unicode: 'F264' },
-  Organization: { cssClass: 'ri-building-2-line', unicode: 'EB09' }
+  Organization: { cssClass: 'ri-building-2-line', unicode: 'EB09' },
+  Vehicle: { cssClass: 'ri-car-line', unicode: 'EB3A' },
+  Location: { cssClass: 'ri-map-pin-line', unicode: 'EF08' },
+  Device: { cssClass: 'ri-smartphone-line', unicode: 'F15E' },
+  Event: { cssClass: 'ri-calendar-event-line', unicode: 'EB1E' }
 };
 
 /** Default icon when entity type is not found */
