@@ -31,7 +31,7 @@ const WorkspaceFilterPanelComponent = ({
   const hasActiveFilters = hiddenEntityTypes.length > 0 || hiddenPredicates.length > 0;
 
   return (
-    <div className="bg-background/90 absolute top-0 right-0 z-10 flex max-h-[calc(100%-11rem)] w-52 flex-col border-l">
+    <div className="bg-background/90 absolute top-0 right-0 z-10 flex max-h-[calc(100%-11rem)] w-52 flex-col border-b border-l">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-medium">Filters</span>

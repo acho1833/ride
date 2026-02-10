@@ -30,7 +30,15 @@ import { debounce } from 'lodash-es';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
-import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG, PLACEMENT_CONFIG, CULLING_CONFIG, MINIMAP_CONFIG } from '../const';
+import {
+  GRAPH_CONFIG,
+  SELECTION_CONFIG,
+  PREVIEW_CONFIG,
+  PLACEMENT_CONFIG,
+  CULLING_CONFIG,
+  MINIMAP_CONFIG,
+  DOT_GRID_CONFIG
+} from '../const';
 import { calculateEntityPositions } from '../utils/coordinate-placement.utils';
 import {
   isPointInRect,
@@ -310,6 +318,29 @@ const WorkspaceGraphComponent = ({
 
     // Create main group for zoom/pan transforms
     const g = svg.append('g');
+
+    // Dot grid background pattern (rendered in SVG so it pans/zooms with the graph)
+    const defs = svg.append('defs');
+    defs
+      .append('pattern')
+      .attr('id', 'dot-grid-pattern')
+      .attr('width', DOT_GRID_CONFIG.spacing)
+      .attr('height', DOT_GRID_CONFIG.spacing)
+      .attr('patternUnits', 'userSpaceOnUse')
+      .append('circle')
+      .attr('cx', DOT_GRID_CONFIG.spacing / 2)
+      .attr('cy', DOT_GRID_CONFIG.spacing / 2)
+      .attr('r', DOT_GRID_CONFIG.dotRadius)
+      .attr('fill', DOT_GRID_CONFIG.dotColor);
+
+    const extent = DOT_GRID_CONFIG.patternExtent;
+    g.append('rect')
+      .attr('x', -extent / 2)
+      .attr('y', -extent / 2)
+      .attr('width', extent)
+      .attr('height', extent)
+      .attr('fill', 'url(#dot-grid-pattern)')
+      .attr('pointer-events', 'none');
 
     // Deep copy data to avoid mutation issues with D3
     // Apply positions: prefer current in-memory positions (nodesRef) over persisted viewState

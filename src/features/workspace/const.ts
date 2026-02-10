@@ -125,6 +125,21 @@ export const MINIMAP_CONFIG = {
   panAnimationMs: 200
 } as const;
 
+/**
+ * Dot grid background configuration.
+ * SVG pattern rendered behind graph nodes, moves with pan/zoom.
+ */
+export const DOT_GRID_CONFIG = {
+  /** Spacing between dots in pixels (world coordinates) */
+  spacing: 30,
+  /** Dot radius in pixels */
+  dotRadius: 1.5,
+  /** Dot fill color */
+  dotColor: 'rgba(255, 255, 255, 0.15)',
+  /** Size of the pattern rect to cover the full pannable area */
+  patternExtent: 10000
+} as const;
+
 export const PREVIEW_CONFIG = {
   /** Maximum entities to show as individual nodes before grouping */
   threshold: 50,
