@@ -21,6 +21,12 @@ interface WorkspaceGraphEntry {
   selectedEntityIds?: string[];
   /** Open entity detail popups (undefined when none open) */
   openPopups?: PopupState[];
+  /** Entity types hidden from the graph (undefined when all visible) */
+  hiddenEntityTypes?: string[];
+  /** Relationship predicates hidden from the graph (undefined when all visible) */
+  hiddenPredicates?: string[];
+  /** Whether the filter panel is open */
+  isFilterPanelOpen?: boolean;
 }
 
 /** Slice state: map of workspaceId → workspace graph state */
@@ -42,6 +48,14 @@ export interface WorkspaceGraphActions {
   closePopup: (workspaceId: string, popupId: string) => void;
   /** Update popup position (after drag) */
   updatePopupPosition: (workspaceId: string, popupId: string, svgX: number, svgY: number) => void;
+  /** Toggle visibility of an entity type in the graph */
+  toggleEntityTypeVisibility: (workspaceId: string, entityType: string) => void;
+  /** Toggle visibility of a relationship predicate in the graph */
+  togglePredicateVisibility: (workspaceId: string, predicate: string) => void;
+  /** Reset all filters (hidden entity types and predicates) for a workspace */
+  resetFilters: (workspaceId: string) => void;
+  /** Open or close the filter panel */
+  setFilterPanelOpen: (workspaceId: string, open: boolean) => void;
 }
 
 export type WorkspaceGraphSlice = WorkspaceGraphState & WorkspaceGraphActions;
@@ -122,5 +136,55 @@ export const createWorkspaceGraphSlice: StateCreator<WorkspaceGraphSlice, [], []
           [workspaceId]: { ...entry, openPopups: updated }
         }
       };
-    })
+    }),
+
+  toggleEntityTypeVisibility: (workspaceId, entityType) =>
+    set(state => {
+      const entry = state.workspaceGraph[workspaceId] ?? {};
+      const current = entry.hiddenEntityTypes ?? [];
+      const updated = current.includes(entityType)
+        ? current.filter(t => t !== entityType)
+        : [...current, entityType];
+      return {
+        workspaceGraph: {
+          ...state.workspaceGraph,
+          [workspaceId]: { ...entry, hiddenEntityTypes: updated.length ? updated : undefined }
+        }
+      };
+    }),
+
+  togglePredicateVisibility: (workspaceId, predicate) =>
+    set(state => {
+      const entry = state.workspaceGraph[workspaceId] ?? {};
+      const current = entry.hiddenPredicates ?? [];
+      const updated = current.includes(predicate)
+        ? current.filter(p => p !== predicate)
+        : [...current, predicate];
+      return {
+        workspaceGraph: {
+          ...state.workspaceGraph,
+          [workspaceId]: { ...entry, hiddenPredicates: updated.length ? updated : undefined }
+        }
+      };
+    }),
+
+  resetFilters: workspaceId =>
+    set(state => {
+      const entry = state.workspaceGraph[workspaceId];
+      if (!entry?.hiddenEntityTypes && !entry?.hiddenPredicates) return state;
+      return {
+        workspaceGraph: {
+          ...state.workspaceGraph,
+          [workspaceId]: { ...entry, hiddenEntityTypes: undefined, hiddenPredicates: undefined }
+        }
+      };
+    }),
+
+  setFilterPanelOpen: (workspaceId, open) =>
+    set(state => ({
+      workspaceGraph: {
+        ...state.workspaceGraph,
+        [workspaceId]: { ...state.workspaceGraph[workspaceId], isFilterPanelOpen: open || undefined }
+      }
+    }))
 });

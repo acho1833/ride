@@ -12,7 +12,15 @@ import { useWorkspaceQuery } from '../hooks/useWorkspaceQuery';
 import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMutation';
 import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitiesMutation';
 import { useWorkspaceRemoveEntitiesMutation } from '../hooks/useWorkspaceRemoveEntitiesMutation';
-import { useSelectedEntityIds, useOpenPopups, useWorkspaceGraphActions } from '@/stores/workspace-graph/workspace-graph.selector';
+import {
+  useSelectedEntityIds,
+  useOpenPopups,
+  useWorkspaceGraphActions,
+  useHiddenEntityTypes,
+  useHiddenPredicates,
+  useIsFilterPanelOpen,
+  useHiddenFilterCount
+} from '@/stores/workspace-graph/workspace-graph.selector';
 import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
 import { useHighlightedEntityIds, usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
 import { toast } from 'sonner';
@@ -20,6 +28,8 @@ import WorkspaceGraphComponent from './workspace-graph.component';
 import WorkspaceContextMenuComponent from './workspace-context-menu.component';
 import DeleteEntitiesDialogComponent from './delete-entities-dialog.component';
 import GraphPreviewPopupComponent from './graph-preview-popup.component';
+import WorkspaceToolbarComponent from './workspace-toolbar.component';
+import WorkspaceFilterPanelComponent from './workspace-filter-panel.component';
 import { useGraphPreview } from '../hooks/useGraphPreview';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
 import type { Entity } from '@/models/entity.model';
@@ -40,8 +50,15 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const { mutate: removeEntities, isPending: isDeleting } = useWorkspaceRemoveEntitiesMutation();
   const selectedEntityIds = useSelectedEntityIds(workspaceId);
   const openPopups = useOpenPopups(workspaceId);
-  const { setSelectedEntityIds, toggleEntitySelection, clearEntitySelection, openPopup, closePopup, updatePopupPosition } =
-    useWorkspaceGraphActions();
+  const {
+    setSelectedEntityIds, toggleEntitySelection, clearEntitySelection,
+    openPopup, closePopup, updatePopupPosition,
+    toggleEntityTypeVisibility, togglePredicateVisibility, resetFilters, setFilterPanelOpen
+  } = useWorkspaceGraphActions();
+  const hiddenEntityTypes = useHiddenEntityTypes(workspaceId);
+  const hiddenPredicates = useHiddenPredicates(workspaceId);
+  const isFilterPanelOpen = useIsFilterPanelOpen(workspaceId);
+  const hiddenFilterCount = useHiddenFilterCount(workspaceId);
   const isEditorGroupFocused = useIsEditorGroupFocused(groupId);
   const { setFocusedPanel } = useUiActions();
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -95,6 +112,55 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     if (!workspace) return new Map();
     return new Map(workspace.entityList.map(e => [e.id, e]));
   }, [workspace]);
+
+  // Derive available entity types and predicates from workspace data
+  const entityTypes = useMemo<string[]>(() => {
+    if (!workspace) return [];
+    return [...new Set(workspace.entityList.map(e => e.type))].sort();
+  }, [workspace]);
+
+  const predicates = useMemo<string[]>(() => {
+    if (!workspace) return [];
+    return [...new Set(workspace.relationshipList.map(r => r.predicate))].sort();
+  }, [workspace]);
+
+  // Compute filtered entity map
+  const filteredEntityMap = useMemo<Map<string, Entity>>(() => {
+    if (!workspace || hiddenEntityTypes.length === 0) return entityMap;
+    const hiddenSet = new Set(hiddenEntityTypes);
+    const map = new Map<string, Entity>();
+    for (const [id, entity] of entityMap) {
+      if (!hiddenSet.has(entity.type)) {
+        map.set(id, entity);
+      }
+    }
+    return map;
+  }, [workspace, entityMap, hiddenEntityTypes]);
+
+  // Compute filtered relationship list
+  const filteredRelationshipList = useMemo(() => {
+    if (!workspace) return [];
+    const { relationshipList } = workspace;
+    if (hiddenEntityTypes.length === 0 && hiddenPredicates.length === 0) return relationshipList;
+    const hiddenPredSet = new Set(hiddenPredicates);
+    return relationshipList.filter(
+      r =>
+        !hiddenPredSet.has(r.predicate) &&
+        filteredEntityMap.has(r.sourceEntityId) &&
+        filteredEntityMap.has(r.relatedEntityId)
+    );
+  }, [workspace, hiddenEntityTypes.length, hiddenPredicates, filteredEntityMap]);
+
+  // Build filtered workspace to pass to graph
+  const filteredWorkspace = useMemo(() => {
+    if (!workspace) return workspace;
+    if (hiddenEntityTypes.length === 0 && hiddenPredicates.length === 0) return workspace;
+    return {
+      ...workspace,
+      entityList: [...filteredEntityMap.values()],
+      relationshipList: filteredRelationshipList
+    };
+  }, [workspace, hiddenEntityTypes.length, hiddenPredicates.length, filteredEntityMap, filteredRelationshipList]);
 
   // Preview mode hook
   const handlePreviewAddEntity = useCallback(
@@ -262,6 +328,10 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     [workspaceId, setSelectedEntityIds, toggleEntitySelection]
   );
 
+  const handleToggleFilterPanel = useCallback(() => {
+    setFilterPanelOpen(workspaceId, !isFilterPanelOpen);
+  }, [workspaceId, isFilterPanelOpen, setFilterPanelOpen]);
+
   const handleContextMenuClose = useCallback(() => {
     setContextMenuPosition(null);
   }, []);
@@ -350,57 +420,75 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   }
 
   return (
-    <>
-      <WorkspaceGraphComponent
-        workspace={workspace}
-        entityMap={entityMap}
-        selectedEntityIds={selectedEntityIds}
-        onSetSelectedEntityIds={handleSetSelectedEntityIds}
-        onToggleEntitySelection={handleToggleEntitySelection}
-        onClearEntitySelection={handleClearEntitySelection}
-        onSaveViewState={handleSaveViewState}
-        onAddEntity={handleAddEntity}
-        onContextMenu={handleContextMenu}
-        onFocusPanel={handleFocusPanel}
-        openPopups={openPopups}
-        onOpenPopup={popup => openPopup(workspaceId, popup)}
-        onClosePopup={popupId => closePopup(workspaceId, popupId)}
-        onUpdatePopupPosition={(popupId, svgX, svgY) => updatePopupPosition(workspaceId, popupId, svgX, svgY)}
-        previewState={previewState}
-        onAltClick={handleAltClick}
-        onPreviewAddEntity={(entityId, position) => {
-          const entity = previewState?.nodes.find(e => e.id === entityId);
-          if (entity) handlePreviewAddEntity(entity, position);
-        }}
-        onPreviewGroupClick={handlePreviewGroupClick}
+    <div className="flex h-full flex-col">
+      <WorkspaceToolbarComponent
+        hiddenCount={hiddenFilterCount}
+        isFilterPanelOpen={isFilterPanelOpen}
+        onToggleFilterPanel={handleToggleFilterPanel}
       />
-      <WorkspaceContextMenuComponent
-        position={contextMenuPosition}
-        onClose={handleContextMenuClose}
-        selectedEntityCount={selectedEntityIds.length}
-        onDelete={handleDeleteClick}
-      />
-      <DeleteEntitiesDialogComponent
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        entityCount={selectedEntityIds.length}
-        onConfirm={handleDeleteConfirm}
-        isPending={isDeleting}
-      />
-      {/* Preview popup for grouped entities (fixed screen position) */}
-      {previewPopup && (
-        <GraphPreviewPopupComponent
-          entityType={previewPopup.group.entityType}
-          entities={previewPopup.group.entities}
-          entitiesInGraph={new Set(entityMap.keys())}
-          x={previewPopup.position.x}
-          y={previewPopup.position.y}
-          onAdd={handlePreviewPopupAdd}
-          onClose={handlePreviewPopupClose}
-          onDragEnd={handlePreviewPopupDragEnd}
+      <div className="relative min-h-0 flex-1">
+        <WorkspaceGraphComponent
+          workspace={filteredWorkspace!}
+          entityMap={filteredEntityMap}
+          selectedEntityIds={selectedEntityIds}
+          onSetSelectedEntityIds={handleSetSelectedEntityIds}
+          onToggleEntitySelection={handleToggleEntitySelection}
+          onClearEntitySelection={handleClearEntitySelection}
+          onSaveViewState={handleSaveViewState}
+          onAddEntity={handleAddEntity}
+          onContextMenu={handleContextMenu}
+          onFocusPanel={handleFocusPanel}
+          openPopups={openPopups}
+          onOpenPopup={popup => openPopup(workspaceId, popup)}
+          onClosePopup={popupId => closePopup(workspaceId, popupId)}
+          onUpdatePopupPosition={(popupId, svgX, svgY) => updatePopupPosition(workspaceId, popupId, svgX, svgY)}
+          previewState={previewState}
+          onAltClick={handleAltClick}
+          onPreviewAddEntity={(entityId, position) => {
+            const entity = previewState?.nodes.find(e => e.id === entityId);
+            if (entity) handlePreviewAddEntity(entity, position);
+          }}
+          onPreviewGroupClick={handlePreviewGroupClick}
         />
-      )}
-    </>
+        {isFilterPanelOpen && (
+          <WorkspaceFilterPanelComponent
+            entityTypes={entityTypes}
+            predicates={predicates}
+            hiddenEntityTypes={hiddenEntityTypes}
+            hiddenPredicates={hiddenPredicates}
+            onToggleEntityType={type => toggleEntityTypeVisibility(workspaceId, type)}
+            onTogglePredicate={predicate => togglePredicateVisibility(workspaceId, predicate)}
+            onReset={() => resetFilters(workspaceId)}
+            onClose={() => setFilterPanelOpen(workspaceId, false)}
+          />
+        )}
+        <WorkspaceContextMenuComponent
+          position={contextMenuPosition}
+          onClose={handleContextMenuClose}
+          selectedEntityCount={selectedEntityIds.length}
+          onDelete={handleDeleteClick}
+        />
+        <DeleteEntitiesDialogComponent
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          entityCount={selectedEntityIds.length}
+          onConfirm={handleDeleteConfirm}
+          isPending={isDeleting}
+        />
+        {previewPopup && (
+          <GraphPreviewPopupComponent
+            entityType={previewPopup.group.entityType}
+            entities={previewPopup.group.entities}
+            entitiesInGraph={new Set(filteredEntityMap.keys())}
+            x={previewPopup.position.x}
+            y={previewPopup.position.y}
+            onAdd={handlePreviewPopupAdd}
+            onClose={handlePreviewPopupClose}
+            onDragEnd={handlePreviewPopupDragEnd}
+          />
+        )}
+      </div>
+    </div>
   );
 };
 
