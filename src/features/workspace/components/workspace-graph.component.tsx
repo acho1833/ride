@@ -1830,7 +1830,7 @@ const WorkspaceGraphComponent = ({
 
   // Click/drag on minimap to pan the main graph
   const handleMinimapInteraction = useCallback(
-    (event: React.MouseEvent<HTMLCanvasElement>) => {
+    (event: React.MouseEvent<HTMLCanvasElement> | MouseEvent, animate = true) => {
       const canvas = minimapCanvasRef.current;
       if (!canvas || !svgRef.current || !zoomRef.current || !dimensions) return;
 
@@ -1855,7 +1855,12 @@ const WorkspaceGraphComponent = ({
       const newY = dimensions.height / 2 - worldY * t.k;
 
       const newTransform = d3.zoomIdentity.translate(newX, newY).scale(t.k);
-      d3.select(svgRef.current).transition().duration(200).call(zoomRef.current.transform, newTransform);
+      const svgSelection = d3.select(svgRef.current);
+      if (animate) {
+        svgSelection.transition().duration(200).call(zoomRef.current.transform, newTransform);
+      } else {
+        svgSelection.call(zoomRef.current.transform, newTransform);
+      }
     },
     [dimensions]
   );
@@ -1964,9 +1969,9 @@ const WorkspaceGraphComponent = ({
         onClick={handleMinimapInteraction}
         onMouseDown={e => {
           if (e.button !== 0) return;
-          handleMinimapInteraction(e);
+          handleMinimapInteraction(e, false);
           const onMouseMove = (moveEvent: MouseEvent) => {
-            handleMinimapInteraction(moveEvent as unknown as React.MouseEvent<HTMLCanvasElement>);
+            handleMinimapInteraction(moveEvent, false);
           };
           const onMouseUp = () => {
             window.removeEventListener('mousemove', onMouseMove);
