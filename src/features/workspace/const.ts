@@ -19,7 +19,7 @@ export const GRAPH_CONFIG = {
   /** Strength of centering force */
   centerForce: 0.1,
   /** Zoom scale limits */
-  zoomExtent: [0.1, 4] as [number, number],
+  zoomExtent: [0.5, 3] as [number, number],
   /** Zoom scale factor for buttons */
   zoomStep: 1.3,
   /** Padding around nodes when fitting to view */
