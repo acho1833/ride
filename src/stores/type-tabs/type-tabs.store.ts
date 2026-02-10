@@ -11,7 +11,7 @@ import { StateCreator } from 'zustand';
 // ============================================================================
 
 /** Chart type union - types of charts that can be displayed in tabs */
-export type ChartType = 'SPREADLINE' | 'BAR' | 'LINE' | 'PIE';
+export type ChartType = 'SPREADLINE' | 'BAR' | 'LINE' | 'PIE' | 'DASHBOARD';
 
 /** Base tab interface */
 export interface Tab<T = unknown> {
@@ -27,6 +27,12 @@ export interface SpreadlineData {
   // Example placeholder:
   values?: number[];
   labels?: string[];
+}
+
+/** Dashboard-specific data - references a workspace by ID */
+export interface DashboardData {
+  workspaceId: string;
+  workspaceName: string;
 }
 
 /** Chart tab category - contains tabs and active tab ID */
