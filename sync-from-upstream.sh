@@ -29,9 +29,9 @@ EXCLUDE=(
   "CLAUDE.md"
   "tasks/"
   ".next/"
-  "sync-from-upstream.sh",
-  "package-lock.json",
-  "yarn.lock",
+  "sync-from-upstream.sh"
+  "package-lock.json"
+  "yarn.lock"
   "pnpm-lock.yaml"
   "bun.lock"
 )
