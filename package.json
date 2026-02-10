@@ -15,6 +15,7 @@
     "test:watch": "jest --watch",
     "mongo-gui": "mongo-gui -p 3091 -u \"mongodb://root:password@localhost:27017/?authMechanism=DEFAULT\"",
     "db:reset": "tsx scripts/db-reset.ts",
+    "db:seed": "tsx scripts/seed-mock-data.ts",
     "test:generate-data": "tsx scripts/generate-dummy-data.ts"
   },
   "dependencies": {
@@ -52,6 +53,7 @@
     "@tanstack/react-query": "^5.90.12",
     "@tanstack/react-query-devtools": "^5.91.1",
     "@xyflow/react": "^12.10.0",
+    "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -81,6 +83,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/d3": "^7.4.3",
     "@types/d3-force": "^3.0.10",
     "@types/d3-selection": "^3.0.11",
