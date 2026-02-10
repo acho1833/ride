@@ -2,12 +2,7 @@
  * @jest-environment node
  */
 
-import {
-  getWorkspaceById,
-  addEntitiesToWorkspace,
-  removeEntitiesFromWorkspace,
-  setWorkspaceData
-} from './workspace.mock-service';
+import { getWorkspaceById, addEntitiesToWorkspace, removeEntitiesFromWorkspace, setWorkspaceData } from './workspace.mock-service';
 
 const TEST_SID = 'test-user-ws-mock';
 const TEST_WORKSPACE = 'ws-mock-test-' + Date.now();
@@ -86,9 +81,7 @@ describe('workspace.mock-service', () => {
         { id: 'e1', labelNormalized: 'Entity 1', type: 'Person' },
         { id: 'e2', labelNormalized: 'Entity 2', type: 'Organization' }
       ];
-      const relationships = [
-        { relationshipId: 'r1', predicate: 'knows', sourceEntityId: 'e1', relatedEntityId: 'e2' }
-      ];
+      const relationships = [{ relationshipId: 'r1', predicate: 'knows', sourceEntityId: 'e1', relatedEntityId: 'e2' }];
 
       const result = await setWorkspaceData(wsId, entities, relationships, TEST_SID);
 

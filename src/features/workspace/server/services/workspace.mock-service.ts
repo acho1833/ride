@@ -70,13 +70,17 @@ async function findConnectingRelationships(entityId: string, existingEntityIds: 
   const db = getDb();
   const existingIds = [...existingEntityIds];
   const placeholders = existingIds.map(() => '?').join(', ');
-  const relationships = db.prepare(`
+  const relationships = db
+    .prepare(
+      `
     SELECT relationship_id as relationshipId, predicate,
            source_entity_id as sourceEntityId, related_entity_id as relatedEntityId
     FROM relationship
     WHERE (source_entity_id = ? AND related_entity_id IN (${placeholders}))
        OR (related_entity_id = ? AND source_entity_id IN (${placeholders}))
-  `).all(entityId, ...existingIds, entityId, ...existingIds) as RelationshipResponse[];
+  `
+    )
+    .all(entityId, ...existingIds, entityId, ...existingIds) as RelationshipResponse[];
 
   return relationships;
 }
@@ -117,9 +121,9 @@ export async function addEntitiesToWorkspace(workspaceId: string, entityIds: str
   // Batch-fetch new entities from SQLite
   const db = getDb();
   const placeholders = newEntityIds.map(() => '?').join(', ');
-  const newEntities = db.prepare(
-    `SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id IN (${placeholders})`
-  ).all(...newEntityIds) as EntityResponse[];
+  const newEntities = db
+    .prepare(`SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id IN (${placeholders})`)
+    .all(...newEntityIds) as EntityResponse[];
 
   for (const entity of newEntities) {
     const entityResponse: EntityResponse = {

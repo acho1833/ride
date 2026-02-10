@@ -61,9 +61,7 @@ describe('pattern.service', () => {
               position: { x: 100, y: 0 }
             }
           ],
-          edges: [
-            { id: 'e1', sourceNodeId: 'n1', targetNodeId: 'n2', predicates: [] }
-          ]
+          edges: [{ id: 'e1', sourceNodeId: 'n1', targetNodeId: 'n2', predicates: [] }]
         },
         pageSize: 10,
         pageNumber: 1
@@ -95,9 +93,7 @@ describe('pattern.service', () => {
               position: { x: 100, y: 0 }
             }
           ],
-          edges: [
-            { id: 'e1', sourceNodeId: 'n1', targetNodeId: 'n2', predicates: ['manages'] }
-          ]
+          edges: [{ id: 'e1', sourceNodeId: 'n1', targetNodeId: 'n2', predicates: ['manages'] }]
         },
         pageSize: 10,
         pageNumber: 1

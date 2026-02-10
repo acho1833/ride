@@ -30,7 +30,9 @@ function buildPatternQuery(
       cols.push(`e${i}.id as e${i}_id, e${i}.label_normalized as e${i}_label, e${i}.type as e${i}_type`);
     }
     for (let i = 0; i < edges.length; i++) {
-      cols.push(`r${i}.relationship_id as r${i}_rid, r${i}.predicate as r${i}_pred, r${i}.source_entity_id as r${i}_src, r${i}.related_entity_id as r${i}_rel`);
+      cols.push(
+        `r${i}.relationship_id as r${i}_rid, r${i}.predicate as r${i}_pred, r${i}.source_entity_id as r${i}_src, r${i}.related_entity_id as r${i}_rel`
+      );
     }
     select = `SELECT ${cols.join(', ')}`;
   }
@@ -60,7 +62,9 @@ function buildPatternQuery(
 
     if (!joinedNodeIndexes.has(newIdx)) {
       joins.push(relJoin);
-      joins.push(`JOIN entity e${newIdx} ON e${newIdx}.id = CASE WHEN r${i}.source_entity_id = e${knownIdx}.id THEN r${i}.related_entity_id ELSE r${i}.source_entity_id END`);
+      joins.push(
+        `JOIN entity e${newIdx} ON e${newIdx}.id = CASE WHEN r${i}.source_entity_id = e${knownIdx}.id THEN r${i}.related_entity_id ELSE r${i}.source_entity_id END`
+      );
       joinedNodeIndexes.add(newIdx);
     } else {
       joins.push(relJoin);
@@ -136,7 +140,9 @@ export async function searchPattern(params: PatternSearchParams): Promise<Patter
   const totalCount = (db.prepare(countQuery.sql).get(...countQuery.params) as { count: number }).count;
 
   const dataQuery = buildPatternQuery(pattern.nodes, pattern.edges, {
-    sortDirection, limit: pageSize, offset
+    sortDirection,
+    limit: pageSize,
+    offset
   });
 
   const rows = db.prepare(dataQuery.sql).all(...dataQuery.params) as Record<string, string>[];

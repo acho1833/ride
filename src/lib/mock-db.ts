@@ -48,16 +48,10 @@ export function getDb(): Database.Database {
   // Seed if empty
   const count = db.prepare('SELECT COUNT(*) as count FROM entity').get() as { count: number };
   if (count.count === 0) {
-    const dummyData: MockDataFile = JSON.parse(
-      readFileSync(resolve(process.cwd(), 'src/lib/mock-data/dummyData.json'), 'utf-8')
-    );
-    const googleData: MockDataFile = JSON.parse(
-      readFileSync(resolve(process.cwd(), 'src/lib/mock-data/googleOrgData.json'), 'utf-8')
-    );
+    const dummyData: MockDataFile = JSON.parse(readFileSync(resolve(process.cwd(), 'src/lib/mock-data/dummyData.json'), 'utf-8'));
+    const googleData: MockDataFile = JSON.parse(readFileSync(resolve(process.cwd(), 'src/lib/mock-data/googleOrgData.json'), 'utf-8'));
 
-    const insertEntity = db.prepare(
-      'INSERT OR IGNORE INTO entity (id, label_normalized, type) VALUES (?, ?, ?)'
-    );
+    const insertEntity = db.prepare('INSERT OR IGNORE INTO entity (id, label_normalized, type) VALUES (?, ?, ?)');
     const insertRel = db.prepare(
       'INSERT OR IGNORE INTO relationship (relationship_id, predicate, source_entity_id, related_entity_id) VALUES (?, ?, ?, ?)'
     );

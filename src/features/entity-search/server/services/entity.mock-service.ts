@@ -80,20 +80,24 @@ export async function getEntityTypes(): Promise<string[]> {
 export async function getEntityById(id: string): Promise<EntityResponse | null> {
   const db = getDb();
 
-  const entity = db.prepare(
-    'SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id = ?'
-  ).get(id) as EntityResponse | undefined;
+  const entity = db.prepare('SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id = ?').get(id) as
+    | EntityResponse
+    | undefined;
 
   if (!entity) return null;
 
   // Query related entities with a JOIN
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT r.predicate as relType,
            e.id as eId, e.label_normalized as eLabel, e.type as eType
     FROM relationship r
     JOIN entity e ON e.id = CASE WHEN r.source_entity_id = ? THEN r.related_entity_id ELSE r.source_entity_id END
     WHERE r.source_entity_id = ? OR r.related_entity_id = ?
-  `).all(id, id, id) as { relType: string; eId: string; eLabel: string; eType: string }[];
+  `
+    )
+    .all(id, id, id) as { relType: string; eId: string; eLabel: string; eType: string }[];
 
   const relatedEntities: RelatedEntityResponse[] = rows.map(row => ({
     type: row.relType,
