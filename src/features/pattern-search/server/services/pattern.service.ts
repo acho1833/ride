@@ -1,208 +1,121 @@
 import 'server-only';
 
-import { getMockEntities, getMockRelationships } from '@/lib/mock-data';
+import { getDb } from '@/lib/mock-db';
 import type { Entity } from '@/models/entity.model';
 import type { Relationship } from '@/models/relationship.model';
 import type { PatternSearchParams, PatternSearchResponse, PatternMatch, PatternNode, PatternEdge } from '../../types';
 
-/**
- * Convert a glob-style pattern to regex.
- * Supports: * (any chars), ? (single char), literal text.
- * Example: "A*" → "^A.*$", "Jo?n" → "^Jo.n$"
- */
-function globToRegex(pattern: string): string {
-  // Escape regex special chars except * and ?
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  // Convert glob wildcards to regex
-  const regexPattern = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
-  // Anchor to match full string
-  return `^${regexPattern}$`;
+/** Convert glob pattern to SQL LIKE pattern */
+function globToLike(pattern: string): string {
+  return pattern.replace(/\*/g, '%').replace(/\?/g, '_');
 }
 
-/**
- * Check if a value matches any of the patterns (OR logic).
- * Patterns use glob-style matching: * for any chars, ? for single char.
- * Empty patterns are skipped.
- */
-function matchesPatterns(value: string | undefined, patterns: string[]): boolean {
-  // Filter out empty patterns
-  const nonEmptyPatterns = patterns.filter(p => p.trim().length > 0);
-
-  if (!value) return nonEmptyPatterns.length === 0;
-  if (nonEmptyPatterns.length === 0) return true;
-
-  return nonEmptyPatterns.some(pattern => {
-    try {
-      const regex = new RegExp(globToRegex(pattern.trim()), 'i');
-      return regex.test(value);
-    } catch {
-      // Invalid pattern - treat as literal substring match
-      return value.toLowerCase().includes(pattern.toLowerCase());
-    }
-  });
-}
-
-/**
- * Check if an entity matches a pattern node's constraints.
- * - Type filter: null means any type
- * - Attribute filters: AND logic between filters, OR logic within each filter's patterns
- */
-function entityMatchesNode(entity: Entity, node: PatternNode): boolean {
-  // Check type filter
-  if (node.type !== null && entity.type !== node.type) {
-    return false;
-  }
-
-  // Check attribute filters (AND logic - all filters must pass)
-  for (const filter of node.filters) {
-    // Get attribute value from entity
-    const value = (entity as Record<string, unknown>)[filter.attribute] as string | undefined;
-
-    // Check if value matches any pattern (OR logic within filter)
-    if (!matchesPatterns(value, filter.patterns)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
- * Check if a relationship matches a pattern edge's constraints.
- * - Predicates: empty array means any predicate, otherwise OR logic
- * - Matches both directions (source→target or target→source)
- */
-function relationshipMatchesEdge(
-  relationship: Relationship,
-  edge: PatternEdge,
-  sourceEntityId: string,
-  targetEntityId: string
-): { matches: boolean; direction: 'forward' | 'reverse' } {
-  // Check if relationship connects the two entities (either direction)
-  const isForward = relationship.sourceEntityId === sourceEntityId && relationship.relatedEntityId === targetEntityId;
-  const isReverse = relationship.sourceEntityId === targetEntityId && relationship.relatedEntityId === sourceEntityId;
-
-  if (!isForward && !isReverse) {
-    return { matches: false, direction: 'forward' };
-  }
-
-  // Check predicate filter (OR logic)
-  if (edge.predicates.length > 0 && !edge.predicates.includes(relationship.predicate)) {
-    return { matches: false, direction: 'forward' };
-  }
-
-  return { matches: true, direction: isForward ? 'forward' : 'reverse' };
-}
-
-/**
- * Find all entity combinations that match the pattern nodes.
- * Uses recursive backtracking to find valid assignments.
- */
-function findMatchingEntitySets(
+/** Build SQL query for pattern matching */
+function buildPatternQuery(
   nodes: PatternNode[],
   edges: PatternEdge[],
-  entities: Entity[],
-  relationships: Relationship[]
-): Array<{ entities: Map<string, Entity>; relationships: Relationship[] }> {
-  const results: Array<{ entities: Map<string, Entity>; relationships: Relationship[] }> = [];
-
-  // Sort nodes alphabetically by label for consistent ordering
+  options: { countOnly?: boolean; sortDirection?: 'asc' | 'desc'; limit?: number; offset?: number }
+): { sql: string; params: unknown[] } {
   const sortedNodes = [...nodes].sort((a, b) => a.label.localeCompare(b.label));
+  const nodeIndexMap = new Map(sortedNodes.map((n, i) => [n.id, i]));
+  const params: unknown[] = [];
 
-  /**
-   * Recursive function to assign entities to pattern nodes.
-   * @param nodeIndex - Current node index to assign
-   * @param assignment - Current entity assignments (nodeId → Entity)
-   * @param usedEntityIds - Set of already-used entity IDs (no duplicates)
-   * @param matchedRelationships - Relationships that matched edges so far
-   */
-  function backtrack(
-    nodeIndex: number,
-    assignment: Map<string, Entity>,
-    usedEntityIds: Set<string>,
-    matchedRelationships: Relationship[]
-  ): void {
-    // Base case: all nodes assigned
-    if (nodeIndex === sortedNodes.length) {
-      results.push({
-        entities: new Map(assignment),
-        relationships: [...matchedRelationships]
-      });
-      return;
+  // SELECT
+  let select: string;
+  if (options.countOnly) {
+    select = 'SELECT COUNT(*) as count';
+  } else {
+    const cols: string[] = [];
+    for (let i = 0; i < sortedNodes.length; i++) {
+      cols.push(`e${i}.id as e${i}_id, e${i}.label_normalized as e${i}_label, e${i}.type as e${i}_type`);
+    }
+    for (let i = 0; i < edges.length; i++) {
+      cols.push(`r${i}.relationship_id as r${i}_rid, r${i}.predicate as r${i}_pred, r${i}.source_entity_id as r${i}_src, r${i}.related_entity_id as r${i}_rel`);
+    }
+    select = `SELECT ${cols.join(', ')}`;
+  }
+
+  // FROM
+  const from = `FROM entity e0`;
+
+  // JOINs
+  const joins: string[] = [];
+  const joinedNodeIndexes = new Set<number>([0]);
+
+  for (let i = 0; i < edges.length; i++) {
+    const edge = edges[i];
+    const srcIdx = nodeIndexMap.get(edge.sourceNodeId)!;
+    const tgtIdx = nodeIndexMap.get(edge.targetNodeId)!;
+
+    const knownIdx = joinedNodeIndexes.has(srcIdx) ? srcIdx : tgtIdx;
+    const newIdx = knownIdx === srcIdx ? tgtIdx : srcIdx;
+
+    // Join relationship (bidirectional)
+    let relJoin = `JOIN relationship r${i} ON (r${i}.source_entity_id = e${knownIdx}.id AND r${i}.related_entity_id = e${newIdx}.id) OR (r${i}.source_entity_id = e${newIdx}.id AND r${i}.related_entity_id = e${knownIdx}.id)`;
+
+    if (edge.predicates.length > 0) {
+      relJoin += ` AND r${i}.predicate IN (${edge.predicates.map(() => '?').join(', ')})`;
+      params.push(...edge.predicates);
     }
 
-    const currentNode = sortedNodes[nodeIndex];
-
-    // Try each entity for this node
-    for (const entity of entities) {
-      // Skip if entity already used
-      if (usedEntityIds.has(entity.id)) continue;
-
-      // Check if entity matches node constraints
-      if (!entityMatchesNode(entity, currentNode)) continue;
-
-      // Check if all edges to already-assigned nodes are satisfied
-      const edgesToCheck = edges.filter(
-        e =>
-          (e.sourceNodeId === currentNode.id && assignment.has(e.targetNodeId)) ||
-          (e.targetNodeId === currentNode.id && assignment.has(e.sourceNodeId))
-      );
-
-      let allEdgesSatisfied = true;
-      const newMatchedRelationships: Relationship[] = [];
-
-      for (const edge of edgesToCheck) {
-        const otherNodeId = edge.sourceNodeId === currentNode.id ? edge.targetNodeId : edge.sourceNodeId;
-        const otherEntity = assignment.get(otherNodeId)!;
-
-        // Find a relationship that satisfies this edge
-        let foundMatch = false;
-        for (const rel of relationships) {
-          const { matches } = relationshipMatchesEdge(rel, edge, entity.id, otherEntity.id);
-          if (matches) {
-            newMatchedRelationships.push(rel);
-            foundMatch = true;
-            break;
-          }
-        }
-
-        if (!foundMatch) {
-          allEdgesSatisfied = false;
-          break;
-        }
-      }
-
-      if (!allEdgesSatisfied) continue;
-
-      // Assign entity and recurse
-      assignment.set(currentNode.id, entity);
-      usedEntityIds.add(entity.id);
-
-      backtrack(nodeIndex + 1, assignment, usedEntityIds, [...matchedRelationships, ...newMatchedRelationships]);
-
-      // Backtrack
-      assignment.delete(currentNode.id);
-      usedEntityIds.delete(entity.id);
+    if (!joinedNodeIndexes.has(newIdx)) {
+      joins.push(relJoin);
+      joins.push(`JOIN entity e${newIdx} ON e${newIdx}.id = CASE WHEN r${i}.source_entity_id = e${knownIdx}.id THEN r${i}.related_entity_id ELSE r${i}.source_entity_id END`);
+      joinedNodeIndexes.add(newIdx);
+    } else {
+      joins.push(relJoin);
     }
   }
 
-  backtrack(0, new Map(), new Set(), []);
+  // Disconnected nodes
+  for (let i = 1; i < sortedNodes.length; i++) {
+    if (!joinedNodeIndexes.has(i)) {
+      joins.push(`CROSS JOIN entity e${i}`);
+      joinedNodeIndexes.add(i);
+    }
+  }
 
-  return results;
-}
+  // WHERE
+  const conditions: string[] = [];
+  for (let i = 0; i < sortedNodes.length; i++) {
+    const node = sortedNodes[i];
+    if (node.type !== null) {
+      conditions.push(`e${i}.type = ?`);
+      params.push(node.type);
+    }
+    for (const filter of node.filters) {
+      if (filter.attribute === 'labelNormalized' && filter.patterns.length > 0) {
+        const nonEmpty = filter.patterns.filter(p => p.trim().length > 0);
+        if (nonEmpty.length > 0) {
+          const likeClauses = nonEmpty.map(() => `e${i}.label_normalized LIKE ? COLLATE NOCASE`);
+          conditions.push(`(${likeClauses.join(' OR ')})`);
+          params.push(...nonEmpty.map(globToLike));
+        }
+      }
+    }
+  }
 
-/**
- * Sort matches by first entity's labelNormalized (case-insensitive).
- */
-function sortMatches(matches: PatternMatch[], sortAttribute: string, sortDirection: 'asc' | 'desc'): PatternMatch[] {
-  if (sortAttribute !== 'label') return matches;
+  // No duplicate entities
+  for (let i = 0; i < sortedNodes.length; i++) {
+    for (let j = i + 1; j < sortedNodes.length; j++) {
+      conditions.push(`e${i}.id != e${j}.id`);
+    }
+  }
 
-  return [...matches].sort((a, b) => {
-    const labelA = (a.entities[0]?.labelNormalized ?? '').toLowerCase();
-    const labelB = (b.entities[0]?.labelNormalized ?? '').toLowerCase();
-    const comparison = labelA.localeCompare(labelB);
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  let orderBy = '';
+  let limitOffset = '';
+  if (!options.countOnly) {
+    orderBy = `ORDER BY e0.label_normalized COLLATE NOCASE ${options.sortDirection === 'desc' ? 'DESC' : 'ASC'}`;
+    if (options.limit !== undefined) {
+      limitOffset = `LIMIT ? OFFSET ?`;
+      params.push(options.limit, options.offset ?? 0);
+    }
+  }
+
+  const sql = [select, from, ...joins, where, orderBy, limitOffset].filter(Boolean).join('\n');
+  return { sql, params };
 }
 
 /**
@@ -210,57 +123,50 @@ function sortMatches(matches: PatternMatch[], sortAttribute: string, sortDirecti
  * Returns paginated results with entities ordered alphabetically by node label.
  */
 export async function searchPattern(params: PatternSearchParams): Promise<PatternSearchResponse> {
-  const { pattern, pageSize, pageNumber, sortAttribute = 'label', sortDirection = 'asc' } = params;
+  const { pattern, pageSize, pageNumber, sortDirection = 'asc' } = params;
 
-  // Handle empty pattern
   if (pattern.nodes.length === 0) {
     return { matches: [], totalCount: 0, pageNumber, pageSize };
   }
 
-  const entities = getMockEntities().map(e => ({
-    id: e.id,
-    labelNormalized: e.labelNormalized,
-    type: e.type
-  }));
+  const db = getDb();
+  const offset = (pageNumber - 1) * pageSize;
 
-  const relationships = getMockRelationships().map(r => ({
-    relationshipId: r.relationshipId,
-    predicate: r.predicate,
-    sourceEntityId: r.sourceEntityId,
-    relatedEntityId: r.relatedEntityId
-  }));
+  const countQuery = buildPatternQuery(pattern.nodes, pattern.edges, { countOnly: true });
+  const totalCount = (db.prepare(countQuery.sql).get(...countQuery.params) as { count: number }).count;
 
-  // Find all matching entity sets
-  const rawMatches = findMatchingEntitySets(pattern.nodes, pattern.edges, entities, relationships);
+  const dataQuery = buildPatternQuery(pattern.nodes, pattern.edges, {
+    sortDirection, limit: pageSize, offset
+  });
 
-  // Convert to PatternMatch format (entities ordered by node label)
+  const rows = db.prepare(dataQuery.sql).all(...dataQuery.params) as Record<string, string>[];
   const sortedNodes = [...pattern.nodes].sort((a, b) => a.label.localeCompare(b.label));
-  const matches: PatternMatch[] = rawMatches.map(match => ({
-    entities: sortedNodes.map(node => match.entities.get(node.id)!),
-    relationships: match.relationships
-  }));
 
-  // Sort matches before pagination
-  const sortedMatches = sortMatches(matches, sortAttribute, sortDirection);
+  const matches: PatternMatch[] = rows.map(row => {
+    const entities: Entity[] = sortedNodes.map((_, i) => ({
+      id: row[`e${i}_id`],
+      labelNormalized: row[`e${i}_label`],
+      type: row[`e${i}_type`]
+    }));
 
-  // Apply pagination
-  const totalCount = sortedMatches.length;
-  const startIndex = (pageNumber - 1) * pageSize;
-  const pagedMatches = sortedMatches.slice(startIndex, startIndex + pageSize);
+    const relationships: Relationship[] = pattern.edges.map((_, i) => ({
+      relationshipId: row[`r${i}_rid`],
+      predicate: row[`r${i}_pred`],
+      sourceEntityId: row[`r${i}_src`],
+      relatedEntityId: row[`r${i}_rel`]
+    }));
 
-  return {
-    matches: pagedMatches,
-    totalCount,
-    pageNumber,
-    pageSize
-  };
+    return { entities, relationships };
+  });
+
+  return { matches, totalCount, pageNumber, pageSize };
 }
 
 /**
  * Get available relationship predicates for the edge filter UI.
  */
 export async function getPredicates(): Promise<string[]> {
-  const relationships = getMockRelationships();
-  const predicates = new Set(relationships.map(r => r.predicate));
-  return Array.from(predicates).sort();
+  const db = getDb();
+  const rows = db.prepare('SELECT DISTINCT predicate FROM relationship ORDER BY predicate').all() as { predicate: string }[];
+  return rows.map(r => r.predicate);
 }
