@@ -1983,17 +1983,19 @@ const WorkspaceGraphComponent = ({
       />
 
       {/* Control buttons - lower right */}
-      <div className="absolute right-4 bottom-4 flex flex-col items-center gap-2 opacity-50 transition-opacity hover:opacity-100">
-        <span className="text-muted-foreground text-xs font-medium">{Math.round(transformRef.current.k * 100)}%</span>
-        <Button variant="outline" size="icon" onClick={handleZoomIn} title="Zoom In">
-          <Plus className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="icon" onClick={handleZoomOut} title="Zoom Out">
-          <Minus className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="icon" onClick={handleZoomToFit} title="Zoom to Fit">
-          <Maximize className="h-4 w-4" />
-        </Button>
+      <div className="group absolute right-4 bottom-4">
+        <div className="bg-background/80 flex flex-col items-center gap-2 rounded-lg border p-2 opacity-50 transition-opacity group-hover:opacity-100">
+          <span className="text-muted-foreground text-xs font-medium">{Math.round(transformRef.current.k * 100)}%</span>
+          <Button variant="outline" size="icon" onClick={handleZoomIn} title="Zoom In">
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={handleZoomOut} title="Zoom Out">
+            <Minus className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={handleZoomToFit} title="Zoom to Fit">
+            <Maximize className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
