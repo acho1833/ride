@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { EntityResponse } from '@/models/entity-response.model';
 import type { WorkspaceResponse, RelationshipResponse } from '@/models/workspace-response.model';
-import { getMockEntities, getMockRelationships } from '@/lib/mock-data';
+import { getDb } from '@/lib/mock-db';
 
 // ============================================================================
 // Per-workspace state persisted to JSON file
@@ -61,16 +61,24 @@ function setWorkspaceState(sid: string, workspaceId: string, state: WorkspaceSta
 }
 
 /**
- * Find relationships from global pool that connect the given entity
+ * Find relationships from SQLite that connect the given entity
  * to entities already in the workspace.
  */
-function findConnectingRelationships(entityId: string, existingEntityIds: Set<string>): RelationshipResponse[] {
-  const relationships = getMockRelationships();
-  return relationships.filter(
-    r =>
-      (r.sourceEntityId === entityId && existingEntityIds.has(r.relatedEntityId)) ||
-      (r.relatedEntityId === entityId && existingEntityIds.has(r.sourceEntityId))
-  );
+async function findConnectingRelationships(entityId: string, existingEntityIds: Set<string>): Promise<RelationshipResponse[]> {
+  if (existingEntityIds.size === 0) return [];
+
+  const db = getDb();
+  const existingIds = [...existingEntityIds];
+  const placeholders = existingIds.map(() => '?').join(', ');
+  const relationships = db.prepare(`
+    SELECT relationship_id as relationshipId, predicate,
+           source_entity_id as sourceEntityId, related_entity_id as relatedEntityId
+    FROM relationship
+    WHERE (source_entity_id = ? AND related_entity_id IN (${placeholders}))
+       OR (related_entity_id = ? AND source_entity_id IN (${placeholders}))
+  `).all(entityId, ...existingIds, entityId, ...existingIds) as RelationshipResponse[];
+
+  return relationships;
 }
 
 // ============================================================================
@@ -96,21 +104,34 @@ export async function getWorkspaceById(id: string, sid: string): Promise<Workspa
  */
 export async function addEntitiesToWorkspace(workspaceId: string, entityIds: string[], sid: string): Promise<WorkspaceResponse> {
   const state = getWorkspaceState(sid, workspaceId);
-  const entities = getMockEntities();
 
   const existingEntityIds = new Set(state.entityList.map(e => e.id));
   const existingRelationshipIds = new Set(state.relationshipList.map(r => r.relationshipId));
 
-  for (const entityId of entityIds) {
-    if (existingEntityIds.has(entityId)) continue;
+  // Filter to only new entity IDs
+  const newEntityIds = entityIds.filter(id => !existingEntityIds.has(id));
+  if (newEntityIds.length === 0) {
+    return getWorkspaceById(workspaceId, sid);
+  }
 
-    const entity = entities.find(e => e.id === entityId);
-    if (!entity) continue;
+  // Batch-fetch new entities from SQLite
+  const db = getDb();
+  const placeholders = newEntityIds.map(() => '?').join(', ');
+  const newEntities = db.prepare(
+    `SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id IN (${placeholders})`
+  ).all(...newEntityIds) as EntityResponse[];
 
-    state.entityList.push(entity);
-    existingEntityIds.add(entityId);
+  for (const entity of newEntities) {
+    const entityResponse: EntityResponse = {
+      id: entity.id,
+      labelNormalized: entity.labelNormalized,
+      type: entity.type
+    };
 
-    const connectingRelationships = findConnectingRelationships(entityId, existingEntityIds);
+    state.entityList.push(entityResponse);
+    existingEntityIds.add(entity.id);
+
+    const connectingRelationships = await findConnectingRelationships(entity.id, existingEntityIds);
     for (const rel of connectingRelationships) {
       if (!existingRelationshipIds.has(rel.relationshipId)) {
         state.relationshipList.push(rel);
