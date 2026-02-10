@@ -50,8 +50,8 @@ function buildPatternQuery(
     const knownIdx = joinedNodeIndexes.has(srcIdx) ? srcIdx : tgtIdx;
     const newIdx = knownIdx === srcIdx ? tgtIdx : srcIdx;
 
-    // Join relationship (bidirectional)
-    let relJoin = `JOIN relationship r${i} ON (r${i}.source_entity_id = e${knownIdx}.id AND r${i}.related_entity_id = e${newIdx}.id) OR (r${i}.source_entity_id = e${newIdx}.id AND r${i}.related_entity_id = e${knownIdx}.id)`;
+    // Join relationship (bidirectional) - wrap OR in parens so predicate filter applies to both directions
+    let relJoin = `JOIN relationship r${i} ON ((r${i}.source_entity_id = e${knownIdx}.id AND r${i}.related_entity_id = e${newIdx}.id) OR (r${i}.source_entity_id = e${newIdx}.id AND r${i}.related_entity_id = e${knownIdx}.id))`;
 
     if (edge.predicates.length > 0) {
       relJoin += ` AND r${i}.predicate IN (${edge.predicates.map(() => '?').join(', ')})`;
