@@ -22,6 +22,7 @@ export type WorkspaceGraphNode = Entity &
 export interface WorkspaceGraphLink extends SimulationLinkDatum<WorkspaceGraphNode> {
   source: string | WorkspaceGraphNode;
   target: string | WorkspaceGraphNode;
+  predicate?: string;
 }
 
 /**
@@ -37,7 +38,7 @@ export interface WorkspaceGraphData {
  */
 export function toGraphData(workspace: {
   entityList: Array<{ id: string; labelNormalized: string; type: string; x?: number; y?: number }>;
-  relationshipList: Array<{ sourceEntityId: string; relatedEntityId: string }>;
+  relationshipList: Array<{ sourceEntityId: string; relatedEntityId: string; predicate?: string }>;
 }): WorkspaceGraphData {
   const nodes: WorkspaceGraphNode[] = workspace.entityList.map(entity => ({
     ...entity,
@@ -47,7 +48,8 @@ export function toGraphData(workspace: {
 
   const links: WorkspaceGraphLink[] = workspace.relationshipList.map(rel => ({
     source: rel.sourceEntityId,
-    target: rel.relatedEntityId
+    target: rel.relatedEntityId,
+    predicate: rel.predicate
   }));
 
   return { nodes, links };

@@ -98,6 +98,10 @@ interface Props {
   onPreviewAddEntity?: (entityId: string, position: { x: number; y: number }) => void;
   /** Called when a preview group is clicked (opens popup) */
   onPreviewGroupClick?: (groupType: string, screenPosition: { x: number; y: number }) => void;
+  /** Entity types to hide via CSS display:none */
+  hiddenEntityTypes?: string[];
+  /** Relationship predicates to hide via CSS display:none */
+  hiddenPredicates?: string[];
 }
 
 const WorkspaceGraphComponent = ({
@@ -118,7 +122,9 @@ const WorkspaceGraphComponent = ({
   previewState,
   onAltClick,
   onPreviewAddEntity,
-  onPreviewGroupClick
+  onPreviewGroupClick,
+  hiddenEntityTypes = [],
+  hiddenPredicates = []
 }: Props) => {
   // ═══════════════════════════════════════════════════════════════════════
   // 1. Refs & State
@@ -1096,6 +1102,44 @@ const WorkspaceGraphComponent = ({
       .selectAll<SVGCircleElement, WorkspaceGraphNode>('.nodes g .cull-badge circle')
       .attr('fill', d => (selectedEntityIds.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor));
   }, [selectedEntityIds]);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 4.5. Filter Effect — toggles CSS display:none on nodes/links
+  //      Uses inline style (higher priority than SVG display attribute)
+  //      so viewport culling via setAttribute('display') still works.
+  // ═══════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+
+    const hiddenTypeSet = new Set(hiddenEntityTypes);
+    const hiddenPredSet = new Set(hiddenPredicates);
+    const hasFilters = hiddenTypeSet.size > 0 || hiddenPredSet.size > 0;
+
+    // Build node type map from current nodes for link filtering
+    const nodeTypeMap = new Map<string, string>();
+    for (const node of nodesRef.current) {
+      nodeTypeMap.set(node.id, node.type);
+    }
+
+    // Toggle node visibility
+    svg
+      .selectAll<SVGGElement, WorkspaceGraphNode>('.nodes g')
+      .style('display', d => (hasFilters && hiddenTypeSet.has(d.type) ? 'none' : null));
+
+    // Toggle link visibility
+    svg.selectAll<SVGLineElement, WorkspaceGraphLink>('.links line').style('display', d => {
+      if (!hasFilters) return null;
+      const { sourceId, targetId } = getLinkNodeIds(d);
+      const sourceType = nodeTypeMap.get(sourceId);
+      const targetType = nodeTypeMap.get(targetId);
+      const isHidden =
+        (sourceType !== undefined && hiddenTypeSet.has(sourceType)) ||
+        (targetType !== undefined && hiddenTypeSet.has(targetType)) ||
+        (d.predicate !== undefined && hiddenPredSet.has(d.predicate));
+      return isHidden ? 'none' : null;
+    });
+  }, [hiddenEntityTypes, hiddenPredicates]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // 5. Preview Effect — renders 1-hop preview nodes with force simulation

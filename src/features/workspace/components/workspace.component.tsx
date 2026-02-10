@@ -148,28 +148,6 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     return map;
   }, [workspace, entityMap, hiddenEntityTypes]);
 
-  // Compute filtered relationship list
-  const filteredRelationshipList = useMemo(() => {
-    if (!workspace) return [];
-    const { relationshipList } = workspace;
-    if (hiddenEntityTypes.length === 0 && hiddenPredicates.length === 0) return relationshipList;
-    const hiddenPredSet = new Set(hiddenPredicates);
-    return relationshipList.filter(
-      r => !hiddenPredSet.has(r.predicate) && filteredEntityMap.has(r.sourceEntityId) && filteredEntityMap.has(r.relatedEntityId)
-    );
-  }, [workspace, hiddenEntityTypes.length, hiddenPredicates, filteredEntityMap]);
-
-  // Build filtered workspace to pass to graph
-  const filteredWorkspace = useMemo(() => {
-    if (!workspace) return workspace;
-    if (hiddenEntityTypes.length === 0 && hiddenPredicates.length === 0) return workspace;
-    return {
-      ...workspace,
-      entityList: [...filteredEntityMap.values()],
-      relationshipList: filteredRelationshipList
-    };
-  }, [workspace, hiddenEntityTypes.length, hiddenPredicates.length, filteredEntityMap, filteredRelationshipList]);
-
   // Preview mode hook
   const handlePreviewAddEntity = useCallback(
     (entity: Entity, position: { x: number; y: number }) => {
@@ -436,8 +414,10 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
       />
       <div className="relative min-h-0 flex-1">
         <WorkspaceGraphComponent
-          workspace={filteredWorkspace!}
-          entityMap={filteredEntityMap}
+          workspace={workspace}
+          entityMap={entityMap}
+          hiddenEntityTypes={hiddenEntityTypes}
+          hiddenPredicates={hiddenPredicates}
           selectedEntityIds={selectedEntityIds}
           onSetSelectedEntityIds={handleSetSelectedEntityIds}
           onToggleEntitySelection={handleToggleEntitySelection}
