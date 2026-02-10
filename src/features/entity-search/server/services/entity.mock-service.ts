@@ -1,24 +1,8 @@
 import 'server-only';
 
-import { getMockEntities, getMockEntityById, getMockRelationships, MOCK_ENTITY_TYPES } from '@/lib/mock-data';
+import { getDb } from '@/lib/mock-db';
 import type { EntityResponse, RelatedEntityResponse } from '@/models/entity-response.model';
 import { EntitySearchParams, EntitySearchMockResponse } from '../../types';
-
-/**
- * Checks if entity label matches the search pattern.
- * Supports trailing wildcard (*) for prefix matching.
- * - "Person*" matches "Person 1", "Person 2", etc.
- * - "Person" matches any label containing "Person" (contains match)
- */
-function matchesNamePattern(label: string, pattern: string): boolean {
-  if (pattern.endsWith('*')) {
-    // Wildcard: prefix match (case-insensitive)
-    const prefix = pattern.slice(0, -1).toLowerCase();
-    return label.toLowerCase().startsWith(prefix);
-  }
-  // Default: contains match (case-insensitive)
-  return label.toLowerCase().includes(pattern.toLowerCase());
-}
 
 /**
  * Simulates external API search endpoint.
@@ -28,32 +12,50 @@ function matchesNamePattern(label: string, pattern: string): boolean {
  * - Applies pagination
  */
 export async function searchEntities(params: EntitySearchParams): Promise<EntitySearchMockResponse> {
-  let filtered = [...getMockEntities()];
+  const db = getDb();
+
+  const conditions: string[] = [];
+  const queryParams: unknown[] = [];
 
   // Filter by name (supports trailing wildcard for prefix match)
   if (params.name && params.name.trim() !== '') {
-    const pattern = params.name.trim();
-    filtered = filtered.filter(e => matchesNamePattern(e.labelNormalized, pattern));
+    const name = params.name.trim();
+    if (name.endsWith('*')) {
+      const prefix = name.slice(0, -1);
+      conditions.push('label_normalized LIKE ? COLLATE NOCASE');
+      queryParams.push(`${prefix}%`);
+    } else {
+      conditions.push('label_normalized LIKE ? COLLATE NOCASE');
+      queryParams.push(`%${name}%`);
+    }
   }
 
   // Filter by types (empty array = show all)
   if (params.types && params.types.length > 0) {
-    filtered = filtered.filter(e => params.types!.includes(e.type));
+    const placeholders = params.types.map(() => '?').join(', ');
+    conditions.push(`type IN (${placeholders})`);
+    queryParams.push(...params.types);
   }
 
-  // Sort by labelNormalized (case-insensitive) based on sortDirection
-  filtered.sort((a, b) => {
-    const comparison = a.labelNormalized.toLowerCase().localeCompare(b.labelNormalized.toLowerCase());
-    return params.sortDirection === 'asc' ? comparison : -comparison;
-  });
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sortDir = params.sortDirection === 'asc' ? 'ASC' : 'DESC';
+  const offset = (params.pageNumber - 1) * params.pageSize;
 
-  // Apply pagination
-  const totalCount = filtered.length;
-  const startIndex = (params.pageNumber - 1) * params.pageSize;
-  const paged = filtered.slice(startIndex, startIndex + params.pageSize);
+  const entitiesQuery = `
+    SELECT id, label_normalized as labelNormalized, type
+    FROM entity
+    ${whereClause}
+    ORDER BY label_normalized COLLATE NOCASE ${sortDir}
+    LIMIT ? OFFSET ?
+  `;
+
+  const countQuery = `SELECT COUNT(*) as totalCount FROM entity ${whereClause}`;
+
+  const entities = db.prepare(entitiesQuery).all(...queryParams, params.pageSize, offset) as EntityResponse[];
+  const { totalCount } = db.prepare(countQuery).get(...queryParams) as { totalCount: number };
 
   return {
-    entities: paged,
+    entities: entities.map(e => ({ id: e.id, labelNormalized: e.labelNormalized, type: e.type })),
     totalCount,
     pageNumber: params.pageNumber,
     pageSize: params.pageSize
@@ -65,7 +67,9 @@ export async function searchEntities(params: EntitySearchParams): Promise<Entity
  * Returns dynamic list of types from the external system.
  */
 export async function getEntityTypes(): Promise<string[]> {
-  return [...MOCK_ENTITY_TYPES];
+  const db = getDb();
+  const rows = db.prepare('SELECT DISTINCT type FROM entity ORDER BY type').all() as { type: string }[];
+  return rows.map(r => r.type);
 }
 
 /**
@@ -74,38 +78,31 @@ export async function getEntityTypes(): Promise<string[]> {
  * @param id - Entity ID to fetch
  */
 export async function getEntityById(id: string): Promise<EntityResponse | null> {
-  const entity = getMockEntityById(id);
+  const db = getDb();
+
+  const entity = db.prepare(
+    'SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id = ?'
+  ).get(id) as EntityResponse | undefined;
+
   if (!entity) return null;
 
-  // Find all relationships involving this entity
-  const relationships = getMockRelationships();
-  const relatedEntities: RelatedEntityResponse[] = [];
+  // Query related entities with a JOIN
+  const rows = db.prepare(`
+    SELECT r.predicate as relType,
+           e.id as eId, e.label_normalized as eLabel, e.type as eType
+    FROM relationship r
+    JOIN entity e ON e.id = CASE WHEN r.source_entity_id = ? THEN r.related_entity_id ELSE r.source_entity_id END
+    WHERE r.source_entity_id = ? OR r.related_entity_id = ?
+  `).all(id, id, id) as { relType: string; eId: string; eLabel: string; eType: string }[];
 
-  for (const rel of relationships) {
-    let relatedId: string | null = null;
-
-    // Determine which entity is the "other" entity in this relationship
-    if (rel.sourceEntityId === id) {
-      relatedId = rel.relatedEntityId;
-    } else if (rel.relatedEntityId === id) {
-      relatedId = rel.sourceEntityId;
+  const relatedEntities: RelatedEntityResponse[] = rows.map(row => ({
+    type: row.relType,
+    entity: {
+      id: row.eId,
+      labelNormalized: row.eLabel,
+      type: row.eType
     }
-
-    if (relatedId) {
-      const relatedEntity = getMockEntityById(relatedId);
-      if (relatedEntity) {
-        // Return flat structure: { type: relationshipType, entity: EntityResponse }
-        relatedEntities.push({
-          type: rel.predicate,
-          entity: {
-            id: relatedEntity.id,
-            labelNormalized: relatedEntity.labelNormalized,
-            type: relatedEntity.type
-          }
-        });
-      }
-    }
-  }
+  }));
 
   return {
     id: entity.id,
