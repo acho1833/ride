@@ -1139,3 +1139,107 @@ Update this plan file with:
 ### Summary
 
 The refactoring achieved its goal: workspace-graph.component.tsx is now focused on D3 rendering and React lifecycle. All pure computation is extracted to graph.utils.ts with comprehensive unit tests. The component dropped 92 lines (2007→1915) with 157 deletions and 66 insertions, replacing inline math with descriptive function calls.
+
+---
+
+## Round 2: Production Hardening & Magic Number Extraction
+
+### Changes Made
+
+1. **Removed 4 debug `console.log` statements** — production cleanup
+2. **Extracted 25+ magic numbers to `const.ts`** — all behavioral/physics constants now configurable:
+   - `GRAPH_CONFIG`: +9 constants (nodeRectRadius, collisionPadding, initialLayoutTicks, zoomAnimationMs, linkStroke/Opacity/Width, labelOffsetY, dragClickDistance)
+   - `PREVIEW_CONFIG`: +12 constants (fadeInMs, addButtonRadius/Offset, groupBadgeMaxCount, stabilityThreshold, stableTicksRequired, maxSimulationMs, simAlphaDecay, collisionRadiusMultiplier, simChargeStrength, initialOffsetRatio, minLinkDistanceRatio, linkDistanceGrowthTicks)
+   - `CULLING_CONFIG`: +2 constants (badgeRadius, badgeFontSize)
+   - `MINIMAP_CONFIG`: +1 constant (panAnimationMs)
+3. **Extracted 3 new pure functions to `graph.utils.ts`**:
+   - `computeDistance(dx, dy)` — replaces 2 inline `Math.sqrt(dx*dx + dy*dy)` patterns
+   - `clampValue(value, min, max)` — replaces inline Math.max/min clamping
+   - `computeSelectionRect(x1, y1, x2, y2)` — replaces 4-line rect calculation
+4. **Updated `computeInitialPreviewPositions`** — now uses `PREVIEW_CONFIG.initialOffsetRatio` instead of hardcoded `0.3`
+5. **Added 12 new unit tests** (67 total, up from 55)
+
+### Updated Line Counts
+
+| File | Round 1 | Round 2 | Delta |
+|------|---------|---------|-------|
+| `workspace-graph.component.tsx` | 1915 | 1903 | -12 |
+| `graph.utils.ts` | 367 | 390 | +23 |
+| `graph.utils.test.ts` | 400 | 473 | +73 |
+| `const.ts` | 119 | 165 | +46 |
+
+### Verification
+- **Tests:** 108/108 passing (67 graph.utils + 24 coordinate-placement + 17 others)
+- **Build:** TypeScript + lint + production build all succeed
+- **Console statements:** 0 remaining in component
+- **Behavior:** No functional changes — all replacements are mechanical
+
+### Architecture Score (Round 2)
+
+| Category | Round 1 | Round 2 | Notes |
+|----------|:---:|:---:|-------|
+| Separation of Concerns | 5 | 7 | 24 pure functions extracted, all constants centralized |
+| Testability | 6 | 8 | 67 unit tests covering all pure logic, 0.5s execution |
+| DRY | 7 | 8 | `computeDistance` replaces 2 sqrt patterns, shared constants eliminate repeated literals |
+| Readability | 6 | 8 | Named constants explain intent (e.g. `PREVIEW_CONFIG.stabilityThreshold` vs `0.5`) |
+| Constants/Config | 9 | 9 | Was already excellent, now even more thorough |
+| Type Safety | 8 | 8 | Unchanged |
+| Production Readiness | 6 | 9 | Zero console.logs, all physics/timing constants configurable |
+| **Overall** | **6.7** | **8.1** | **+1.4 improvement** |
+
+### Remaining Magic Numbers (Intentionally Left)
+
+A few hardcoded values remain intentionally:
+- **Expand simulation params** (lines ~720-731): Used once for a different physics scenario (small node expansion vs preview). Extracting would over-fragment the config.
+- **Label truncation at 15 chars** (line ~1222): UI decision, not a physics constant.
+- **setTimeout 100ms** (3 occurrences): Event debounce for alt-click reset, standard UI timing.
+- **Badge rect dimensions** (-12, -8, 24, 16, 8): Pure SVG layout, tightly coupled to badge rendering.
+- **Tailwind classes**: CSS framework values, not data constants.
+
+---
+
+## Round 3: Readability & Section Organization
+
+### Changes Made
+
+1. **Expanded top-level JSDoc** — documents architecture, file relationships, and lists all 9 sections with search markers
+2. **Added 9 section markers** (═══) at component level:
+   - Refs & State, Callbacks, Main Graph Effect, Selection Effect, Preview Effect, Minimap Effect, Zoom Controls, Drag & Drop, JSX
+3. **Added 6 sub-section markers** (───) inside the main graph effect:
+   - Viewport Culling, Force Simulation, New Node Expansion, Drag Behavior, Click Handlers, Rectangle Selection
+4. **Added 3 sub-section markers** (───) inside the preview effect:
+   - Setup & positions, DOM creation helpers, Preview Force Simulation
+5. **Added "why" comments** on non-obvious patterns (quadtree linked-list traversal, stability detection algorithm, cache invalidation strategy)
+
+### Impact on Readability
+
+A developer can now:
+- Skim the file structure by searching for "═══" (9 top-level sections)
+- Navigate within effects by searching for "───" (9 sub-sections)
+- Understand the component's architecture from the top JSDoc without reading any code
+- Understand complex algorithms from inline "why" comments
+
+### Updated Line Count
+
+| File | Round 2 | Round 3 | Delta |
+|------|---------|---------|-------|
+| `workspace-graph.component.tsx` | 1903 | 1967 | +64 (all comments) |
+
+### Architecture Score (Round 3)
+
+| Category | Round 2 | Round 3 | Notes |
+|----------|:---:|:---:|-------|
+| Separation of Concerns | 7 | 8 | Clear section boundaries make each concern independently navigable |
+| Testability | 8 | 8 | Unchanged |
+| DRY | 8 | 8 | Unchanged |
+| Readability | 8 | 9 | Section markers, algorithm explanations, architecture JSDoc |
+| Constants/Config | 9 | 9 | Unchanged |
+| Type Safety | 8 | 8 | Unchanged |
+| Production Readiness | 9 | 9 | Unchanged |
+| **Overall** | **8.1** | **8.4** | **+0.3 improvement** |
+
+### Why SoC improved from 7 → 8
+
+The section markers transform the monolithic useEffects from "one big blob" into clearly delineated subsystems. While the code hasn't physically moved to separate files, each section can now be understood, reviewed, and modified independently. The top-level JSDoc serves as a table of contents. A developer can jump directly to "Viewport Culling" or "Preview Force Simulation" without reading anything else.
+
+**To reach 9+:** Would require physically splitting the D3 orchestration into separate files (e.g., `graph-culling.ts`, `graph-preview.ts`) — but this risks breaking the shared mutable state (refs, D3 selections) that connects these sections. The current 8 represents the practical ceiling while keeping D3 as the rendering engine.

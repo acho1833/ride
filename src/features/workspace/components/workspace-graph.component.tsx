@@ -3,8 +3,25 @@
 /**
  * Workspace Graph Component
  *
- * D3.js force-directed graph for .ws files.
- * React renders the container once; D3 owns all dynamic updates.
+ * Renders a force-directed entity relationship graph using D3.js.
+ * React only renders the outer container + popups; D3 owns all SVG nodes, links,
+ * zoom/pan, drag, selection, culling, minimap, and preview rendering.
+ *
+ * Architecture:
+ *  - Pure math/data logic lives in ../utils/graph.utils.ts (tested independently)
+ *  - All tuning constants live in ../const.ts (GRAPH_CONFIG, PREVIEW_CONFIG, etc.)
+ *  - This component focuses on D3 DOM orchestration and React lifecycle
+ *
+ * Main sections (search for "═══" markers):
+ *  1. Refs & State         — React refs and mutable state for D3
+ *  2. Callbacks            — Popup, save, and event handlers
+ *  3. Main Graph Effect    — D3 setup, rendering, interactions
+ *  4. Selection Effect     — Updates node colors on selection change
+ *  5. Preview Effect       — 1-hop preview node rendering & force simulation
+ *  6. Minimap Effect       — Canvas-based overview rendering
+ *  7. Zoom Controls        — Button handlers for zoom in/out/fit
+ *  8. Drag & Drop          — External entity drop handling
+ *  9. JSX                  — Container, SVG, minimap, popups
  */
 
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
@@ -31,6 +48,9 @@ import {
   computePreviewItemId,
   computeScaledPreviewDistance,
   hasReachedTarget,
+  computeDistance,
+  clampValue,
+  computeSelectionRect,
   type MinimapTransform
 } from '../utils/graph.utils';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData, type PreviewState } from '../types';
@@ -100,6 +120,9 @@ const WorkspaceGraphComponent = ({
   onPreviewAddEntity,
   onPreviewGroupClick
 }: Props) => {
+  // ═══════════════════════════════════════════════════════════════════════
+  // 1. Refs & State
+  // ═══════════════════════════════════════════════════════════════════════
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const minimapCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -148,6 +171,10 @@ const WorkspaceGraphComponent = ({
 
   // Convert workspace to graph data
   const data = useMemo<WorkspaceGraphData>(() => toGraphData(workspace), [workspace]);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 2. Callbacks — popup management, view state persistence
+  // ═══════════════════════════════════════════════════════════════════════
 
   // Collect current state and save
   const collectAndSave = useCallback(() => {
@@ -261,7 +288,11 @@ const WorkspaceGraphComponent = ({
     };
   }, []);
 
-  // Initialize D3 graph when dimensions are available
+  // ═══════════════════════════════════════════════════════════════════════
+  // 3. Main Graph Effect — D3 setup, rendering, interactions
+  //    Runs when data or dimensions change. Creates all SVG elements,
+  //    sets up force simulation, drag, selection, and viewport culling.
+  // ═══════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!svgRef.current || !dimensions) return;
 
@@ -326,9 +357,9 @@ const WorkspaceGraphComponent = ({
       .selectAll<SVGLineElement, WorkspaceGraphLink>('line')
       .data(links)
       .join('line')
-      .attr('stroke', 'white')
-      .attr('stroke-opacity', 0.6)
-      .attr('stroke-width', 2);
+      .attr('stroke', GRAPH_CONFIG.linkStroke)
+      .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity)
+      .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth);
 
     // Register link elements with nodes for fast lookup during drag
     link.each(function (d) {
@@ -354,11 +385,11 @@ const WorkspaceGraphComponent = ({
       .attr('y', -GRAPH_CONFIG.nodeRadius)
       .attr('width', GRAPH_CONFIG.nodeRadius * 2)
       .attr('height', GRAPH_CONFIG.nodeRadius * 2)
-      .attr('rx', 4)
-      .attr('ry', 4)
+      .attr('rx', GRAPH_CONFIG.nodeRectRadius)
+      .attr('ry', GRAPH_CONFIG.nodeRectRadius)
       .attr('fill', GRAPH_CONFIG.nodeColor)
-      .attr('stroke', 'white')
-      .attr('stroke-width', 2);
+      .attr('stroke', GRAPH_CONFIG.linkStroke)
+      .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth);
 
     // Add entity type icons (centered in square)
     node
@@ -375,7 +406,7 @@ const WorkspaceGraphComponent = ({
       .append('text')
       .text(d => d.labelNormalized)
       .attr('text-anchor', 'middle')
-      .attr('dy', GRAPH_CONFIG.nodeRadius + 14)
+      .attr('dy', GRAPH_CONFIG.nodeRadius + GRAPH_CONFIG.labelOffsetY)
       .attr('fill', 'white')
       .attr('font-size', '12px')
       .attr('pointer-events', 'none');
@@ -394,9 +425,9 @@ const WorkspaceGraphComponent = ({
           .append('circle')
           .attr('cx', GRAPH_CONFIG.nodeRadius)
           .attr('cy', -GRAPH_CONFIG.nodeRadius)
-          .attr('r', 7)
+          .attr('r', CULLING_CONFIG.badgeRadius)
           .attr('fill', GRAPH_CONFIG.nodeColor)
-          .attr('stroke', 'white')
+          .attr('stroke', GRAPH_CONFIG.linkStroke)
           .attr('stroke-width', 1.5);
         badge
           .append('text')
@@ -405,7 +436,7 @@ const WorkspaceGraphComponent = ({
           .attr('text-anchor', 'middle')
           .attr('dy', '3')
           .attr('fill', 'white')
-          .attr('font-size', '9px')
+          .attr('font-size', CULLING_CONFIG.badgeFontSize)
           .attr('font-weight', 'bold');
       });
 
@@ -425,7 +456,10 @@ const WorkspaceGraphComponent = ({
       .attr('pointer-events', 'none')
       .attr('visibility', 'hidden');
 
-    // --- Viewport culling (quadtree + diff-based) ---
+    // ─── Viewport Culling ──────────────────────────────────────────────
+    // For large graphs (500+ nodes), hides off-screen nodes/links to reduce paint cost.
+    // Uses a quadtree spatial index for O(log n) viewport queries, then a diff-based
+    // approach to only touch DOM elements that changed visibility state.
     const cullingEnabled = nodes.length >= CULLING_CONFIG.nodeThreshold;
     let cullingRafId: number | null = null;
 
@@ -468,7 +502,7 @@ const WorkspaceGraphComponent = ({
             if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
               visibleNodeIds.add(d.id);
             }
-          } while ((leaf = (leaf as any).next));
+          } while ((leaf = (leaf as any).next)); // D3 quadtree linked-list traversal (untyped)
         }
         return false;
       });
@@ -569,7 +603,10 @@ const WorkspaceGraphComponent = ({
       });
     };
 
-    // Setup force simulation
+    // ─── Force Simulation ─────────────────────────────────────────────
+    // Computes initial node positions using a physics simulation with
+    // link distance, charge repulsion, centering, and collision forces.
+    // Runs synchronously for new graphs, skipped when saved positions exist.
     const simulation = d3
       .forceSimulation<WorkspaceGraphNode>(nodes)
       .force(
@@ -581,13 +618,13 @@ const WorkspaceGraphComponent = ({
       )
       .force('charge', d3.forceManyBody().strength(GRAPH_CONFIG.chargeStrength))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(GRAPH_CONFIG.nodeRadius + 10));
+      .force('collision', d3.forceCollide().radius(GRAPH_CONFIG.nodeRadius + GRAPH_CONFIG.collisionPadding));
 
     // Run simulation synchronously to calculate initial positions
     // Skip if we have saved positions - they're already applied to nodes
     simulation.stop();
     if (!workspace.viewState) {
-      for (let i = 0; i < 300; i++) {
+      for (let i = 0; i < GRAPH_CONFIG.initialLayoutTicks; i++) {
         simulation.tick();
       }
       // Save the calculated positions after initial layout
@@ -604,7 +641,14 @@ const WorkspaceGraphComponent = ({
       ? transformRef.current
       : workspace.viewState
         ? d3.zoomIdentity.translate(workspace.viewState.panX, workspace.viewState.panY).scale(workspace.viewState.scale)
-        : (() => { const fit = calculateFitTransform(nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })), width, height); return d3.zoomIdentity.translate(fit.translateX, fit.translateY).scale(fit.scale); })();
+        : (() => {
+            const fit = calculateFitTransform(
+              nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })),
+              width,
+              height
+            );
+            return d3.zoomIdentity.translate(fit.translateX, fit.translateY).scale(fit.scale);
+          })();
 
     transformRef.current = initialTransform;
     svg.call(zoom.transform, initialTransform);
@@ -621,7 +665,10 @@ const WorkspaceGraphComponent = ({
     // Initial viewport culling pass
     updateViewportCulling();
 
-    // Detect new nodes for smooth position transitions
+    // ─── New Node Expansion ────────────────────────────────────────────
+    // When entities are added to the workspace, position them near related
+    // existing nodes. Uses placement algorithm for large batches (500+),
+    // or a mini force simulation for small batches.
     const currentNodeIds = new Set(nodes.map(n => n.id));
     const newNodeIds = nodes.filter(n => !prevNodeIdsRef.current.has(n.id)).map(n => n.id);
     const hasNewNodes = newNodeIds.length > 0 && prevNodeIdsRef.current.size > 0;
@@ -760,7 +807,9 @@ const WorkspaceGraphComponent = ({
       node.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
-    // Reuse cullingNodeElements as nodeElementMap for group drag updates
+    // ─── Drag Behavior ────────────────────────────────────────────────
+    // Supports single-node and group drag (when node is part of selection).
+    // Disabled during preview mode. Shift/Alt clicks are reserved for preview.
     const nodeElementMap = cullingNodeElements;
 
     // Helper: update connected links for a given node
@@ -785,9 +834,8 @@ const WorkspaceGraphComponent = ({
     const drag = d3
       .drag<SVGGElement, WorkspaceGraphNode>()
       .filter(event => !event.shiftKey && !event.altKey) // Shift+Click or Alt+Click goes to preview, not drag
-      .clickDistance(4) // Allow clicks/dblclicks through if pointer moves less than 4px
-      .on('start', function (event, d) {
-        console.log('[WorkspaceGraph] drag start', { shiftKey: event.sourceEvent?.shiftKey, entityId: d.id });
+      .clickDistance(GRAPH_CONFIG.dragClickDistance)
+      .on('start', function () {
         // Disable regular node dragging during preview mode
         if (previewStateRef.current?.isActive) return;
 
@@ -851,6 +899,7 @@ const WorkspaceGraphComponent = ({
       }
     });
 
+    // ─── Click Handlers ────────────────────────────────────────────────
     // Left-click on node: single select, ctrl+click toggle
     node.on('click', function (event: MouseEvent, d: WorkspaceGraphNode) {
       event.stopPropagation();
@@ -894,7 +943,9 @@ const WorkspaceGraphComponent = ({
       handleOpenPopupRef.current(d.id, d.x ?? 0, d.y ?? 0);
     });
 
-    // Rectangle selection: use native event listeners to avoid D3 zoom interference
+    // ─── Rectangle Selection ────────────────────────────────────────────
+    // Drag on empty canvas draws a selection rectangle. Uses native event
+    // listeners (not D3) to avoid interference with D3's zoom behavior.
     const svgElement = svgRef.current!;
 
     const handleMouseDown = (event: MouseEvent) => {
@@ -924,9 +975,7 @@ const WorkspaceGraphComponent = ({
       if (!dragStartRef.current) return;
 
       // Calculate screen distance moved
-      const dx = event.clientX - dragStartRef.current.screenX;
-      const dy = event.clientY - dragStartRef.current.screenY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = computeDistance(event.clientX - dragStartRef.current.screenX, event.clientY - dragStartRef.current.screenY);
 
       // Start rectangle selection if moved past threshold
       if (!isDraggingSelectionRef.current && distance >= SELECTION_CONFIG.minDragDistance) {
@@ -941,21 +990,15 @@ const WorkspaceGraphComponent = ({
       if (isDraggingSelectionRef.current) {
         // Clamp mouse coordinates to SVG bounds
         const svgRect = svgElement.getBoundingClientRect();
-        const clampedX = Math.max(svgRect.left, Math.min(event.clientX, svgRect.right));
-        const clampedY = Math.max(svgRect.top, Math.min(event.clientY, svgRect.bottom));
+        const clampedX = clampValue(event.clientX, svgRect.left, svgRect.right);
+        const clampedY = clampValue(event.clientY, svgRect.top, svgRect.bottom);
 
         const currentCoords = invertTransform(clampedX - svgRect.left, clampedY - svgRect.top, transformRef.current);
 
         // Calculate rectangle bounds (handle drag in any direction)
-        const rectX = Math.min(dragStartRef.current.x, currentCoords.x);
-        const rectY = Math.min(dragStartRef.current.y, currentCoords.y);
-        const rectWidth = Math.abs(currentCoords.x - dragStartRef.current.x);
-        const rectHeight = Math.abs(currentCoords.y - dragStartRef.current.y);
+        const rect = computeSelectionRect(dragStartRef.current.x, dragStartRef.current.y, currentCoords.x, currentCoords.y);
 
-        selectionRect.attr('x', rectX).attr('y', rectY).attr('width', rectWidth).attr('height', rectHeight);
-
-        // Visual feedback: highlight nodes inside rectangle (without triggering state update)
-        const rect = { x: rectX, y: rectY, width: rectWidth, height: rectHeight };
+        selectionRect.attr('x', rect.x).attr('y', rect.y).attr('width', rect.width).attr('height', rect.height);
         d3.select(svgElement)
           .selectAll<SVGRectElement, WorkspaceGraphNode>('.nodes g rect')
           .attr('fill', d => {
@@ -1039,7 +1082,9 @@ const WorkspaceGraphComponent = ({
     onFocusPanel
   ]);
 
-  // Update node colors when selection changes (driven by prop from parent/store)
+  // ═══════════════════════════════════════════════════════════════════════
+  // 4. Selection Effect — updates node colors when selection changes
+  // ═══════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
@@ -1052,7 +1097,12 @@ const WorkspaceGraphComponent = ({
       .attr('fill', d => (selectedEntityIds.includes(d.id) ? GRAPH_CONFIG.nodeColorSelected : GRAPH_CONFIG.nodeColor));
   }, [selectedEntityIds]);
 
-  // Render preview nodes/groups when previewState changes
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5. Preview Effect — renders 1-hop preview nodes with force simulation
+  //    Shows neighboring entities as semi-transparent nodes connected by
+  //    dashed lines. Uses a separate force simulation to animate new nodes
+  //    into position, with caching to preserve positions across re-renders.
+  // ═══════════════════════════════════════════════════════════════════════
   useEffect(() => {
     // Stop any running preview simulation and cache current positions
     if (previewSimulationRef.current) {
@@ -1062,12 +1112,7 @@ const WorkspaceGraphComponent = ({
       const cache = previewCacheRef.current;
       const targetDist = PREVIEW_CONFIG.previewDistance;
       for (const [id, item] of previewAnimatingRef.current) {
-        const reachedTarget = hasReachedTarget(
-          { x: item.x, y: item.y },
-          item.sourcePos,
-          targetDist,
-          0.5
-        );
+        const reachedTarget = hasReachedTarget({ x: item.x, y: item.y }, item.sourcePos, targetDist, 0.5);
         cache.set(id, {
           x: item.x,
           y: item.y,
@@ -1113,11 +1158,11 @@ const WorkspaceGraphComponent = ({
       }
     }
 
-    // Create preview layer group
+    // ─── Setup preview layer and collect positions ─────────────────────
     const previewLayer = g.append('g').attr('class', 'preview-layer');
 
-    // Build force simulation data for preview nodes
-    // Include existing graph nodes as fixed positions to avoid overlap
+    // Include existing graph nodes as fixed positions so preview nodes
+    // don't overlap with the main graph
     interface SimNode {
       id: string;
       x: number;
@@ -1149,8 +1194,6 @@ const WorkspaceGraphComponent = ({
       }
     });
 
-    console.log('[Preview] items:', items.length, 'uninitialized:', uninitializedItems.length, 'cache:', cache.size);
-
     // Track DOM elements for uninitialized items so force tick can update them
     interface AnimatingItem {
       simNodeId: string;
@@ -1162,7 +1205,9 @@ const WorkspaceGraphComponent = ({
     }
     const animatingItems: AnimatingItem[] = [];
 
-    // Helper to create individual preview node DOM (shared for both animated and static)
+    // ─── DOM creation helpers ───────────────────────────────────────────
+    // These build the SVG elements for each preview node/group.
+    // Used for both animated (new) and static (cached) items.
     const createPreviewNodeDOM = (
       entity: (typeof previewNodes)[0],
       parentGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -1193,7 +1238,7 @@ const WorkspaceGraphComponent = ({
 
       // Fade in for new nodes
       if (isAnimating) {
-        node.transition().duration(150).style('opacity', 1);
+        node.transition().duration(PREVIEW_CONFIG.fadeInMs).style('opacity', 1);
       }
 
       // Node square with dashed border
@@ -1203,12 +1248,12 @@ const WorkspaceGraphComponent = ({
         .attr('y', -GRAPH_CONFIG.nodeRadius)
         .attr('width', GRAPH_CONFIG.nodeRadius * 2)
         .attr('height', GRAPH_CONFIG.nodeRadius * 2)
-        .attr('rx', 4)
-        .attr('ry', 4)
+        .attr('rx', GRAPH_CONFIG.nodeRectRadius)
+        .attr('ry', GRAPH_CONFIG.nodeRectRadius)
         .attr('fill', GRAPH_CONFIG.nodeColor)
         .attr('fill-opacity', PREVIEW_CONFIG.nodeOpacity)
         .attr('stroke', PREVIEW_CONFIG.borderColor)
-        .attr('stroke-width', 2)
+        .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth)
         .attr('stroke-dasharray', PREVIEW_CONFIG.lineDash);
 
       // Entity icon
@@ -1227,7 +1272,7 @@ const WorkspaceGraphComponent = ({
       const label = entity.labelNormalized.length > 15 ? entity.labelNormalized.slice(0, 15) + '...' : entity.labelNormalized;
       node
         .append('text')
-        .attr('y', GRAPH_CONFIG.nodeRadius + 14)
+        .attr('y', GRAPH_CONFIG.nodeRadius + GRAPH_CONFIG.labelOffsetY)
         .attr('text-anchor', 'middle')
         .attr('fill', 'white')
         .attr('font-size', '12px')
@@ -1238,16 +1283,16 @@ const WorkspaceGraphComponent = ({
       const addButton = node.append('g').attr('class', 'add-button').attr('opacity', 0).style('cursor', 'pointer');
       addButton
         .append('circle')
-        .attr('cx', GRAPH_CONFIG.nodeRadius - 4)
-        .attr('cy', -GRAPH_CONFIG.nodeRadius + 4)
-        .attr('r', 10)
+        .attr('cx', GRAPH_CONFIG.nodeRadius - PREVIEW_CONFIG.addButtonOffset)
+        .attr('cy', -GRAPH_CONFIG.nodeRadius + PREVIEW_CONFIG.addButtonOffset)
+        .attr('r', PREVIEW_CONFIG.addButtonRadius)
         .attr('fill', GRAPH_CONFIG.nodeColorSelected)
-        .attr('stroke', 'white')
+        .attr('stroke', GRAPH_CONFIG.linkStroke)
         .attr('stroke-width', 1.5);
       addButton
         .append('text')
-        .attr('x', GRAPH_CONFIG.nodeRadius - 4)
-        .attr('y', -GRAPH_CONFIG.nodeRadius + 4)
+        .attr('x', GRAPH_CONFIG.nodeRadius - PREVIEW_CONFIG.addButtonOffset)
+        .attr('y', -GRAPH_CONFIG.nodeRadius + PREVIEW_CONFIG.addButtonOffset)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'central')
         .attr('fill', 'white')
@@ -1282,13 +1327,11 @@ const WorkspaceGraphComponent = ({
           }
         })
         .on('click', function (event: MouseEvent) {
-          console.log('[PreviewNode] click', { shiftKey: event.shiftKey, altKey: event.altKey, entityId: entity.id });
           event.stopPropagation();
           // Skip if Shift/Alt was held (handled in mousedown)
           if (event.shiftKey || event.altKey) return;
           // Regular click adds entity to graph
           if (onPreviewAddEntityRef.current) {
-            console.log('[PreviewNode] adding entity to graph', entity.id);
             onPreviewAddEntityRef.current(entity.id, pos);
           }
         });
@@ -1325,7 +1368,7 @@ const WorkspaceGraphComponent = ({
         .style('opacity', isAnimating ? 0 : 1);
 
       if (isAnimating) {
-        node.transition().duration(150).style('opacity', 1);
+        node.transition().duration(PREVIEW_CONFIG.fadeInMs).style('opacity', 1);
       }
 
       // Circle node
@@ -1351,7 +1394,12 @@ const WorkspaceGraphComponent = ({
         .attr('opacity', PREVIEW_CONFIG.nodeOpacity);
 
       // Count badge
-      const badge = node.append('g').attr('transform', `translate(${GRAPH_CONFIG.nodeRadius - 4}, ${-GRAPH_CONFIG.nodeRadius + 4})`);
+      const badge = node
+        .append('g')
+        .attr(
+          'transform',
+          `translate(${GRAPH_CONFIG.nodeRadius - PREVIEW_CONFIG.addButtonOffset}, ${-GRAPH_CONFIG.nodeRadius + PREVIEW_CONFIG.addButtonOffset})`
+        );
       badge
         .append('rect')
         .attr('x', -12)
@@ -1369,12 +1417,12 @@ const WorkspaceGraphComponent = ({
         .attr('fill', 'white')
         .attr('font-size', '10px')
         .attr('font-weight', 'bold')
-        .text(group.count > 999 ? '999+' : group.count);
+        .text(group.count > PREVIEW_CONFIG.groupBadgeMaxCount ? `${PREVIEW_CONFIG.groupBadgeMaxCount}+` : group.count);
 
       // Label
       node
         .append('text')
-        .attr('y', GRAPH_CONFIG.nodeRadius + 14)
+        .attr('y', GRAPH_CONFIG.nodeRadius + GRAPH_CONFIG.labelOffsetY)
         .attr('text-anchor', 'middle')
         .attr('fill', 'white')
         .attr('font-size', '12px')
@@ -1447,7 +1495,11 @@ const WorkspaceGraphComponent = ({
       });
     }
 
-    // Run async force simulation for uninitialized items
+    // ─── Preview Force Simulation ──────────────────────────────────────
+    // Animates new (uninitialized) preview nodes into position using a
+    // separate D3 force simulation. Fixed nodes (existing graph + cached
+    // preview) prevent overlap. Link distance grows incrementally so nodes
+    // spread out naturally. Stops when all nodes stabilize or timeout.
     if (animatingItems.length > 0) {
       // Include already-positioned preview items as fixed nodes
       const fixedPreviewPositions: SimNode[] = [];
@@ -1526,16 +1578,13 @@ const WorkspaceGraphComponent = ({
 
       // Track previous positions to detect stability
       const prevPositions = new Map<string, { x: number; y: number }>();
-      const STABILITY_THRESHOLD = 0.5; // px - stop if no node moved more than this
       let stableTicks = 0;
-      const STABLE_TICKS_REQUIRED = 3; // consecutive stable ticks before stopping
 
       // Incrementally grow link distance so nodes spread out naturally
-      const MIN_LINK_DISTANCE = previewDistance * 0.4;
+      const MIN_LINK_DISTANCE = previewDistance * PREVIEW_CONFIG.minLinkDistanceRatio;
       const MAX_LINK_DISTANCE = previewDistance;
       let currentLinkDistance = MIN_LINK_DISTANCE;
-      const LINK_DISTANCE_STEP = (MAX_LINK_DISTANCE - MIN_LINK_DISTANCE) / 60; // grow over ~60 ticks
-      const MAX_SIM_MS = 3000; // hard cap at 3 seconds
+      const LINK_DISTANCE_STEP = (MAX_LINK_DISTANCE - MIN_LINK_DISTANCE) / PREVIEW_CONFIG.linkDistanceGrowthTicks;
 
       const cacheAndStop = (sim: d3.Simulation<SimNodeWithSource, undefined>) => {
         sim.stop();
@@ -1560,19 +1609,19 @@ const WorkspaceGraphComponent = ({
 
       const simulation = d3
         .forceSimulation(allSimNodes)
-        .alphaDecay(0.05)
+        .alphaDecay(PREVIEW_CONFIG.simAlphaDecay)
         .force('link', linkForce)
         .force(
           'collision',
           d3
             .forceCollide<SimNodeWithSource>()
-            .radius(GRAPH_CONFIG.nodeRadius * 2.5)
+            .radius(GRAPH_CONFIG.nodeRadius * PREVIEW_CONFIG.collisionRadiusMultiplier)
             .strength(0.8)
             .iterations(2)
         )
         .force(
           'charge',
-          d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : -200))
+          d3.forceManyBody<SimNodeWithSource>().strength(node => (node.fx !== undefined ? 0 : PREVIEW_CONFIG.simChargeStrength))
         )
         .on('tick', () => {
           // Grow link distance incrementally and update the force
@@ -1610,17 +1659,19 @@ const WorkspaceGraphComponent = ({
           let maxDistanceError = 0;
           for (const [, { simNode }] of simNodeMap) {
             if (simNode.sourceX !== undefined && simNode.sourceY !== undefined) {
-              const ldx = simNode.x - simNode.sourceX;
-              const ldy = simNode.y - simNode.sourceY;
-              const linkDist = Math.sqrt(ldx * ldx + ldy * ldy);
+              const linkDist = computeDistance(simNode.x - simNode.sourceX, simNode.y - simNode.sourceY);
               maxDistanceError = Math.max(maxDistanceError, Math.abs(linkDist - currentLinkDistance));
             }
           }
 
           // Stop early if nodes stopped moving AND links are near target distance AND distance fully grown
-          if (maxMovement < STABILITY_THRESHOLD && maxDistanceError < GRAPH_CONFIG.nodeRadius && currentLinkDistance >= MAX_LINK_DISTANCE) {
+          if (
+            maxMovement < PREVIEW_CONFIG.stabilityThreshold &&
+            maxDistanceError < GRAPH_CONFIG.nodeRadius &&
+            currentLinkDistance >= MAX_LINK_DISTANCE
+          ) {
             stableTicks++;
-            if (stableTicks >= STABLE_TICKS_REQUIRED) {
+            if (stableTicks >= PREVIEW_CONFIG.stableTicksRequired) {
               cacheAndStop(simulation);
             }
           } else {
@@ -1646,7 +1697,7 @@ const WorkspaceGraphComponent = ({
         if (previewSimulationRef.current === simulation) {
           cacheAndStop(simulation);
         }
-      }, MAX_SIM_MS);
+      }, PREVIEW_CONFIG.maxSimulationMs);
 
       // Store simulation and cleanup timeout together
       previewSimulationRef.current = simulation;
@@ -1665,12 +1716,7 @@ const WorkspaceGraphComponent = ({
         const cleanupCache = previewCacheRef.current;
         const cleanupTargetDist = PREVIEW_CONFIG.previewDistance;
         for (const [id, item] of previewAnimatingRef.current) {
-          const reachedTarget = hasReachedTarget(
-            { x: item.x, y: item.y },
-            item.sourcePos,
-            cleanupTargetDist,
-            0.5
-          );
+          const reachedTarget = hasReachedTarget({ x: item.x, y: item.y }, item.sourcePos, cleanupTargetDist, 0.5);
           cleanupCache.set(id, {
             x: item.x,
             y: item.y,
@@ -1691,7 +1737,9 @@ const WorkspaceGraphComponent = ({
   // Minimap: Canvas rendering + click-to-pan
   // -----------------------------------------------------------------------
 
-  // Render minimap whenever nodes move or viewport changes
+  // ═══════════════════════════════════════════════════════════════════════
+  // 6. Minimap Effect — canvas-based overview with viewport rectangle
+  // ═══════════════════════════════════════════════════════════════════════
   useEffect(() => {
     const canvas = minimapCanvasRef.current;
     if (!canvas || !dimensions) return;
@@ -1712,7 +1760,12 @@ const WorkspaceGraphComponent = ({
     if (nodes.length === 0) return;
 
     // Compute minimap transform (bounds, scale, offset)
-    const mt = computeMinimapTransform(nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })), mw, mh, pad);
+    const mt = computeMinimapTransform(
+      nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })),
+      mw,
+      mh,
+      pad
+    );
     if (!mt) return;
 
     // Draw nodes as dots
@@ -1764,7 +1817,7 @@ const WorkspaceGraphComponent = ({
       const newTransform = d3.zoomIdentity.translate(newX, newY).scale(t.k);
       const svgSelection = d3.select(svgRef.current);
       if (animate) {
-        svgSelection.transition().duration(200).call(zoomRef.current.transform, newTransform);
+        svgSelection.transition().duration(MINIMAP_CONFIG.panAnimationMs).call(zoomRef.current.transform, newTransform);
       } else {
         svgSelection.call(zoomRef.current.transform, newTransform);
       }
@@ -1772,17 +1825,19 @@ const WorkspaceGraphComponent = ({
     [dimensions]
   );
 
-  // Zoom control handlers
+  // ═══════════════════════════════════════════════════════════════════════
+  // 7. Zoom Controls
+  // ═══════════════════════════════════════════════════════════════════════
   const handleZoomIn = () => {
     if (!svgRef.current || !zoomRef.current) return;
-    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, GRAPH_CONFIG.zoomStep);
+    d3.select(svgRef.current).transition().duration(GRAPH_CONFIG.zoomAnimationMs).call(zoomRef.current.scaleBy, GRAPH_CONFIG.zoomStep);
   };
 
   const handleZoomOut = () => {
     if (!svgRef.current || !zoomRef.current) return;
     d3.select(svgRef.current)
       .transition()
-      .duration(300)
+      .duration(GRAPH_CONFIG.zoomAnimationMs)
       .call(zoomRef.current.scaleBy, 1 / GRAPH_CONFIG.zoomStep);
   };
 
@@ -1791,12 +1846,18 @@ const WorkspaceGraphComponent = ({
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
 
-    const fit = calculateFitTransform(nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })), dimensions.width, dimensions.height);
+    const fit = calculateFitTransform(
+      nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })),
+      dimensions.width,
+      dimensions.height
+    );
     const fitTransform = d3.zoomIdentity.translate(fit.translateX, fit.translateY).scale(fit.scale);
-    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.transform, fitTransform);
+    d3.select(svgRef.current).transition().duration(GRAPH_CONFIG.zoomAnimationMs).call(zoomRef.current.transform, fitTransform);
   };
 
-  // Handle drag over to accept drops
+  // ═══════════════════════════════════════════════════════════════════════
+  // 8. Drag & Drop — accept entity drops from external panels
+  // ═══════════════════════════════════════════════════════════════════════
   const handleDragOver = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
@@ -1844,6 +1905,9 @@ const WorkspaceGraphComponent = ({
     [entityMap, onAddEntity, onFocusPanel]
   );
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // 9. JSX — container, SVG, popups, minimap, zoom controls
+  // ═══════════════════════════════════════════════════════════════════════
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden" onDragOver={handleDragOver} onDrop={handleDrop}>
       <svg ref={svgRef} className="h-full w-full select-none" />

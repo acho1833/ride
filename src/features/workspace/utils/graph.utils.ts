@@ -54,6 +54,29 @@ export function isPointInRect(x: number, y: number, rect: Rect): boolean {
   return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
 }
 
+/** Euclidean distance between two deltas. */
+export function computeDistance(dx: number, dy: number): number {
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/** Clamp a value to [min, max]. */
+export function clampValue(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(value, max));
+}
+
+/**
+ * Compute axis-aligned bounding rect from two corner points.
+ * Handles drag in any direction (start may be > end).
+ */
+export function computeSelectionRect(x1: number, y1: number, x2: number, y2: number): Rect {
+  return {
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
+    width: Math.abs(x2 - x1),
+    height: Math.abs(y2 - y1)
+  };
+}
+
 /**
  * Invert a zoom/pan transform to convert screen-relative SVG coordinates
  * to world (graph) coordinates.
@@ -122,11 +145,7 @@ export function calculateFitTransform(
   const graphCenterX = (bounds.minX + bounds.maxX) / 2;
   const graphCenterY = (bounds.minY + bounds.maxY) / 2;
 
-  const scale = Math.min(
-    (width - padding * 2) / graphWidth,
-    (height - padding * 2) / graphHeight,
-    1
-  );
+  const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
   const translateX = width / 2 - graphCenterX * scale;
   const translateY = height / 2 - graphCenterY * scale;
 
@@ -192,12 +211,7 @@ export function formatBadgeCount(count: number): string {
  * Compute world-space viewport bounds from transform and dimensions.
  * Adds configurable padding to prevent pop-in.
  */
-export function computeViewportBounds(
-  transform: Transform,
-  width: number,
-  height: number,
-  padding?: number
-): Bounds {
+export function computeViewportBounds(transform: Transform, width: number, height: number, padding?: number): Bounds {
   const pad = padding ?? CULLING_CONFIG.viewportPadding;
   return {
     minX: -transform.x / transform.k - pad,
@@ -225,11 +239,7 @@ export function diffSets<T>(current: Set<T>, previous: Set<T>): { added: Set<T>;
 }
 
 /** Determine if a link should be visible based on whether both endpoints are visible. */
-export function isLinkVisible(
-  sourceId: string,
-  targetId: string,
-  visibleNodeIds: Set<string>
-): boolean {
+export function isLinkVisible(sourceId: string, targetId: string, visibleNodeIds: Set<string>): boolean {
   return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
 }
 
@@ -293,12 +303,7 @@ export function minimapToWorld(minimapX: number, minimapY: number, mt: MinimapTr
 /**
  * Compute the viewport rectangle in minimap coordinates.
  */
-export function viewportToMinimap(
-  transform: Transform,
-  viewWidth: number,
-  viewHeight: number,
-  mt: MinimapTransform
-): Rect {
+export function viewportToMinimap(transform: Transform, viewWidth: number, viewHeight: number, mt: MinimapTransform): Rect {
   const vpMinX = -transform.x / transform.k;
   const vpMinY = -transform.y / transform.k;
   const vpMaxX = (viewWidth - transform.x) / transform.k;
@@ -335,12 +340,8 @@ export function computeScaledPreviewDistance(itemCount: number, baseDistance?: n
  * Compute initial positions for preview items distributed in a circle around source.
  * Returns array of { x, y } positions.
  */
-export function computeInitialPreviewPositions(
-  count: number,
-  sourcePos: Point,
-  scaledDistance: number
-): Point[] {
-  const initialOffset = scaledDistance * 0.3;
+export function computeInitialPreviewPositions(count: number, sourcePos: Point, scaledDistance: number): Point[] {
+  const initialOffset = scaledDistance * PREVIEW_CONFIG.initialOffsetRatio;
   return Array.from({ length: count }, (_, i) => {
     const angle = (i / count) * Math.PI * 2;
     return {
@@ -354,12 +355,7 @@ export function computeInitialPreviewPositions(
  * Check if an animated preview item has moved far enough from its source
  * to be considered "initialized" (reached target distance).
  */
-export function hasReachedTarget(
-  position: Point,
-  sourcePosition: Point,
-  targetDistance: number,
-  threshold?: number
-): boolean {
+export function hasReachedTarget(position: Point, sourcePosition: Point, targetDistance: number, threshold?: number): boolean {
   const dx = position.x - sourcePosition.x;
   const dy = position.y - sourcePosition.y;
   const dist = Math.sqrt(dx * dx + dy * dy);

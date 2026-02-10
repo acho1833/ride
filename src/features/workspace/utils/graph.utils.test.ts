@@ -19,7 +19,10 @@ import {
   computePreviewItemId,
   computeScaledPreviewDistance,
   computeInitialPreviewPositions,
-  hasReachedTarget
+  hasReachedTarget,
+  computeDistance,
+  clampValue,
+  computeSelectionRect
 } from './graph.utils';
 
 describe('graph.utils', () => {
@@ -98,12 +101,19 @@ describe('graph.utils', () => {
     });
 
     it('returns correct bounds for multiple nodes', () => {
-      const nodes = [{ x: 10, y: 20 }, { x: 50, y: 80 }, { x: 30, y: 5 }];
+      const nodes = [
+        { x: 10, y: 20 },
+        { x: 50, y: 80 },
+        { x: 30, y: 5 }
+      ];
       expect(computeNodeBounds(nodes)).toEqual({ minX: 10, minY: 5, maxX: 50, maxY: 80 });
     });
 
     it('handles negative coordinates', () => {
-      const nodes = [{ x: -100, y: -50 }, { x: 100, y: 50 }];
+      const nodes = [
+        { x: -100, y: -50 },
+        { x: 100, y: 50 }
+      ];
       expect(computeNodeBounds(nodes)).toEqual({ minX: -100, minY: -50, maxX: 100, maxY: 50 });
     });
   });
@@ -123,14 +133,20 @@ describe('graph.utils', () => {
     });
 
     it('scales down large graph to fit viewport', () => {
-      const nodes = [{ x: 0, y: 0 }, { x: 2000, y: 2000 }];
+      const nodes = [
+        { x: 0, y: 0 },
+        { x: 2000, y: 2000 }
+      ];
       const result = calculateFitTransform(nodes, 800, 600, { padding: 0, nodeRadius: 0 });
       expect(result.scale).toBeLessThan(1);
       expect(result.scale).toBeCloseTo(600 / 2000);
     });
 
     it('does not scale up small graph beyond 1', () => {
-      const nodes = [{ x: 0, y: 0 }, { x: 10, y: 10 }];
+      const nodes = [
+        { x: 0, y: 0 },
+        { x: 10, y: 10 }
+      ];
       const result = calculateFitTransform(nodes, 800, 600, { padding: 0, nodeRadius: 0 });
       expect(result.scale).toBe(1);
     });
@@ -307,7 +323,10 @@ describe('graph.utils', () => {
     });
 
     it('computes transform for nodes', () => {
-      const nodes = [{ x: 0, y: 0 }, { x: 100, y: 100 }];
+      const nodes = [
+        { x: 0, y: 0 },
+        { x: 100, y: 100 }
+      ];
       const mt = computeMinimapTransform(nodes, 200, 100, 0);
       expect(mt).not.toBeNull();
       expect(mt!.scale).toBeCloseTo(1);
@@ -316,7 +335,10 @@ describe('graph.utils', () => {
 
   describe('worldToMinimap / minimapToWorld roundtrip', () => {
     it('roundtrips correctly', () => {
-      const nodes = [{ x: -500, y: -300 }, { x: 500, y: 300 }];
+      const nodes = [
+        { x: -500, y: -300 },
+        { x: 500, y: 300 }
+      ];
       const mt = computeMinimapTransform(nodes, 180, 120, 50)!;
 
       const world = { x: 100, y: -50 };
@@ -330,7 +352,10 @@ describe('graph.utils', () => {
 
   describe('viewportToMinimap', () => {
     it('returns positive-sized rect', () => {
-      const nodes = [{ x: 0, y: 0 }, { x: 800, y: 600 }];
+      const nodes = [
+        { x: 0, y: 0 },
+        { x: 800, y: 600 }
+      ];
       const mt = computeMinimapTransform(nodes, 180, 120, 0)!;
       const rect = viewportToMinimap({ x: 0, y: 0, k: 1 }, 800, 600, mt);
       expect(rect.width).toBeGreaterThan(0);
@@ -395,6 +420,88 @@ describe('graph.utils', () => {
 
     it('returns true when past threshold', () => {
       expect(hasReachedTarget({ x: 60, y: 0 }, { x: 0, y: 0 }, 100, 0.5)).toBe(true);
+    });
+  });
+
+  // ─── computeDistance ──────────────────────────────────────────────
+
+  describe('computeDistance', () => {
+    it('returns 0 for zero deltas', () => {
+      expect(computeDistance(0, 0)).toBe(0);
+    });
+
+    it('returns correct distance for 3-4-5 triangle', () => {
+      expect(computeDistance(3, 4)).toBe(5);
+    });
+
+    it('handles negative deltas', () => {
+      expect(computeDistance(-3, -4)).toBe(5);
+    });
+
+    it('handles axis-aligned distance', () => {
+      expect(computeDistance(7, 0)).toBe(7);
+      expect(computeDistance(0, 7)).toBe(7);
+    });
+  });
+
+  // ─── clampValue ──────────────────────────────────────────────────
+
+  describe('clampValue', () => {
+    it('returns value when within range', () => {
+      expect(clampValue(5, 0, 10)).toBe(5);
+    });
+
+    it('clamps to min when below', () => {
+      expect(clampValue(-5, 0, 10)).toBe(0);
+    });
+
+    it('clamps to max when above', () => {
+      expect(clampValue(15, 0, 10)).toBe(10);
+    });
+
+    it('returns boundary values exactly', () => {
+      expect(clampValue(0, 0, 10)).toBe(0);
+      expect(clampValue(10, 0, 10)).toBe(10);
+    });
+  });
+
+  // ─── computeSelectionRect ─────────────────────────────────────────
+
+  describe('computeSelectionRect', () => {
+    it('handles top-left to bottom-right drag', () => {
+      expect(computeSelectionRect(10, 20, 50, 60)).toEqual({
+        x: 10,
+        y: 20,
+        width: 40,
+        height: 40
+      });
+    });
+
+    it('handles bottom-right to top-left drag', () => {
+      expect(computeSelectionRect(50, 60, 10, 20)).toEqual({
+        x: 10,
+        y: 20,
+        width: 40,
+        height: 40
+      });
+    });
+
+    it('handles zero-size rect (same point)', () => {
+      expect(computeSelectionRect(10, 20, 10, 20)).toEqual({
+        x: 10,
+        y: 20,
+        width: 0,
+        height: 0
+      });
+    });
+
+    it('handles negative coordinates', () => {
+      expect(computeSelectionRect(-50, -30, -10, -5)).toEqual({
+        x: -50,
+        y: -30,
+        width: 40,
+        height: 25
+      });
     });
   });
 });

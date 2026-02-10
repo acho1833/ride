@@ -12,16 +12,24 @@ export const GRAPH_CONFIG = {
   nodeRadius: 20,
   /** Entity icon size in pixels */
   iconSize: 32,
+  /** Node rectangle corner radius */
+  nodeRectRadius: 4,
   /** Target distance between linked nodes */
   linkDistance: 180,
   /** Repulsion strength between nodes (negative = repel) */
   chargeStrength: -400,
   /** Strength of centering force */
   centerForce: 0.1,
+  /** Collision force padding beyond nodeRadius */
+  collisionPadding: 10,
+  /** Ticks to run initial force layout before rendering */
+  initialLayoutTicks: 300,
   /** Zoom scale limits */
   zoomExtent: [0.5, 3] as [number, number],
   /** Zoom scale factor for buttons */
   zoomStep: 1.3,
+  /** Zoom button animation duration (ms) */
+  zoomAnimationMs: 300,
   /** Padding around nodes when fitting to view */
   fitPadding: 50,
   /** Debounce delay for saving view state in milliseconds */
@@ -29,7 +37,17 @@ export const GRAPH_CONFIG = {
   /** Default node fill color (teal) */
   nodeColor: 'hsl(175, 40%, 45%)',
   /** Node fill color when selected (blue) */
-  nodeColorSelected: 'hsl(210, 70%, 50%)'
+  nodeColorSelected: 'hsl(210, 70%, 50%)',
+  /** Link stroke color */
+  linkStroke: 'white',
+  /** Link stroke opacity */
+  linkStrokeOpacity: 0.6,
+  /** Link stroke width */
+  linkStrokeWidth: 2,
+  /** Node label vertical offset below node center */
+  labelOffsetY: 14,
+  /** Min drag distance to distinguish from click (px) */
+  dragClickDistance: 4
 } as const;
 
 /**
@@ -48,9 +66,6 @@ export const SELECTION_CONFIG = {
   rectStrokeDash: '4,2'
 } as const;
 
-/**
- * Preview mode configuration.
- */
 /**
  * Smart coordinate placement configuration.
  * Used for placing large numbers of entities without force simulation.
@@ -78,7 +93,11 @@ export const CULLING_CONFIG = {
   /** Minimum node count to activate viewport culling */
   nodeThreshold: 500,
   /** Extra padding around viewport in world coordinates (prevents pop-in) */
-  viewportPadding: 200
+  viewportPadding: 200,
+  /** Badge circle radius for relationship count */
+  badgeRadius: 7,
+  /** Badge font size */
+  badgeFontSize: '9px'
 } as const;
 
 /**
@@ -101,7 +120,9 @@ export const MINIMAP_CONFIG = {
   /** Minimap background color */
   background: 'hsl(0, 0%, 90%)',
   /** Minimap border color */
-  borderColor: 'rgba(0, 0, 0, 0.15)'
+  borderColor: 'rgba(0, 0, 0, 0.15)',
+  /** Pan animation duration when clicking minimap (ms) */
+  panAnimationMs: 200
 } as const;
 
 export const PREVIEW_CONFIG = {
@@ -114,5 +135,31 @@ export const PREVIEW_CONFIG = {
   /** Preview connecting line dash pattern */
   lineDash: '4,4',
   /** Distance from source node for preview nodes */
-  previewDistance: 120
+  previewDistance: 120,
+  /** Fade-in animation duration (ms) */
+  fadeInMs: 150,
+  /** Add button circle radius */
+  addButtonRadius: 10,
+  /** Add button offset from node corner (px) */
+  addButtonOffset: 4,
+  /** Max count to display in group badge before showing "N+" */
+  groupBadgeMaxCount: 999,
+  /** Max pixel movement per tick to consider simulation stable */
+  stabilityThreshold: 0.5,
+  /** Consecutive stable ticks before stopping simulation */
+  stableTicksRequired: 3,
+  /** Hard timeout for preview simulation (ms) */
+  maxSimulationMs: 3000,
+  /** Simulation energy decay rate */
+  simAlphaDecay: 0.05,
+  /** Collision radius as multiple of nodeRadius */
+  collisionRadiusMultiplier: 2.5,
+  /** Repulsion strength for preview nodes */
+  simChargeStrength: -200,
+  /** Initial position offset as fraction of previewDistance */
+  initialOffsetRatio: 0.3,
+  /** Min link distance as fraction of previewDistance */
+  minLinkDistanceRatio: 0.4,
+  /** Ticks to grow link distance from min to max */
+  linkDistanceGrowthTicks: 60
 } as const;
