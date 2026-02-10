@@ -1959,42 +1959,44 @@ const WorkspaceGraphComponent = ({
         );
       })}
 
-      {/* Minimap - upper right */}
-      <canvas
-        ref={minimapCanvasRef}
-        width={MINIMAP_CONFIG.width}
-        height={MINIMAP_CONFIG.height}
-        className="absolute top-4 right-4 cursor-crosshair rounded"
-        style={{ border: `1px solid ${MINIMAP_CONFIG.borderColor}` }}
-        onClick={handleMinimapInteraction}
-        onMouseDown={e => {
-          if (e.button !== 0) return;
-          handleMinimapInteraction(e, false);
-          const onMouseMove = (moveEvent: MouseEvent) => {
-            handleMinimapInteraction(moveEvent, false);
-          };
-          const onMouseUp = () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-          };
-          window.addEventListener('mousemove', onMouseMove);
-          window.addEventListener('mouseup', onMouseUp);
-        }}
-      />
-
-      {/* Control buttons - lower right */}
-      <div className="group absolute right-4 bottom-4">
-        <div className="bg-background/80 flex flex-col items-center gap-2 rounded-lg border p-2 opacity-50 transition-opacity group-hover:opacity-100">
-          <span className="text-muted-foreground text-xs font-medium">{Math.round(transformRef.current.k * 100)}%</span>
-          <Button variant="outline" size="icon" onClick={handleZoomIn} title="Zoom In">
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={handleZoomOut} title="Zoom Out">
-            <Minus className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={handleZoomToFit} title="Zoom to Fit">
-            <Maximize className="h-4 w-4" />
-          </Button>
+      {/* Minimap + zoom controls - lower right */}
+      <div className="absolute right-4 bottom-4 opacity-50 transition-opacity hover:opacity-100">
+        <div className="bg-background/80 flex flex-col items-center gap-1 rounded-lg border p-1.5">
+          {/* Zoom toolbar - horizontal */}
+          <div className="flex w-full items-center justify-between">
+            <Button variant="ghost" size="icon-xs" onClick={handleZoomOut} title="Zoom Out">
+              <Minus className="h-3 w-3" />
+            </Button>
+            <span className="text-muted-foreground text-xs font-medium">{Math.round(transformRef.current.k * 100)}%</span>
+            <Button variant="ghost" size="icon-xs" onClick={handleZoomIn} title="Zoom In">
+              <Plus className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="icon-xs" onClick={handleZoomToFit} title="Zoom to Fit">
+              <Maximize className="h-3 w-3" />
+            </Button>
+          </div>
+          {/* Minimap */}
+          <canvas
+            ref={minimapCanvasRef}
+            width={MINIMAP_CONFIG.width}
+            height={MINIMAP_CONFIG.height}
+            className="cursor-crosshair rounded"
+            style={{ border: `1px solid ${MINIMAP_CONFIG.borderColor}` }}
+            onClick={handleMinimapInteraction}
+            onMouseDown={e => {
+              if (e.button !== 0) return;
+              handleMinimapInteraction(e, false);
+              const onMouseMove = (moveEvent: MouseEvent) => {
+                handleMinimapInteraction(moveEvent, false);
+              };
+              const onMouseUp = () => {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+              };
+              window.addEventListener('mousemove', onMouseMove);
+              window.addEventListener('mouseup', onMouseUp);
+            }}
+          />
         </div>
       </div>
     </div>
