@@ -60,7 +60,6 @@ const GOOGLE_SEED = 54321;
 const MICROSOFT_SEED = 99999;
 
 const DB_PATH = path.join(__dirname, '../src/lib/mock-data/mock.db');
-const WORKSPACE_STATE_PATH = path.join(__dirname, '../src/lib/mock-data/workspaceState.json');
 const LEGACY_DUMMY_PATH = path.join(__dirname, '../src/lib/mock-data/dummyData.json');
 const LEGACY_GOOGLE_PATH = path.join(__dirname, '../src/lib/mock-data/googleOrgData.json');
 
@@ -1085,7 +1084,6 @@ async function main(): Promise<void> {
   deleteIfExists(DB_PATH);
   deleteIfExists(`${DB_PATH}-wal`);
   deleteIfExists(`${DB_PATH}-shm`);
-  deleteIfExists(WORKSPACE_STATE_PATH);
   deleteIfExists(LEGACY_DUMMY_PATH);
   deleteIfExists(LEGACY_GOOGLE_PATH);
 

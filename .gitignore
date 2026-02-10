@@ -65,7 +65,6 @@ tasks/
 bun.lock
 
 # Mock data runtime state
-src/lib/mock-data/workspaceState.json
 src/lib/mock-data/mock.db
 src/lib/mock-data/mock.db-wal
 src/lib/mock-data/mock.db-shm

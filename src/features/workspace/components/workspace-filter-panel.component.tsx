@@ -87,9 +87,7 @@ const WorkspaceFilterPanelComponent = ({
                     ) : (
                       <Eye className="h-3.5 w-3.5 shrink-0" />
                     )}
-                    <span className={isHidden ? 'text-muted-foreground line-through' : ''}>
-                      {predicate.replace(/_/g, ' ')}
-                    </span>
+                    <span className={isHidden ? 'text-muted-foreground line-through' : ''}>{predicate.replace(/_/g, ' ')}</span>
                   </button>
                 );
               })}

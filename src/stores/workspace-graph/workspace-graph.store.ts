@@ -142,9 +142,7 @@ export const createWorkspaceGraphSlice: StateCreator<WorkspaceGraphSlice, [], []
     set(state => {
       const entry = state.workspaceGraph[workspaceId] ?? {};
       const current = entry.hiddenEntityTypes ?? [];
-      const updated = current.includes(entityType)
-        ? current.filter(t => t !== entityType)
-        : [...current, entityType];
+      const updated = current.includes(entityType) ? current.filter(t => t !== entityType) : [...current, entityType];
       return {
         workspaceGraph: {
           ...state.workspaceGraph,
@@ -157,9 +155,7 @@ export const createWorkspaceGraphSlice: StateCreator<WorkspaceGraphSlice, [], []
     set(state => {
       const entry = state.workspaceGraph[workspaceId] ?? {};
       const current = entry.hiddenPredicates ?? [];
-      const updated = current.includes(predicate)
-        ? current.filter(p => p !== predicate)
-        : [...current, predicate];
+      const updated = current.includes(predicate) ? current.filter(p => p !== predicate) : [...current, predicate];
       return {
         workspaceGraph: {
           ...state.workspaceGraph,

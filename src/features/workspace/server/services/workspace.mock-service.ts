@@ -1,13 +1,11 @@
 import 'server-only';
 
-import * as fs from 'fs';
-import * as path from 'path';
 import type { EntityResponse } from '@/models/entity-response.model';
 import type { WorkspaceResponse, RelationshipResponse } from '@/models/workspace-response.model';
 import { getDb } from '@/lib/mock-db';
 
 // ============================================================================
-// Per-workspace state persisted to JSON file
+// Per-workspace state persisted to SQLite
 // ============================================================================
 
 interface WorkspaceState {
@@ -15,49 +13,49 @@ interface WorkspaceState {
   relationshipList: RelationshipResponse[];
 }
 
-const STATE_FILE_PATH = path.join(process.cwd(), 'src/lib/mock-data/workspaceState.json');
-
-/** Load all workspace states from JSON file */
-function loadStateFromFile(): Record<string, WorkspaceState> {
-  try {
-    if (fs.existsSync(STATE_FILE_PATH)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE_PATH, 'utf-8'));
-    }
-  } catch {
-    // File doesn't exist or is invalid - start fresh
-  }
-  return {};
-}
-
-/** Save all workspace states to JSON file */
-function saveStateToFile(states: Record<string, WorkspaceState>): void {
-  fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(states, null, 2));
-}
-
-/** Build a storage key scoped by user and workspace */
-function stateKey(sid: string, workspaceId: string): string {
-  return `${sid}:${workspaceId}`;
-}
-
-/**
- * Get or initialize workspace state.
- * New workspaces start empty - entities are added via drag-drop or expand.
- */
+/** Read workspace state from SQLite */
 function getWorkspaceState(sid: string, workspaceId: string): WorkspaceState {
-  const states = loadStateFromFile();
-  const key = stateKey(sid, workspaceId);
-  if (!states[key]) {
-    states[key] = { entityList: [], relationshipList: [] };
-    saveStateToFile(states);
-  }
-  return states[key];
+  const db = getDb();
+  const entityList = db
+    .prepare(
+      `SELECT entity_id as id, label_normalized as labelNormalized, type
+       FROM workspace_entity WHERE sid = ? AND workspace_id = ?`
+    )
+    .all(sid, workspaceId) as EntityResponse[];
+
+  const relationshipList = db
+    .prepare(
+      `SELECT relationship_id as relationshipId, predicate,
+              source_entity_id as sourceEntityId, related_entity_id as relatedEntityId
+       FROM workspace_relationship WHERE sid = ? AND workspace_id = ?`
+    )
+    .all(sid, workspaceId) as RelationshipResponse[];
+
+  return { entityList, relationshipList };
 }
 
-/** Update workspace state and persist */
+/** Write workspace state to SQLite (replace all rows for this sid+workspace) */
 function setWorkspaceState(sid: string, workspaceId: string, state: WorkspaceState): void {
-  const states = loadStateFromFile();
-  states[stateKey(sid, workspaceId)] = state;
-  saveStateToFile(states);
+  const db = getDb();
+  const transaction = db.transaction(() => {
+    db.prepare('DELETE FROM workspace_entity WHERE sid = ? AND workspace_id = ?').run(sid, workspaceId);
+    db.prepare('DELETE FROM workspace_relationship WHERE sid = ? AND workspace_id = ?').run(sid, workspaceId);
+
+    const insertEntity = db.prepare(
+      'INSERT INTO workspace_entity (sid, workspace_id, entity_id, label_normalized, type) VALUES (?, ?, ?, ?, ?)'
+    );
+    for (const e of state.entityList) {
+      insertEntity.run(sid, workspaceId, e.id, e.labelNormalized, e.type);
+    }
+
+    const insertRel = db.prepare(
+      'INSERT INTO workspace_relationship (sid, workspace_id, relationship_id, predicate, source_entity_id, related_entity_id) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    for (const r of state.relationshipList) {
+      insertRel.run(sid, workspaceId, r.relationshipId, r.predicate, r.sourceEntityId, r.relatedEntityId);
+    }
+  });
+  transaction();
 }
 
 /**
