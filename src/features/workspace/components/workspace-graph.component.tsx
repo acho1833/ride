@@ -15,6 +15,24 @@ import { Plus, Minus, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
 import { GRAPH_CONFIG, SELECTION_CONFIG, PREVIEW_CONFIG, PLACEMENT_CONFIG, CULLING_CONFIG, MINIMAP_CONFIG } from '../const';
 import { calculateEntityPositions } from '../utils/coordinate-placement.utils';
+import {
+  isPointInRect,
+  invertTransform,
+  applyTransform,
+  calculateFitTransform,
+  getLinkNodeIds,
+  computeRelationshipCounts,
+  formatBadgeCount,
+  computeViewportBounds,
+  computeMinimapTransform,
+  worldToMinimap,
+  minimapToWorld,
+  viewportToMinimap,
+  computePreviewItemId,
+  computeScaledPreviewDistance,
+  hasReachedTarget,
+  type MinimapTransform
+} from '../utils/graph.utils';
 import { toGraphData, type WorkspaceGraphNode, type WorkspaceGraphLink, type WorkspaceGraphData, type PreviewState } from '../types';
 import type { Workspace } from '@/models/workspace.model';
 import type { WorkspaceViewStateInput } from '@/models/workspace-view-state.model';
@@ -25,56 +43,6 @@ import EntityDetailPopupComponent from './entity-detail-popup.component';
 
 // Re-export PopupState type from store for convenience
 import type { PopupState } from '@/stores/workspace-graph/workspace-graph.store';
-
-/**
- * Convert screen coordinates to SVG graph coordinates.
- * Accounts for SVG position and current zoom/pan transform.
- */
-function screenToSvgCoords(
-  screenX: number,
-  screenY: number,
-  svgElement: SVGSVGElement,
-  transform: d3.ZoomTransform
-): { x: number; y: number } {
-  const rect = svgElement.getBoundingClientRect();
-  const svgX = screenX - rect.left;
-  const svgY = screenY - rect.top;
-
-  // Invert the zoom/pan transform
-  return {
-    x: (svgX - transform.x) / transform.k,
-    y: (svgY - transform.y) / transform.k
-  };
-}
-
-/**
- * Calculate zoom-to-fit transform for given nodes and dimensions.
- */
-function calculateFitTransform(nodes: WorkspaceGraphNode[], width: number, height: number): d3.ZoomTransform {
-  if (nodes.length === 0) return d3.zoomIdentity;
-
-  const padding = GRAPH_CONFIG.fitPadding;
-  const xExtent = d3.extent(nodes, d => d.x) as [number, number];
-  const yExtent = d3.extent(nodes, d => d.y) as [number, number];
-
-  const graphWidth = xExtent[1] - xExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
-  const graphHeight = yExtent[1] - yExtent[0] + GRAPH_CONFIG.nodeRadius * 2;
-  const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
-  const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
-
-  const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
-  const translateX = width / 2 - graphCenterX * scale;
-  const translateY = height / 2 - graphCenterY * scale;
-
-  return d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-}
-
-/**
- * Check if a point is inside a rectangle.
- */
-function isPointInRect(x: number, y: number, rect: { x: number; y: number; width: number; height: number }): boolean {
-  return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
-}
 
 interface Props {
   workspace: Workspace;
@@ -208,12 +176,7 @@ const WorkspaceGraphComponent = ({
    * Computes from SVG coordinates stored in state + current transform.
    */
   const getPopupScreenPosition = useCallback((svgX: number, svgY: number): { x: number; y: number } => {
-    const transform = transformRef.current;
-    // Apply zoom transform: containerPos = svgPos * scale + translate
-    return {
-      x: svgX * transform.k + transform.x,
-      y: svgY * transform.k + transform.y
-    };
+    return applyTransform(svgX, svgY, transformRef.current);
   }, []);
 
   /**
@@ -256,10 +219,8 @@ const WorkspaceGraphComponent = ({
    */
   const handlePopupDragEnd = useCallback(
     (popupId: string, containerX: number, containerY: number) => {
-      const transform = transformRef.current;
       // Convert container-relative coords to SVG coords
-      const svgX = (containerX - transform.x) / transform.k;
-      const svgY = (containerY - transform.y) / transform.k;
+      const { x: svgX, y: svgY } = invertTransform(containerX, containerY, transformRef.current);
 
       onUpdatePopupPosition(popupId, svgX, svgY);
     },
@@ -371,8 +332,7 @@ const WorkspaceGraphComponent = ({
 
     // Register link elements with nodes for fast lookup during drag
     link.each(function (d) {
-      const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-      const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+      const { sourceId, targetId } = getLinkNodeIds(d);
       nodeLinkMap.get(sourceId)?.push(this);
       nodeLinkMap.get(targetId)?.push(this);
     });
@@ -421,13 +381,7 @@ const WorkspaceGraphComponent = ({
       .attr('pointer-events', 'none');
 
     // Compute relationship counts per node (for culling badges)
-    const nodeRelCounts = new Map<string, number>();
-    for (const l of links) {
-      const srcId = typeof l.source === 'string' ? l.source : l.source.id;
-      const tgtId = typeof l.target === 'string' ? l.target : l.target.id;
-      nodeRelCounts.set(srcId, (nodeRelCounts.get(srcId) ?? 0) + 1);
-      nodeRelCounts.set(tgtId, (nodeRelCounts.get(tgtId) ?? 0) + 1);
-    }
+    const nodeRelCounts = computeRelationshipCounts(links);
 
     // Append culling badge to each node (hidden by default, shown when links are culled)
     node
@@ -457,8 +411,7 @@ const WorkspaceGraphComponent = ({
 
     // Set badge text (total relationship count)
     node.select('.cull-badge text').text(d => {
-      const count = nodeRelCounts.get(d.id) ?? 0;
-      return count > 1000 ? '1k+' : String(count);
+      return formatBadgeCount(nodeRelCounts.get(d.id) ?? 0);
     });
 
     // Create selection rectangle (initially hidden, rendered on top of nodes)
@@ -498,12 +451,7 @@ const WorkspaceGraphComponent = ({
     const updateViewportCulling = () => {
       if (!cullingEnabled) return;
 
-      const t = transformRef.current;
-      const pad = CULLING_CONFIG.viewportPadding;
-      const minX = -t.x / t.k - pad;
-      const minY = -t.y / t.k - pad;
-      const maxX = (width - t.x) / t.k + pad;
-      const maxY = (height - t.y) / t.k + pad;
+      const { minX, minY, maxX, maxY } = computeViewportBounds(transformRef.current, width, height);
 
       // Query quadtree for visible nodes — O(log n + visible)
       visibleNodeIds.clear();
@@ -552,8 +500,7 @@ const WorkspaceGraphComponent = ({
         const connectedLinks = nodeLinkMap.get(nodeId) ?? [];
         for (const linkEl of connectedLinks) {
           const linkData = d3.select<SVGLineElement, WorkspaceGraphLink>(linkEl).datum();
-          const srcId = typeof linkData.source === 'string' ? linkData.source : (linkData.source as WorkspaceGraphNode).id;
-          const tgtId = typeof linkData.target === 'string' ? linkData.target : (linkData.target as WorkspaceGraphNode).id;
+          const { sourceId: srcId, targetId: tgtId } = getLinkNodeIds(linkData);
           linkEl.setAttribute('display', visibleNodeIds.has(srcId) && visibleNodeIds.has(tgtId) ? '' : 'none');
         }
       }
@@ -583,8 +530,7 @@ const WorkspaceGraphComponent = ({
         const connectedLinks = nodeLinkMap.get(nodeId) ?? [];
         for (const linkEl of connectedLinks) {
           const linkData = d3.select<SVGLineElement, WorkspaceGraphLink>(linkEl).datum();
-          const srcId = typeof linkData.source === 'string' ? linkData.source : (linkData.source as WorkspaceGraphNode).id;
-          const tgtId = typeof linkData.target === 'string' ? linkData.target : (linkData.target as WorkspaceGraphNode).id;
+          const { sourceId: srcId, targetId: tgtId } = getLinkNodeIds(linkData);
           const neighborId = srcId === nodeId ? tgtId : srcId;
 
           if (visibleNodeIds.has(neighborId) && !changedNodeIds.has(neighborId)) {
@@ -658,7 +604,7 @@ const WorkspaceGraphComponent = ({
       ? transformRef.current
       : workspace.viewState
         ? d3.zoomIdentity.translate(workspace.viewState.panX, workspace.viewState.panY).scale(workspace.viewState.scale)
-        : calculateFitTransform(nodes, width, height);
+        : (() => { const fit = calculateFitTransform(nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })), width, height); return d3.zoomIdentity.translate(fit.translateX, fit.translateY).scale(fit.scale); })();
 
     transformRef.current = initialTransform;
     svg.call(zoom.transform, initialTransform);
@@ -725,8 +671,7 @@ const WorkspaceGraphComponent = ({
 
         const findRelatedExistingNode = (newNodeId: string): WorkspaceGraphNode | undefined => {
           for (const l of links) {
-            const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
-            const targetId = typeof l.target === 'string' ? l.target : l.target.id;
+            const { sourceId, targetId } = getLinkNodeIds(l);
             if (sourceId === newNodeId && prevNodeIdsRef.current.has(targetId)) return nodeMap.get(targetId);
             if (targetId === newNodeId && prevNodeIdsRef.current.has(sourceId)) return nodeMap.get(sourceId);
           }
@@ -964,7 +909,8 @@ const WorkspaceGraphComponent = ({
       if (target.closest('.nodes g')) return;
 
       // Store start position in both screen and graph coordinates
-      const graphCoords = screenToSvgCoords(event.clientX, event.clientY, svgElement, transformRef.current);
+      const svgRect = svgElement.getBoundingClientRect();
+      const graphCoords = invertTransform(event.clientX - svgRect.left, event.clientY - svgRect.top, transformRef.current);
       dragStartRef.current = {
         x: graphCoords.x,
         y: graphCoords.y,
@@ -998,7 +944,7 @@ const WorkspaceGraphComponent = ({
         const clampedX = Math.max(svgRect.left, Math.min(event.clientX, svgRect.right));
         const clampedY = Math.max(svgRect.top, Math.min(event.clientY, svgRect.bottom));
 
-        const currentCoords = screenToSvgCoords(clampedX, clampedY, svgElement, transformRef.current);
+        const currentCoords = invertTransform(clampedX - svgRect.left, clampedY - svgRect.top, transformRef.current);
 
         // Calculate rectangle bounds (handle drag in any direction)
         const rectX = Math.min(dragStartRef.current.x, currentCoords.x);
@@ -1116,10 +1062,12 @@ const WorkspaceGraphComponent = ({
       const cache = previewCacheRef.current;
       const targetDist = PREVIEW_CONFIG.previewDistance;
       for (const [id, item] of previewAnimatingRef.current) {
-        const dx = item.x - item.sourcePos.x;
-        const dy = item.y - item.sourcePos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const reachedTarget = dist > targetDist * 0.5;
+        const reachedTarget = hasReachedTarget(
+          { x: item.x, y: item.y },
+          item.sourcePos,
+          targetDist,
+          0.5
+        );
         cache.set(id, {
           x: item.x,
           y: item.y,
@@ -1156,7 +1104,7 @@ const WorkspaceGraphComponent = ({
     const cache = previewCacheRef.current;
 
     // Build set of current item IDs
-    const currentItemIds = new Set(items.map(item => ('id' in item ? item.id : `group-${item.sourceEntityId}-${item.entityType}`)));
+    const currentItemIds = new Set(items.map(item => computePreviewItemId(item)));
 
     // Clean up stale cache entries (items no longer in preview)
     for (const cachedId of cache.keys()) {
@@ -1192,7 +1140,7 @@ const WorkspaceGraphComponent = ({
     const uninitializedItems: { item: (typeof items)[0]; index: number; sourcePos: { x: number; y: number } }[] = [];
 
     items.forEach((item, index) => {
-      const id = 'id' in item ? item.id : `group-${item.sourceEntityId}-${item.entityType}`;
+      const id = computePreviewItemId(item);
       const cached = cache.get(id);
       if (!cached || !cached.initialized) {
         const itemSourceId = item.sourceEntityId;
@@ -1504,7 +1452,7 @@ const WorkspaceGraphComponent = ({
       // Include already-positioned preview items as fixed nodes
       const fixedPreviewPositions: SimNode[] = [];
       items.forEach(item => {
-        const id = 'id' in item ? item.id : `group-${item.sourceEntityId}-${item.entityType}`;
+        const id = computePreviewItemId(item);
         const cached = cache.get(id);
         if (cached?.initialized) {
           fixedPreviewPositions.push({ id, x: cached.x, y: cached.y, fx: cached.x, fy: cached.y });
@@ -1531,7 +1479,7 @@ const WorkspaceGraphComponent = ({
       }
       // Scale preview distance gently with sqrt so nodes stay near source
       // Collision force will push overflow into concentric rings naturally
-      const scaledPreviewDistance = PREVIEW_CONFIG.previewDistance * Math.max(1, Math.sqrt(animatingItems.length / 8));
+      const scaledPreviewDistance = computeScaledPreviewDistance(animatingItems.length);
       const initialOffset = scaledPreviewDistance * 0.3;
       const previewSimNodes: PreviewSimNode[] = animatingItems.map(({ simNodeId, sourceId, sourcePos }, i) => {
         const angle = (i / animatingItems.length) * Math.PI * 2;
@@ -1717,10 +1665,12 @@ const WorkspaceGraphComponent = ({
         const cleanupCache = previewCacheRef.current;
         const cleanupTargetDist = PREVIEW_CONFIG.previewDistance;
         for (const [id, item] of previewAnimatingRef.current) {
-          const dx = item.x - item.sourcePos.x;
-          const dy = item.y - item.sourcePos.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const reachedTarget = dist > cleanupTargetDist * 0.5;
+          const reachedTarget = hasReachedTarget(
+            { x: item.x, y: item.y },
+            item.sourcePos,
+            cleanupTargetDist,
+            0.5
+          );
           cleanupCache.set(id, {
             x: item.x,
             y: item.y,
@@ -1761,71 +1711,31 @@ const WorkspaceGraphComponent = ({
 
     if (nodes.length === 0) return;
 
-    // Compute node bounds
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    for (const n of nodes) {
-      const nx = n.x ?? 0;
-      const ny = n.y ?? 0;
-      if (nx < minX) minX = nx;
-      if (nx > maxX) maxX = nx;
-      if (ny < minY) minY = ny;
-      if (ny > maxY) maxY = ny;
-    }
-
-    // Add padding to bounds
-    minX -= pad;
-    minY -= pad;
-    maxX += pad;
-    maxY += pad;
-
-    const boundsW = maxX - minX || 1;
-    const boundsH = maxY - minY || 1;
-
-    // Scale to fit minimap
-    const scale = Math.min(mw / boundsW, mh / boundsH);
-    const offsetX = (mw - boundsW * scale) / 2;
-    const offsetY = (mh - boundsH * scale) / 2;
+    // Compute minimap transform (bounds, scale, offset)
+    const mt = computeMinimapTransform(nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })), mw, mh, pad);
+    if (!mt) return;
 
     // Draw nodes as dots
     ctx.fillStyle = GRAPH_CONFIG.nodeColor;
     const r = MINIMAP_CONFIG.dotRadius;
     for (const n of nodes) {
-      const x = ((n.x ?? 0) - minX) * scale + offsetX;
-      const y = ((n.y ?? 0) - minY) * scale + offsetY;
+      const { x, y } = worldToMinimap(n.x ?? 0, n.y ?? 0, mt);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // Draw viewport rectangle
-    const t = transformRef.current;
-    // Viewport corners in world coords
-    const vpMinX = -t.x / t.k;
-    const vpMinY = -t.y / t.k;
-    const vpMaxX = (dimensions.width - t.x) / t.k;
-    const vpMaxY = (dimensions.height - t.y) / t.k;
-
-    // Convert to minimap coords
-    const rx = (vpMinX - minX) * scale + offsetX;
-    const ry = (vpMinY - minY) * scale + offsetY;
-    const rw = (vpMaxX - vpMinX) * scale;
-    const rh = (vpMaxY - vpMinY) * scale;
+    const vpRect = viewportToMinimap(transformRef.current, dimensions.width, dimensions.height, mt);
 
     ctx.fillStyle = MINIMAP_CONFIG.viewportFill;
-    ctx.fillRect(rx, ry, rw, rh);
+    ctx.fillRect(vpRect.x, vpRect.y, vpRect.width, vpRect.height);
     ctx.strokeStyle = MINIMAP_CONFIG.viewportStroke;
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.strokeRect(vpRect.x, vpRect.y, vpRect.width, vpRect.height);
 
-    // Store bounds on canvas dataset for click-to-pan calculations
-    canvas.dataset.boundsMinX = String(minX);
-    canvas.dataset.boundsMinY = String(minY);
-    canvas.dataset.boundsScale = String(scale);
-    canvas.dataset.boundsOffsetX = String(offsetX);
-    canvas.dataset.boundsOffsetY = String(offsetY);
+    // Store minimap transform on canvas dataset for click-to-pan calculations
+    canvas.dataset.minimapTransform = JSON.stringify(mt);
   }, [dimensions, renderTrigger]);
 
   // Click/drag on minimap to pan the main graph
@@ -1838,16 +1748,13 @@ const WorkspaceGraphComponent = ({
       const mx = event.clientX - rect.left;
       const my = event.clientY - rect.top;
 
-      // Read stored bounds from canvas dataset
-      const boundsMinX = Number(canvas.dataset.boundsMinX ?? 0);
-      const boundsMinY = Number(canvas.dataset.boundsMinY ?? 0);
-      const scale = Number(canvas.dataset.boundsScale ?? 1);
-      const offsetX = Number(canvas.dataset.boundsOffsetX ?? 0);
-      const offsetY = Number(canvas.dataset.boundsOffsetY ?? 0);
+      // Read stored minimap transform from canvas dataset
+      const mtData = canvas.dataset.minimapTransform;
+      if (!mtData) return;
+      const mt = JSON.parse(mtData) as MinimapTransform;
 
       // Convert minimap pixel to world coordinate
-      const worldX = (mx - offsetX) / scale + boundsMinX;
-      const worldY = (my - offsetY) / scale + boundsMinY;
+      const { x: worldX, y: worldY } = minimapToWorld(mx, my, mt);
 
       // Pan so this world point is at the center of the viewport
       const t = transformRef.current;
@@ -1884,7 +1791,8 @@ const WorkspaceGraphComponent = ({
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
 
-    const fitTransform = calculateFitTransform(nodes, dimensions.width, dimensions.height);
+    const fit = calculateFitTransform(nodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 })), dimensions.width, dimensions.height);
+    const fitTransform = d3.zoomIdentity.translate(fit.translateX, fit.translateY).scale(fit.scale);
     d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.transform, fitTransform);
   };
 
@@ -1925,7 +1833,8 @@ const WorkspaceGraphComponent = ({
 
       // Convert screen coordinates to SVG coordinates
       if (!svgRef.current) return;
-      const position = screenToSvgCoords(event.clientX, event.clientY, svgRef.current, transformRef.current);
+      const svgRect = svgRef.current.getBoundingClientRect();
+      const position = invertTransform(event.clientX - svgRect.left, event.clientY - svgRect.top, transformRef.current);
 
       // Focus this panel first (prevents selection from being cleared by focus effect)
       onFocusPanel?.();
