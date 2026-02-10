@@ -6,10 +6,13 @@
 # Pulls files from upstream repo and overlays them into current repo.
 #
 # Usage:
-#   ./sync-from-upstream.sh                    # Sync to latest (review only)
-#   ./sync-from-upstream.sh --commit           # Sync to latest + commit + push
-#   ./sync-from-upstream.sh abc123f            # Sync to specific commit
-#   ./sync-from-upstream.sh abc123f --commit   # Sync to specific commit + commit + push
+#   ./sync-from-upstream.sh                              # Sync from matching upstream branch
+#   ./sync-from-upstream.sh --commit                     # Sync + commit + push
+#   ./sync-from-upstream.sh --branch feature-x           # Override upstream branch
+#   ./sync-from-upstream.sh abc123f                      # Sync to specific commit
+#   ./sync-from-upstream.sh abc123f --commit             # Sync to specific commit + commit + push
+#
+# By default, syncs from the upstream branch matching your current local branch.
 #
 
 set -e
@@ -40,13 +43,23 @@ EXCLUDE=(
 # Parse arguments
 COMMIT_REF="HEAD"
 DO_COMMIT=false
+UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-for arg in "$@"; do
-  if [ "$arg" == "--commit" ]; then
-    DO_COMMIT=true
-  else
-    COMMIT_REF="$arg"
-  fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --commit)
+      DO_COMMIT=true
+      shift
+      ;;
+    --branch)
+      UPSTREAM_BRANCH="$2"
+      shift 2
+      ;;
+    *)
+      COMMIT_REF="$1"
+      shift
+      ;;
+  esac
 done
 
 TEMP_DIR="/tmp/upstream-sync-$$"
@@ -94,8 +107,8 @@ trap cleanup EXIT
 main() {
   check_dependencies
 
-  log_info "Cloning upstream: $UPSTREAM"
-  git clone --quiet "$UPSTREAM" "$TEMP_DIR"
+  log_info "Cloning upstream: $UPSTREAM (branch: $UPSTREAM_BRANCH)"
+  git clone --quiet --branch "$UPSTREAM_BRANCH" "$UPSTREAM" "$TEMP_DIR"
 
   cd "$TEMP_DIR"
 
@@ -159,8 +172,9 @@ main() {
       git add .
       git commit -m "$COMMIT_MSG"
 
-      log_info "Pushing to origin main..."
-      git push origin main
+      CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+      log_info "Pushing to origin $CURRENT_BRANCH..."
+      git push origin "$CURRENT_BRANCH"
 
       echo ""
       log_info "Done! Changes committed and pushed."

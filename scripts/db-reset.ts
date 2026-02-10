@@ -5,7 +5,7 @@
  * Usage: npm run db:reset
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, unlinkSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import mongoose from 'mongoose';
 
@@ -44,6 +44,23 @@ async function resetDatabase() {
     await mongoose.connection.dropDatabase();
 
     console.log(`Database "${MONGODB_DATABASE}" dropped successfully.`);
+
+    // Remove SQLite mock data
+    const sqliteDir = resolve(process.cwd(), 'src/lib/mock-data');
+    const sqliteFiles = ['mock.db', 'mock.db-wal', 'mock.db-shm'];
+    let removed = 0;
+    for (const file of sqliteFiles) {
+      const filePath = resolve(sqliteDir, file);
+      if (existsSync(filePath)) {
+        unlinkSync(filePath);
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      console.log(`Removed SQLite mock data (${removed} file(s)).`);
+    } else {
+      console.log('No SQLite mock data to remove.');
+    }
   } catch (error) {
     console.error('Failed to reset database:', error);
     process.exit(1);
