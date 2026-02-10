@@ -14,5 +14,14 @@ export async function register() {
       console.error('Shutting down server...');
       process.exit(1); // Force shutdown with error code
     }
+
+    // Initialize sql.js mock database (dynamic import to avoid Edge Runtime analysis)
+    try {
+      const { initMockDb } = await import('@/lib/mock-db');
+      await initMockDb();
+      console.log('✅ Mock database initialized successfully');
+    } catch (error) {
+      console.error('❌ Mock database initialization failed:', error);
+    }
   }
 }

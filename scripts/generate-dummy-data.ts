@@ -10,7 +10,7 @@
  */
 
 import { faker } from '@faker-js/faker';
-import Database from 'better-sqlite3';
+import initSqlJs from 'sql.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { isMainThread, Worker } from 'worker_threads';
@@ -1013,15 +1013,15 @@ async function generateMicrosoftOrgData(): Promise<DataSet> {
 // SQLite Database Creation & Insertion
 // ---------------------------------------------------------------------------
 
-function createAndPopulateDatabase(datasets: DataSet[]): void {
+async function createAndPopulateDatabase(datasets: DataSet[]): Promise<void> {
   console.log('\n=== Writing to SQLite ===');
   const start = performance.now();
 
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
 
   // Create tables and indexes
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS entity (
       id TEXT PRIMARY KEY,
       label_normalized TEXT NOT NULL,
@@ -1040,31 +1040,28 @@ function createAndPopulateDatabase(datasets: DataSet[]): void {
     CREATE INDEX IF NOT EXISTS idx_rel_predicate ON relationship(predicate);
   `);
 
-  const insertEntity = db.prepare(
-    'INSERT OR IGNORE INTO entity (id, label_normalized, type) VALUES (?, ?, ?)'
-  );
-  const insertRel = db.prepare(
-    'INSERT OR IGNORE INTO relationship (relationship_id, predicate, source_entity_id, related_entity_id) VALUES (?, ?, ?, ?)'
-  );
-
   let totalEntities = 0;
   let totalRelationships = 0;
 
-  const insertAll = db.transaction(() => {
-    for (const dataset of datasets) {
-      for (const e of dataset.entities) {
-        insertEntity.run(e.id, e.labelNormalized, e.type);
-      }
-      totalEntities += dataset.entities.length;
-
-      for (const r of dataset.relationships) {
-        insertRel.run(r.relationshipId, r.predicate, r.sourceEntityId, r.relatedEntityId);
-      }
-      totalRelationships += dataset.relationships.length;
+  db.run('BEGIN');
+  for (const dataset of datasets) {
+    for (const e of dataset.entities) {
+      db.run('INSERT OR IGNORE INTO entity (id, label_normalized, type) VALUES (?, ?, ?)', [e.id, e.labelNormalized, e.type]);
     }
-  });
+    totalEntities += dataset.entities.length;
 
-  insertAll();
+    for (const r of dataset.relationships) {
+      db.run(
+        'INSERT OR IGNORE INTO relationship (relationship_id, predicate, source_entity_id, related_entity_id) VALUES (?, ?, ?, ?)',
+        [r.relationshipId, r.predicate, r.sourceEntityId, r.relatedEntityId]
+      );
+    }
+    totalRelationships += dataset.relationships.length;
+  }
+  db.run('COMMIT');
+
+  // Persist to disk
+  fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
   db.close();
 
   const elapsed = ((performance.now() - start) / 1000).toFixed(2);
@@ -1093,7 +1090,7 @@ async function main(): Promise<void> {
   const microsoftData = await generateMicrosoftOrgData();
 
   // Write all to SQLite in a single transaction
-  createAndPopulateDatabase([dummyData, googleData, microsoftData]);
+  await createAndPopulateDatabase([dummyData, googleData, microsoftData]);
 
   const totalElapsed = ((performance.now() - totalStart) / 1000).toFixed(2);
   console.log(`\n=== Done in ${totalElapsed}s ===`);

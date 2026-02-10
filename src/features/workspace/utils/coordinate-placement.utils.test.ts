@@ -1,26 +1,42 @@
 import { calculateEntityPositions, type PlacementInput } from './coordinate-placement.utils';
 import { GRAPH_CONFIG, PLACEMENT_CONFIG } from '../const';
-import Database from 'better-sqlite3';
+import initSqlJs from 'sql.js';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 /** Load Google org data from SQLite for large-scale placement tests. */
-function loadGoogleOrgData() {
-  const db = new Database(resolve(process.cwd(), 'src/lib/mock-data/mock.db'), { readonly: true });
-  const entities = db
-    .prepare(
-      "SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id = 'google-hq' OR id LIKE 'div-%' OR id LIKE 'team-%' OR id LIKE 'exec-%' OR id LIKE 'dir-%' OR id LIKE 'mgr-%' OR id LIKE 'emp-%' OR id LIKE 'partner-%' OR id LIKE 'contractor-%'"
-    )
-    .all() as Array<{ id: string; labelNormalized: string; type: string }>;
-  const relationships = db
-    .prepare(
-      "SELECT source_entity_id as sourceEntityId, related_entity_id as relatedEntityId FROM relationship WHERE relationship_id LIKE 'grel-%'"
-    )
-    .all() as Array<{ sourceEntityId: string; relatedEntityId: string }>;
+async function loadGoogleOrgData() {
+  const SQL = await initSqlJs();
+  const buffer = readFileSync(resolve(process.cwd(), 'src/lib/mock-data/mock.db'));
+  const db = new SQL.Database(buffer);
+
+  const entitiesStmt = db.prepare(
+    "SELECT id, label_normalized as labelNormalized, type FROM entity WHERE id = 'google-hq' OR id LIKE 'div-%' OR id LIKE 'team-%' OR id LIKE 'exec-%' OR id LIKE 'dir-%' OR id LIKE 'mgr-%' OR id LIKE 'emp-%' OR id LIKE 'partner-%' OR id LIKE 'contractor-%'"
+  );
+  const entities: Array<{ id: string; labelNormalized: string; type: string }> = [];
+  while (entitiesStmt.step()) {
+    entities.push(entitiesStmt.getAsObject() as { id: string; labelNormalized: string; type: string });
+  }
+  entitiesStmt.free();
+
+  const relStmt = db.prepare(
+    "SELECT source_entity_id as sourceEntityId, related_entity_id as relatedEntityId FROM relationship WHERE relationship_id LIKE 'grel-%'"
+  );
+  const relationships: Array<{ sourceEntityId: string; relatedEntityId: string }> = [];
+  while (relStmt.step()) {
+    relationships.push(relStmt.getAsObject() as { sourceEntityId: string; relatedEntityId: string });
+  }
+  relStmt.free();
+
   db.close();
   return { entities, relationships };
 }
 
-const googleOrgData = loadGoogleOrgData();
+let googleOrgData: Awaited<ReturnType<typeof loadGoogleOrgData>>;
+
+beforeAll(async () => {
+  googleOrgData = await loadGoogleOrgData();
+});
 
 const NODE_RADIUS = GRAPH_CONFIG.nodeRadius;
 const CELL_SIZE = NODE_RADIUS * PLACEMENT_CONFIG.cellSizeMultiplier;

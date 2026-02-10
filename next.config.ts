@@ -3,7 +3,7 @@ import { API_PREFIX } from '@/const';
 
 const nextConfig: NextConfig = {
   /* config options here */
-  serverExternalPackages: ['better-sqlite3'],
+  serverExternalPackages: ['sql.js'],
   reactCompiler: true,
   async redirects() {
     return [
