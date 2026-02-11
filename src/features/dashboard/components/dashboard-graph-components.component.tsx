@@ -13,23 +13,13 @@ interface Props {
 
 const DashboardGraphComponentsComponent = ({ data }: Props) => {
   return (
-    <DashboardSectionComponent
-      title="Graph Components"
-      tooltip={SECTION_TOOLTIPS.graphComponents}
-      badge={data.length}
-    >
+    <DashboardSectionComponent title="Graph Components" tooltip={SECTION_TOOLTIPS.graphComponents} badge={data.length}>
       {data.length === 0 ? (
         <p className="text-muted-foreground text-xs">No data</p>
       ) : (
         <div className="space-y-2">
-          {data.map((comp) => (
-            <div
-              key={comp.id}
-              className={cn(
-                'border-border rounded-md border px-3 py-2 text-xs',
-                comp.isMainComponent && 'bg-muted/50'
-              )}
-            >
+          {data.map(comp => (
+            <div key={comp.id} className={cn('border-border rounded-md border px-3 py-2 text-xs', comp.isMainComponent && 'bg-muted/50')}>
               <div className="flex items-center justify-between">
                 <span className="font-medium">
                   {comp.isMainComponent ? 'Main Component' : `Component ${comp.id + 1}`}

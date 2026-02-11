@@ -13,15 +13,12 @@ const DashboardRelationshipPathsComponent = ({ data }: Props) => {
   const maxCount = data[0]?.count ?? 0;
 
   return (
-    <DashboardSectionComponent
-      title="Relationship Paths"
-      tooltip={SECTION_TOOLTIPS.relationshipPaths}
-    >
+    <DashboardSectionComponent title="Relationship Paths" tooltip={SECTION_TOOLTIPS.relationshipPaths}>
       {data.length === 0 ? (
         <p className="text-muted-foreground text-xs">No data</p>
       ) : (
         <div className="space-y-2">
-          {data.map((path) => {
+          {data.map(path => {
             const key = `${path.sourceType}-${path.predicate}-${path.targetType}`;
             const widthPercent = maxCount > 0 ? (path.count / maxCount) * 100 : 0;
 
@@ -36,14 +33,9 @@ const DashboardRelationshipPathsComponent = ({ data }: Props) => {
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <div className="bg-muted h-3 flex-1 overflow-hidden rounded-sm">
-                    <div
-                      className="bg-primary h-full rounded-sm transition-all"
-                      style={{ width: `${widthPercent}%` }}
-                    />
+                    <div className="bg-primary h-full rounded-sm transition-all" style={{ width: `${widthPercent}%` }} />
                   </div>
-                  <span className="text-muted-foreground w-8 shrink-0 text-right font-mono">
-                    {path.count}
-                  </span>
+                  <span className="text-muted-foreground w-8 shrink-0 text-right font-mono">{path.count}</span>
                 </div>
               </div>
             );

@@ -41,12 +41,8 @@ const DashboardTypeMatrixComponent = ({ data }: Props) => {
           <thead>
             <tr>
               <th className="p-1" />
-              {data.types.map((type) => (
-                <th
-                  key={type}
-                  className="text-muted-foreground p-1 text-center font-normal"
-                  title={type}
-                >
+              {data.types.map(type => (
+                <th key={type} className="text-muted-foreground p-1 text-center font-normal" title={type}>
                   {abbreviate(type)}
                 </th>
               ))}
@@ -55,10 +51,7 @@ const DashboardTypeMatrixComponent = ({ data }: Props) => {
           <tbody>
             {data.types.map((rowType, i) => (
               <tr key={rowType}>
-                <td
-                  className="text-muted-foreground p-1 text-right font-normal"
-                  title={rowType}
-                >
+                <td className="text-muted-foreground p-1 text-right font-normal" title={rowType}>
                   {abbreviate(rowType)}
                 </td>
                 {data.types.map((_, j) => {
@@ -75,11 +68,7 @@ const DashboardTypeMatrixComponent = ({ data }: Props) => {
                           'mx-auto flex h-7 w-7 items-center justify-center rounded-sm text-xs',
                           count > 0 ? 'text-primary-foreground' : 'text-muted-foreground'
                         )}
-                        style={
-                          count > 0
-                            ? { backgroundColor: `hsl(var(--primary) / ${Math.max(0.15, opacity)})` }
-                            : undefined
-                        }
+                        style={count > 0 ? { backgroundColor: `hsl(var(--primary) / ${Math.max(0.15, opacity)})` } : undefined}
                         title={`${rowType} - ${data.types[j]}: ${count}`}
                       >
                         {count > 0 ? count : '\u00B7'}
@@ -97,14 +86,12 @@ const DashboardTypeMatrixComponent = ({ data }: Props) => {
       <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
         {data.strongest && (
           <p>
-            <span className="font-medium">Strongest:</span> {data.strongest.typeA} —{' '}
-            {data.strongest.typeB} ({data.strongest.count})
+            <span className="font-medium">Strongest:</span> {data.strongest.typeA} — {data.strongest.typeB} ({data.strongest.count})
           </p>
         )}
         {data.weakest && (
           <p>
-            <span className="font-medium">Weakest:</span> {data.weakest.typeA} —{' '}
-            {data.weakest.typeB} ({data.weakest.count})
+            <span className="font-medium">Weakest:</span> {data.weakest.typeA} — {data.weakest.typeB} ({data.weakest.count})
           </p>
         )}
       </div>

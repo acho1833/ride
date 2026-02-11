@@ -18,10 +18,7 @@ const DashboardBarComponent = ({ label, value, maxValue, className }: Props) => 
         {label}
       </span>
       <div className="bg-muted h-3.5 flex-1 overflow-hidden rounded-sm">
-        <div
-          className="bg-primary h-full rounded-sm transition-all"
-          style={{ width: `${widthPercent}%` }}
-        />
+        <div className="bg-primary h-full rounded-sm transition-all" style={{ width: `${widthPercent}%` }} />
       </div>
       <span className="text-muted-foreground w-8 shrink-0 text-right font-mono">{value}</span>
     </div>

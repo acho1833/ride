@@ -15,13 +15,7 @@ const WorkspaceToolbarComponent = ({ hiddenCount, isFilterPanelOpen, onToggleFil
   return (
     <div className="bg-background flex h-8 shrink-0 items-center justify-between border-b px-2">
       <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 gap-1 px-2 text-xs"
-          onClick={onOpenDashboard}
-          title="Open Dashboard"
-        >
+        <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs" onClick={onOpenDashboard} title="Open Dashboard">
           <LayoutDashboard className="h-3.5 w-3.5" />
           <span>Dashboard</span>
         </Button>

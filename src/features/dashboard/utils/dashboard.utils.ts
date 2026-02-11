@@ -62,8 +62,8 @@ export function computeKpiStats(entities: Entity[], relationships: Relationship[
   const n = entities.length;
   const edges = relationships.length;
 
-  const uniqueEntityTypes = new Set(entities.map((e) => e.type)).size;
-  const uniquePredicates = new Set(relationships.map((r) => r.predicate)).size;
+  const uniqueEntityTypes = new Set(entities.map(e => e.type)).size;
+  const uniquePredicates = new Set(relationships.map(r => r.predicate)).size;
 
   const networkDensity = n < 2 ? 0 : edges / ((n * (n - 1)) / 2);
   const avgDegree = n === 0 ? 0 : (2 * edges) / n;
@@ -115,7 +115,7 @@ export function computePredicateDistribution(relationships: Relationship[]): Dis
 // ─── 4. computeTypeMatrix ─────────────────────────────────────────────
 
 export function computeTypeMatrix(entities: Entity[], relationships: Relationship[]): TypeMatrix {
-  const types = [...new Set(entities.map((e) => e.type))].sort();
+  const types = [...new Set(entities.map(e => e.type))].sort();
   if (types.length === 0) {
     return { types: [], matrix: [], strongest: null, weakest: null };
   }
@@ -164,11 +164,7 @@ export function computeTypeMatrix(entities: Entity[], relationships: Relationshi
 
 // ─── 5. computeTopHubs ────────────────────────────────────────────────
 
-export function computeTopHubs(
-  entities: Entity[],
-  relationships: Relationship[],
-  topN: number = TOP_HUBS_COUNT
-): HubEntity[] {
+export function computeTopHubs(entities: Entity[], relationships: Relationship[], topN: number = TOP_HUBS_COUNT): HubEntity[] {
   if (entities.length === 0) return [];
 
   const degreeMap = computeDegreeMap(entities, relationships);
@@ -177,7 +173,7 @@ export function computeTopHubs(
   const sorted = [...entities].sort((a, b) => (degreeMap.get(b.id) ?? 0) - (degreeMap.get(a.id) ?? 0));
   const topEntities = sorted.slice(0, topN);
 
-  return topEntities.map((entity) => {
+  return topEntities.map(entity => {
     // Count predicates for this entity's relationships
     const predicateCounts = new Map<string, number>();
     for (const rel of relationships) {
@@ -201,13 +197,10 @@ export function computeTopHubs(
 
 // ─── 6. computeDegreeDistribution ─────────────────────────────────────
 
-export function computeDegreeDistribution(
-  entities: Entity[],
-  relationships: Relationship[]
-): DegreeBucket[] {
+export function computeDegreeDistribution(entities: Entity[], relationships: Relationship[]): DegreeBucket[] {
   const degreeMap = computeDegreeMap(entities, relationships);
 
-  return DEGREE_BUCKETS.map((bucket) => {
+  return DEGREE_BUCKETS.map(bucket => {
     let count = 0;
     for (const degree of degreeMap.values()) {
       if (degree >= bucket.min && degree <= bucket.max) {
@@ -261,10 +254,7 @@ export function computeRelationshipPaths(
 
 // ─── 8. computePredicateByType ────────────────────────────────────────
 
-export function computePredicateByType(
-  entities: Entity[],
-  relationships: Relationship[]
-): PredicateByType[] {
+export function computePredicateByType(entities: Entity[], relationships: Relationship[]): PredicateByType[] {
   if (entities.length === 0) return [];
 
   // Group entities by type
@@ -347,10 +337,7 @@ export function computeMultiEdgePairs(
 
 // ─── 10. computeAvgDegreeByType ───────────────────────────────────────
 
-export function computeAvgDegreeByType(
-  entities: Entity[],
-  relationships: Relationship[]
-): AvgDegreeByType[] {
+export function computeAvgDegreeByType(entities: Entity[], relationships: Relationship[]): AvgDegreeByType[] {
   if (entities.length === 0) return [];
 
   const degreeMap = computeDegreeMap(entities, relationships);
@@ -415,10 +402,7 @@ export function computeDiverseEntities(
 
 // ─── 12. computeGraphComponents ───────────────────────────────────────
 
-export function computeGraphComponents(
-  entities: Entity[],
-  relationships: Relationship[]
-): GraphComponent[] {
+export function computeGraphComponents(entities: Entity[], relationships: Relationship[]): GraphComponent[] {
   if (entities.length === 0) return [];
 
   const totalEntities = entities.length;
@@ -507,10 +491,7 @@ export function computeGraphComponents(
 
 // ─── 13. computePredicateExclusivity ──────────────────────────────────
 
-export function computePredicateExclusivity(
-  entities: Entity[],
-  relationships: Relationship[]
-): PredicateExclusivity {
+export function computePredicateExclusivity(entities: Entity[], relationships: Relationship[]): PredicateExclusivity {
   if (relationships.length === 0) return { exclusive: [], generic: [] };
 
   const entityMap = buildEntityMap(entities);
@@ -536,7 +517,7 @@ export function computePredicateExclusivity(
   const generic: PredicateExclusivity['generic'] = [];
 
   for (const [predicate, pairs] of predicatePairs) {
-    const pairsList = [...pairs].map((p) => {
+    const pairsList = [...pairs].map(p => {
       const [sourceType, targetType] = p.split('|');
       return { sourceType, targetType };
     });
@@ -560,10 +541,7 @@ export function computePredicateExclusivity(
 
 // ─── 14. computeReciprocalPairs ───────────────────────────────────────
 
-export function computeReciprocalPairs(
-  entities: Entity[],
-  relationships: Relationship[]
-): ReciprocalPair[] {
+export function computeReciprocalPairs(entities: Entity[], relationships: Relationship[]): ReciprocalPair[] {
   if (relationships.length === 0) return [];
 
   const entityMap = buildEntityMap(entities);
@@ -599,10 +577,7 @@ export function computeReciprocalPairs(
       // Collect all predicates between this pair
       const predicates = new Set<string>();
       for (const r of relationships) {
-        if (
-          (r.sourceEntityId === a && r.relatedEntityId === b) ||
-          (r.sourceEntityId === b && r.relatedEntityId === a)
-        ) {
+        if ((r.sourceEntityId === a && r.relatedEntityId === b) || (r.sourceEntityId === b && r.relatedEntityId === a)) {
           predicates.add(r.predicate);
         }
       }
@@ -620,23 +595,15 @@ export function computeReciprocalPairs(
 
 // ─── 15. computeIsolatedEntities ──────────────────────────────────────
 
-export function computeIsolatedEntities(
-  entities: Entity[],
-  relationships: Relationship[]
-): Entity[] {
+export function computeIsolatedEntities(entities: Entity[], relationships: Relationship[]): Entity[] {
   const degreeMap = computeDegreeMap(entities, relationships);
 
-  return entities
-    .filter((e) => (degreeMap.get(e.id) ?? 0) === 0)
-    .sort((a, b) => a.labelNormalized.localeCompare(b.labelNormalized));
+  return entities.filter(e => (degreeMap.get(e.id) ?? 0) === 0).sort((a, b) => a.labelNormalized.localeCompare(b.labelNormalized));
 }
 
 // ─── 16. computeLeafEntities ──────────────────────────────────────────
 
-export function computeLeafEntities(
-  entities: Entity[],
-  relationships: Relationship[]
-): LeafEntity[] {
+export function computeLeafEntities(entities: Entity[], relationships: Relationship[]): LeafEntity[] {
   if (entities.length === 0) return [];
 
   const entityMap = buildEntityMap(entities);
@@ -648,13 +615,10 @@ export function computeLeafEntities(
     if ((degreeMap.get(entity.id) ?? 0) !== 1) continue;
 
     // Find the single relationship
-    const rel = relationships.find(
-      (r) => r.sourceEntityId === entity.id || r.relatedEntityId === entity.id
-    );
+    const rel = relationships.find(r => r.sourceEntityId === entity.id || r.relatedEntityId === entity.id);
     if (!rel) continue;
 
-    const connectedId =
-      rel.sourceEntityId === entity.id ? rel.relatedEntityId : rel.sourceEntityId;
+    const connectedId = rel.sourceEntityId === entity.id ? rel.relatedEntityId : rel.sourceEntityId;
     const connectedEntity = entityMap.get(connectedId);
     if (!connectedEntity) continue;
 

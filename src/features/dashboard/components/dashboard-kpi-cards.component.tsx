@@ -50,7 +50,7 @@ const DashboardKpiCardsComponent = ({ stats }: Props) => {
 
   return (
     <div className="flex flex-wrap gap-3">
-      {cards.map((card) => (
+      {cards.map(card => (
         <div key={card.label} className="border-border bg-card rounded-lg border px-3 py-2">
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground text-xs">{card.label}</span>
@@ -65,9 +65,7 @@ const DashboardKpiCardsComponent = ({ stats }: Props) => {
               </Tooltip>
             </TooltipProvider>
           </div>
-          <div className={cn('text-lg font-semibold', card.warning && 'text-destructive')}>
-            {card.value}
-          </div>
+          <div className={cn('text-lg font-semibold', card.warning && 'text-destructive')}>{card.value}</div>
         </div>
       ))}
     </div>

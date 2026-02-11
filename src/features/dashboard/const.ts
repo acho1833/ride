@@ -36,39 +36,23 @@ export const SECTION_TOOLTIPS = {
   relationships: 'Total number of relationships (edges) connecting entities',
   entityTypes: 'Number of distinct entity types (e.g., Person, Organization)',
   predicateTypes: 'Number of distinct relationship types (e.g., works_for, knows)',
-  networkDensity:
-    'Percentage of possible connections that actually exist. Low density means a sparse graph',
+  networkDensity: 'Percentage of possible connections that actually exist. Low density means a sparse graph',
   avgDegree: 'Average number of relationships per entity. Higher means more interconnected',
   isolated: 'Entities with zero connections. May indicate data quality issues',
   leaf: 'Entities with exactly one connection. These are the periphery of the graph',
-  entityTypeDistribution:
-    'Distribution of entities by type. Shows what this graph is primarily about',
-  predicateDistribution:
-    'Distribution of relationship types. Shows the dominant kinds of connections',
-  typeMatrix:
-    'How many relationships exist between each pair of entity types. Reveals the structural backbone of the graph',
-  topHubs:
-    'Most connected entities — the key nodes in the graph. Shows their top predicates',
-  relationshipPaths:
-    'Most common type-to-type connection patterns including the predicate. Shows the dominant information flows',
-  degreeDistribution:
-    'How connections are spread across entities. A long tail means few hubs and many peripheral nodes',
-  predicateByType:
-    'Which predicates each entity type participates in. Shows the role each type plays in the graph',
-  multiEdge:
-    'Entity pairs connected by two or more different predicates. These are the strongest relationships',
-  avgDegreeByType:
-    'Average connections per entity, broken down by type. Shows which types are most interconnected',
-  diverseEntities:
-    'Entities connected to the most different entity types. These are the bridge nodes spanning domains',
-  graphComponents:
-    'Disconnected subgraphs within the workspace. Multiple components may indicate fragmented data',
-  predicateExclusivity:
-    'Whether predicates connect only specific type pairs (exclusive) or multiple type combinations (generic)',
-  reciprocalPairs:
-    'Entity pairs with relationships in both directions. Indicates strong bidirectional connections',
-  isolatedEntities:
-    'Entities with no connections at all. Consider whether these should be linked or removed',
-  leafEntities:
-    'Entities with only one connection. Shown with their single relationship for context'
+  entityTypeDistribution: 'Distribution of entities by type. Shows what this graph is primarily about',
+  predicateDistribution: 'Distribution of relationship types. Shows the dominant kinds of connections',
+  typeMatrix: 'How many relationships exist between each pair of entity types. Reveals the structural backbone of the graph',
+  topHubs: 'Most connected entities — the key nodes in the graph. Shows their top predicates',
+  relationshipPaths: 'Most common type-to-type connection patterns including the predicate. Shows the dominant information flows',
+  degreeDistribution: 'How connections are spread across entities. A long tail means few hubs and many peripheral nodes',
+  predicateByType: 'Which predicates each entity type participates in. Shows the role each type plays in the graph',
+  multiEdge: 'Entity pairs connected by two or more different predicates. These are the strongest relationships',
+  avgDegreeByType: 'Average connections per entity, broken down by type. Shows which types are most interconnected',
+  diverseEntities: 'Entities connected to the most different entity types. These are the bridge nodes spanning domains',
+  graphComponents: 'Disconnected subgraphs within the workspace. Multiple components may indicate fragmented data',
+  predicateExclusivity: 'Whether predicates connect only specific type pairs (exclusive) or multiple type combinations (generic)',
+  reciprocalPairs: 'Entity pairs with relationships in both directions. Indicates strong bidirectional connections',
+  isolatedEntities: 'Entities with no connections at all. Consider whether these should be linked or removed',
+  leafEntities: 'Entities with only one connection. Shown with their single relationship for context'
 } as const;

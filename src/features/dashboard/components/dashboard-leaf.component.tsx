@@ -20,16 +20,12 @@ const DashboardLeafComponent = ({ data }: Props) => {
   const hiddenCount = data.length - LEAF_DISPLAY_LIMIT;
 
   return (
-    <DashboardSectionComponent
-      title="Leaf Entities"
-      tooltip={SECTION_TOOLTIPS.leafEntities}
-      badge={data.length}
-    >
+    <DashboardSectionComponent title="Leaf Entities" tooltip={SECTION_TOOLTIPS.leafEntities} badge={data.length}>
       {data.length === 0 ? (
         <p className="text-muted-foreground text-xs">No leaf entities</p>
       ) : (
         <div className="space-y-1.5">
-          {visibleItems.map((leaf) => (
+          {visibleItems.map(leaf => (
             <div key={leaf.entity.id} className="flex items-center gap-1.5 text-xs">
               <span className="truncate font-medium" title={leaf.entity.labelNormalized}>
                 {leaf.entity.labelNormalized}
@@ -44,23 +40,13 @@ const DashboardLeafComponent = ({ data }: Props) => {
           ))}
 
           {!expanded && hiddenCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-xs"
-              onClick={() => setExpanded(true)}
-            >
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setExpanded(true)}>
               +{hiddenCount} more
             </Button>
           )}
 
           {expanded && hiddenCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-xs"
-              onClick={() => setExpanded(false)}
-            >
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setExpanded(false)}>
               Show less
             </Button>
           )}

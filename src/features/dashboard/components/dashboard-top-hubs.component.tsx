@@ -24,9 +24,7 @@ const DashboardTopHubsComponent = ({ data }: Props) => {
             <div key={hub.entity.id} className="space-y-1">
               {/* Hub header: rank, name, type badge */}
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground w-4 shrink-0 text-xs font-mono">
-                  {index + 1}
-                </span>
+                <span className="text-muted-foreground w-4 shrink-0 font-mono text-xs">{index + 1}</span>
                 <span className="truncate text-sm font-medium" title={hub.entity.labelNormalized}>
                   {hub.entity.labelNormalized}
                 </span>
@@ -43,15 +41,13 @@ const DashboardTopHubsComponent = ({ data }: Props) => {
                     style={{ width: `${maxDegree > 0 ? (hub.degree / maxDegree) * 100 : 0}%` }}
                   />
                 </div>
-                <span className="text-muted-foreground w-8 shrink-0 text-right font-mono">
-                  {hub.degree}
-                </span>
+                <span className="text-muted-foreground w-8 shrink-0 text-right font-mono">{hub.degree}</span>
               </div>
 
               {/* Predicate breakdown */}
               {hub.predicateBreakdown.length > 0 && (
                 <p className="text-muted-foreground truncate pl-6 text-xs">
-                  {hub.predicateBreakdown.map((p) => `${p.label} (${p.count})`).join(', ')}
+                  {hub.predicateBreakdown.map(p => `${p.label} (${p.count})`).join(', ')}
                 </p>
               )}
             </div>

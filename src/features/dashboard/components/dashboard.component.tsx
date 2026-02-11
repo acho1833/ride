@@ -116,11 +116,7 @@ const DashboardComponent = ({ workspaceId }: Props) => {
         <DashboardTopHubsComponent data={analytics.topHubs} />
 
         <DashboardRelationshipPathsComponent data={analytics.relationshipPaths} />
-        <DashboardDegreeDistributionComponent
-          data={analytics.degreeDistribution}
-          median={medianDegree}
-          max={maxDegree}
-        />
+        <DashboardDegreeDistributionComponent data={analytics.degreeDistribution} median={medianDegree} max={maxDegree} />
       </div>
 
       {/* Predicate by Type - full width */}
@@ -129,10 +125,7 @@ const DashboardComponent = ({ workspaceId }: Props) => {
       {/* 2-column grid continued */}
       <div className="grid grid-cols-2 gap-4">
         <DashboardMultiEdgeComponent data={analytics.multiEdgePairs} />
-        <DashboardAvgDegreeByTypeComponent
-          data={analytics.avgDegreeByType}
-          overallAvg={analytics.kpiStats.avgDegree}
-        />
+        <DashboardAvgDegreeByTypeComponent data={analytics.avgDegreeByType} overallAvg={analytics.kpiStats.avgDegree} />
 
         <DashboardDiverseEntitiesComponent data={analytics.diverseEntities} />
         <DashboardGraphComponentsComponent data={analytics.graphComponents} />

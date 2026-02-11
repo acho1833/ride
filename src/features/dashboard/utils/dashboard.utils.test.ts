@@ -95,7 +95,7 @@ describe('dashboard.utils', () => {
       // remaining types each have count 1
       const rest = dist.slice(1);
       expect(rest).toHaveLength(3);
-      rest.forEach((item) => expect(item.count).toBe(1));
+      rest.forEach(item => expect(item.count).toBe(1));
     });
 
     it('returns empty array for empty entities', () => {
@@ -178,7 +178,7 @@ describe('dashboard.utils', () => {
 
     it('includes predicate breakdown for each hub', () => {
       const hubs = computeTopHubs(entities, relationships);
-      const aliceHub = hubs.find((h) => h.entity.id === 'e1');
+      const aliceHub = hubs.find(h => h.entity.id === 'e1');
       expect(aliceHub).toBeDefined();
       // Alice: works_for(1), knows(2 - r3+r5), reports_to(1) - top 3
       expect(aliceHub!.predicateBreakdown).toHaveLength(3);
@@ -202,26 +202,26 @@ describe('dashboard.utils', () => {
     it('buckets entities into correct ranges', () => {
       const buckets = computeDegreeDistribution(entities, relationships);
       // e5: degree 0 -> "0 rels" bucket
-      expect(buckets.find((b) => b.range === '0 rels')!.count).toBe(1);
+      expect(buckets.find(b => b.range === '0 rels')!.count).toBe(1);
       // e4: degree 1 -> "1 rel" bucket
-      expect(buckets.find((b) => b.range === '1 rel')!.count).toBe(1);
+      expect(buckets.find(b => b.range === '1 rel')!.count).toBe(1);
       // e2: degree 3 -> "2-3" bucket
-      expect(buckets.find((b) => b.range === '2-3')!.count).toBe(1);
+      expect(buckets.find(b => b.range === '2-3')!.count).toBe(1);
       // e1, e3: degree 4 -> "4-6" bucket
-      expect(buckets.find((b) => b.range === '4-6')!.count).toBe(2);
+      expect(buckets.find(b => b.range === '4-6')!.count).toBe(2);
     });
 
     it('includes all buckets even when count is 0', () => {
       const buckets = computeDegreeDistribution(entities, relationships);
       expect(buckets).toHaveLength(7); // all DEGREE_BUCKETS
-      expect(buckets.find((b) => b.range === '7-10')!.count).toBe(0);
-      expect(buckets.find((b) => b.range === '11-15')!.count).toBe(0);
-      expect(buckets.find((b) => b.range === '16+')!.count).toBe(0);
+      expect(buckets.find(b => b.range === '7-10')!.count).toBe(0);
+      expect(buckets.find(b => b.range === '11-15')!.count).toBe(0);
+      expect(buckets.find(b => b.range === '16+')!.count).toBe(0);
     });
 
     it('returns all-zero buckets for empty inputs', () => {
       const buckets = computeDegreeDistribution([], []);
-      buckets.forEach((b) => expect(b.count).toBe(0));
+      buckets.forEach(b => expect(b.count).toBe(0));
     });
   });
 
@@ -251,14 +251,14 @@ describe('dashboard.utils', () => {
   describe('computePredicateByType', () => {
     it('lists predicates per entity type sorted alphabetically', () => {
       const result = computePredicateByType(entities, relationships);
-      const types = result.map((r) => r.type);
+      const types = result.map(r => r.type);
       // Should be sorted alphabetically by type
       expect(types).toEqual([...types].sort());
     });
 
     it('counts predicates correctly for Person type', () => {
       const result = computePredicateByType(entities, relationships);
-      const personEntry = result.find((r) => r.type === 'Person');
+      const personEntry = result.find(r => r.type === 'Person');
       expect(personEntry).toBeDefined();
       // Person participates in: works_for(2-r1,r2), knows(4-r3,r5 x2 endpoints), reports_to(1-r6)
       // e1: r1(works_for), r3(knows), r5(knows), r6(reports_to)
@@ -344,7 +344,7 @@ describe('dashboard.utils', () => {
 
     it('marks largest component as main', () => {
       const components = computeGraphComponents(entities, relationships);
-      const main = components.find((c) => c.isMainComponent);
+      const main = components.find(c => c.isMainComponent);
       expect(main).toBeDefined();
       expect(main!.entityCount).toBe(4);
       expect(main!.relCount).toBe(6);
@@ -352,7 +352,7 @@ describe('dashboard.utils', () => {
 
     it('includes isolated entities as separate component', () => {
       const components = computeGraphComponents(entities, relationships);
-      const isolated = components.find((c) => !c.isMainComponent);
+      const isolated = components.find(c => !c.isMainComponent);
       expect(isolated).toBeDefined();
       expect(isolated!.entityCount).toBe(1);
       expect(isolated!.relCount).toBe(0);
@@ -360,9 +360,9 @@ describe('dashboard.utils', () => {
 
     it('calculates percentages correctly', () => {
       const components = computeGraphComponents(entities, relationships);
-      const main = components.find((c) => c.isMainComponent)!;
+      const main = components.find(c => c.isMainComponent)!;
       expect(main.percentage).toBeCloseTo(80); // 4/5 * 100
-      const isolated = components.find((c) => !c.isMainComponent)!;
+      const isolated = components.find(c => !c.isMainComponent)!;
       expect(isolated.percentage).toBeCloseTo(20); // 1/5 * 100
     });
 
@@ -386,7 +386,7 @@ describe('dashboard.utils', () => {
 
     it('sorts by predicate alphabetically', () => {
       const result = computePredicateExclusivity(entities, relationships);
-      const exclusivePredicates = result.exclusive.map((e) => e.predicate);
+      const exclusivePredicates = result.exclusive.map(e => e.predicate);
       expect(exclusivePredicates).toEqual([...exclusivePredicates].sort());
     });
 
@@ -425,10 +425,7 @@ describe('dashboard.utils', () => {
     });
 
     it('sorts alphabetically by labelNormalized', () => {
-      const extraEntities: Entity[] = [
-        ...entities,
-        { id: 'e6', labelNormalized: 'Alpha Event', type: 'Event' }
-      ];
+      const extraEntities: Entity[] = [...entities, { id: 'e6', labelNormalized: 'Alpha Event', type: 'Event' }];
       const isolated = computeIsolatedEntities(extraEntities, relationships);
       expect(isolated).toHaveLength(2);
       expect(isolated[0].labelNormalized).toBe('Alpha Event');

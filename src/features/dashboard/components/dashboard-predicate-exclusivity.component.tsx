@@ -15,10 +15,7 @@ const DashboardPredicateExclusivityComponent = ({ data }: Props) => {
   const hasData = data.exclusive.length > 0 || data.generic.length > 0;
 
   return (
-    <DashboardSectionComponent
-      title="Predicate Exclusivity"
-      tooltip={SECTION_TOOLTIPS.predicateExclusivity}
-    >
+    <DashboardSectionComponent title="Predicate Exclusivity" tooltip={SECTION_TOOLTIPS.predicateExclusivity}>
       {!hasData ? (
         <p className="text-muted-foreground text-xs">No data</p>
       ) : (
@@ -26,11 +23,9 @@ const DashboardPredicateExclusivityComponent = ({ data }: Props) => {
           {/* Exclusive predicates */}
           {data.exclusive.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-xs font-medium">
-                Exclusive ({data.exclusive.length})
-              </p>
+              <p className="text-xs font-medium">Exclusive ({data.exclusive.length})</p>
               <div className="space-y-1">
-                {data.exclusive.map((item) => (
+                {data.exclusive.map(item => (
                   <div key={item.predicate} className="flex items-center gap-1.5 text-xs">
                     <Badge variant="secondary" className="shrink-0 text-xs">
                       {item.predicate}
@@ -47,11 +42,9 @@ const DashboardPredicateExclusivityComponent = ({ data }: Props) => {
           {/* Generic predicates */}
           {data.generic.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-xs font-medium">
-                Generic ({data.generic.length})
-              </p>
+              <p className="text-xs font-medium">Generic ({data.generic.length})</p>
               <div className="space-y-1.5">
-                {data.generic.map((item) => (
+                {data.generic.map(item => (
                   <div key={item.predicate} className="space-y-0.5">
                     <Badge variant="secondary" className="text-xs">
                       {item.predicate}

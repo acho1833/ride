@@ -13,11 +13,7 @@ interface Props {
 
 const DashboardDiverseEntitiesComponent = ({ data }: Props) => {
   return (
-    <DashboardSectionComponent
-      title="Diverse Entities"
-      tooltip={SECTION_TOOLTIPS.diverseEntities}
-      badge={data.length}
-    >
+    <DashboardSectionComponent title="Diverse Entities" tooltip={SECTION_TOOLTIPS.diverseEntities} badge={data.length}>
       {data.length === 0 ? (
         <p className="text-muted-foreground text-xs">No data</p>
       ) : (
@@ -29,12 +25,10 @@ const DashboardDiverseEntitiesComponent = ({ data }: Props) => {
                 <span className="truncate font-medium" title={item.entity.labelNormalized}>
                   {item.entity.labelNormalized}
                 </span>
-                <span className="text-muted-foreground shrink-0">
-                  ({item.typeCount} types)
-                </span>
+                <span className="text-muted-foreground shrink-0">({item.typeCount} types)</span>
               </div>
               <div className="flex flex-wrap gap-1 pl-6">
-                {item.types.map((type) => (
+                {item.types.map(type => (
                   <Badge key={type} variant="outline" className="text-xs">
                     {type}
                   </Badge>

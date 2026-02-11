@@ -14,22 +14,13 @@ const DashboardPredicatesComponent = ({ data }: Props) => {
   const maxValue = data[0]?.count ?? 0;
 
   return (
-    <DashboardSectionComponent
-      title="Predicates"
-      tooltip={SECTION_TOOLTIPS.predicateDistribution}
-      badge={data.length}
-    >
+    <DashboardSectionComponent title="Predicates" tooltip={SECTION_TOOLTIPS.predicateDistribution} badge={data.length}>
       {data.length === 0 ? (
         <p className="text-muted-foreground text-xs">No data</p>
       ) : (
         <div className="space-y-1.5">
-          {data.map((item) => (
-            <DashboardBarComponent
-              key={item.label}
-              label={item.label}
-              value={item.count}
-              maxValue={maxValue}
-            />
+          {data.map(item => (
+            <DashboardBarComponent key={item.label} label={item.label} value={item.count} maxValue={maxValue} />
           ))}
         </div>
       )}
