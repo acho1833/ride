@@ -5,7 +5,7 @@ import type { WorkspaceResponse, RelationshipResponse } from '@/models/workspace
 import { getDb } from '@/lib/mock-db';
 
 // ============================================================================
-// Per-workspace state persisted to SQLite
+// Per-workspace state persisted to SQLite as JSON TEXT
 // ============================================================================
 
 interface WorkspaceState {
@@ -13,49 +13,25 @@ interface WorkspaceState {
   relationshipList: RelationshipResponse[];
 }
 
-/** Read workspace state from SQLite */
+/** Read workspace state from SQLite (single JSON row) */
 function getWorkspaceState(sid: string, workspaceId: string): WorkspaceState {
   const db = getDb();
-  const entityList = db
-    .prepare(
-      `SELECT entity_id as id, label_normalized as labelNormalized, type
-       FROM workspace_entity WHERE sid = ? AND workspace_id = ?`
-    )
-    .all(sid, workspaceId) as EntityResponse[];
+  const row = db.prepare('SELECT data FROM workspace_state WHERE sid = ? AND workspace_id = ?').get(sid, workspaceId) as
+    | { data: string }
+    | undefined;
 
-  const relationshipList = db
-    .prepare(
-      `SELECT relationship_id as relationshipId, predicate,
-              source_entity_id as sourceEntityId, related_entity_id as relatedEntityId
-       FROM workspace_relationship WHERE sid = ? AND workspace_id = ?`
-    )
-    .all(sid, workspaceId) as RelationshipResponse[];
-
-  return { entityList, relationshipList };
+  if (!row) return { entityList: [], relationshipList: [] };
+  return JSON.parse(row.data) as WorkspaceState;
 }
 
-/** Write workspace state to SQLite (replace all rows for this sid+workspace) */
+/** Write workspace state to SQLite (single JSON row) */
 function setWorkspaceState(sid: string, workspaceId: string, state: WorkspaceState): void {
   const db = getDb();
-  const transaction = db.transaction(() => {
-    db.prepare('DELETE FROM workspace_entity WHERE sid = ? AND workspace_id = ?').run(sid, workspaceId);
-    db.prepare('DELETE FROM workspace_relationship WHERE sid = ? AND workspace_id = ?').run(sid, workspaceId);
-
-    const insertEntity = db.prepare(
-      'INSERT INTO workspace_entity (sid, workspace_id, entity_id, label_normalized, type) VALUES (?, ?, ?, ?, ?)'
-    );
-    for (const e of state.entityList) {
-      insertEntity.run(sid, workspaceId, e.id, e.labelNormalized, e.type);
-    }
-
-    const insertRel = db.prepare(
-      'INSERT INTO workspace_relationship (sid, workspace_id, relationship_id, predicate, source_entity_id, related_entity_id) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    for (const r of state.relationshipList) {
-      insertRel.run(sid, workspaceId, r.relationshipId, r.predicate, r.sourceEntityId, r.relatedEntityId);
-    }
-  });
-  transaction();
+  db.prepare('INSERT OR REPLACE INTO workspace_state (sid, workspace_id, data) VALUES (?, ?, ?)').run(
+    sid,
+    workspaceId,
+    JSON.stringify(state)
+  );
 }
 
 /**
@@ -66,21 +42,32 @@ async function findConnectingRelationships(entityId: string, existingEntityIds: 
   if (existingEntityIds.size === 0) return [];
 
   const db = getDb();
-  const existingIds = [...existingEntityIds];
-  const placeholders = existingIds.map(() => '?').join(', ');
+  // Query all relationships involving this entity (uses indexed columns)
   const relationships = db
     .prepare(
-      `
-    SELECT relationship_id as relationshipId, predicate,
-           source_entity_id as sourceEntityId, related_entity_id as relatedEntityId
-    FROM relationship
-    WHERE (source_entity_id = ? AND related_entity_id IN (${placeholders}))
-       OR (related_entity_id = ? AND source_entity_id IN (${placeholders}))
-  `
+      `SELECT relationship_id as relationshipId, predicate,
+              source_entity_id as sourceEntityId, related_entity_id as relatedEntityId
+       FROM relationship
+       WHERE source_entity_id = ? OR related_entity_id = ?`
     )
-    .all(entityId, ...existingIds, entityId, ...existingIds) as RelationshipResponse[];
+    .all(entityId, entityId) as RelationshipResponse[];
 
-  return relationships;
+  // Filter to only those connecting to existing workspace entities
+  return relationships.filter(
+    r =>
+      (r.sourceEntityId === entityId && existingEntityIds.has(r.relatedEntityId)) ||
+      (r.relatedEntityId === entityId && existingEntityIds.has(r.sourceEntityId))
+  );
+}
+
+/** Build a WorkspaceResponse from in-memory state */
+function toResponse(workspaceId: string, state: WorkspaceState): WorkspaceResponse {
+  return {
+    id: workspaceId,
+    name: `Workspace ${workspaceId}`,
+    entityList: state.entityList,
+    relationshipList: state.relationshipList
+  };
 }
 
 // ============================================================================
@@ -91,13 +78,7 @@ async function findConnectingRelationships(entityId: string, existingEntityIds: 
  * Get workspace by ID.
  */
 export async function getWorkspaceById(id: string, sid: string): Promise<WorkspaceResponse> {
-  const state = getWorkspaceState(sid, id);
-  return {
-    id,
-    name: `Workspace ${id}`,
-    entityList: state.entityList,
-    relationshipList: state.relationshipList
-  };
+  return toResponse(id, getWorkspaceState(sid, id));
 }
 
 /**
@@ -113,7 +94,7 @@ export async function addEntitiesToWorkspace(workspaceId: string, entityIds: str
   // Filter to only new entity IDs
   const newEntityIds = entityIds.filter(id => !existingEntityIds.has(id));
   if (newEntityIds.length === 0) {
-    return getWorkspaceById(workspaceId, sid);
+    return toResponse(workspaceId, state);
   }
 
   // Batch-fetch new entities from SQLite
@@ -143,7 +124,7 @@ export async function addEntitiesToWorkspace(workspaceId: string, entityIds: str
   }
 
   setWorkspaceState(sid, workspaceId, state);
-  return getWorkspaceById(workspaceId, sid);
+  return toResponse(workspaceId, state);
 }
 
 /**
@@ -160,7 +141,7 @@ export async function removeEntitiesFromWorkspace(workspaceId: string, entityIds
   );
 
   setWorkspaceState(sid, workspaceId, state);
-  return getWorkspaceById(workspaceId, sid);
+  return toResponse(workspaceId, state);
 }
 
 /**
@@ -173,9 +154,7 @@ export async function setWorkspaceData(
   relationships: RelationshipResponse[],
   sid: string
 ): Promise<WorkspaceResponse> {
-  setWorkspaceState(sid, workspaceId, {
-    entityList: entities,
-    relationshipList: relationships
-  });
-  return getWorkspaceById(workspaceId, sid);
+  const state: WorkspaceState = { entityList: entities, relationshipList: relationships };
+  setWorkspaceState(sid, workspaceId, state);
+  return toResponse(workspaceId, state);
 }

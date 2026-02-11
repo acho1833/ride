@@ -7,7 +7,7 @@
  * Retrieves workspace data by workspaceId and passes to graph component.
  */
 
-import { useMemo, useCallback, useEffect, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState, useRef } from 'react';
 import { useWorkspaceQuery } from '../hooks/useWorkspaceQuery';
 import { useWorkspaceViewStateMutation } from '../hooks/useWorkspaceViewStateMutation';
 import { useWorkspaceAddEntitiesMutation } from '../hooks/useWorkspaceAddEntitiesMutation';
@@ -74,8 +74,13 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  // Pending drop positions: tracks positions for entities that have been dropped
+  // but not yet added to the graph. Merged into every debouncedSave to prevent overwrites.
+  const pendingPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
+
   // Preview mode state
   const [previewPopup, setPreviewPopup] = useState<{ group: PreviewGroup; position: { x: number; y: number } } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Clear selection state when this workspace component unmounts (tab closed)
   useEffect(() => {
@@ -266,19 +271,25 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
 
   const handleSaveViewState = useCallback(
     (input: Omit<WorkspaceViewStateInput, 'workspaceId'>) => {
-      saveViewState({ ...input, workspaceId });
+      // Merge any pending drop positions so debouncedSave never overwrites them
+      const entityPositions = { ...input.entityPositions, ...pendingPositionsRef.current };
+      saveViewState({ ...input, workspaceId, entityPositions });
     },
     [saveViewState, workspaceId]
   );
 
   const handleAddEntity = useCallback(
     (entityId: string, position: { x: number; y: number }) => {
+      // Store drop position so debouncedSave merges it into every save
+      pendingPositionsRef.current[entityId] = position;
+
       // Add entity to workspace, then select it after success
       addEntities(
         { workspaceId, entityIds: [entityId] },
         {
           onSuccess: () => {
-            // Select the entity after it's been added and graph re-renders
+            // Entity is now in the graph — clear pending position
+            delete pendingPositionsRef.current[entityId];
             setSelectedEntityIds(workspaceId, [entityId]);
           }
         }
@@ -364,7 +375,12 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     (groupType: string, screenPosition: { x: number; y: number }) => {
       const group = previewState?.groups.find(g => g.entityType === groupType);
       if (group) {
-        setPreviewPopup({ group, position: screenPosition });
+        // Convert viewport coords to container-relative coords for absolute positioning
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        const position = containerRect
+          ? { x: screenPosition.x - containerRect.left, y: screenPosition.y - containerRect.top }
+          : screenPosition;
+        setPreviewPopup({ group, position });
       }
     },
     [previewState?.groups]
@@ -427,7 +443,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
         onToggleFilterPanel={handleToggleFilterPanel}
         onOpenDashboard={handleOpenDashboard}
       />
-      <div className="relative min-h-0 flex-1">
+      <div ref={containerRef} className="relative min-h-0 flex-1">
         <WorkspaceGraphComponent
           workspace={workspace}
           entityMap={entityMap}

@@ -43,6 +43,13 @@ const DDL = `
   );
   CREATE INDEX IF NOT EXISTS idx_ws_entity_lookup ON workspace_entity(sid, workspace_id);
   CREATE INDEX IF NOT EXISTS idx_ws_rel_lookup ON workspace_relationship(sid, workspace_id);
+
+  CREATE TABLE IF NOT EXISTS workspace_state (
+    sid TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    data TEXT NOT NULL DEFAULT '{"entityList":[],"relationshipList":[]}',
+    PRIMARY KEY (sid, workspace_id)
+  );
 `;
 
 /** Persist the in-memory database to disk */
