@@ -1,5 +1,5 @@
 /** Mock entity types */
-export const MOCK_ENTITY_TYPES = ['Person', 'Organization', 'Vehicle', 'Location', 'Device', 'Event'] as const;
+export const MOCK_ENTITY_TYPES = ['Person', 'Organization', 'Vehicle', 'Location', 'Phone', 'Email', 'Document', 'Account'] as const;
 
 /** Relationship predicates for generating mock relationships */
 export const RELATIONSHIP_PREDICATES = [
@@ -11,6 +11,6 @@ export const RELATIONSHIP_PREDICATES = [
   'part_of',
   'owns',
   'located_at',
-  'attends',
-  'operates'
+  'contacted_via',
+  'authored'
 ] as const;

@@ -25,8 +25,8 @@ const RELATIONSHIP_PREDICATES = [
   'part_of',
   'owns',
   'located_at',
-  'attends',
-  'operates'
+  'contacted_via',
+  'authored'
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,18 @@ const MS_EMPLOYEE_COUNT = 15000;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Prints entity count breakdown by type. */
+function logEntityBreakdown(entities: EntityRow[]): void {
+  const counts: Record<string, number> = {};
+  for (const e of entities) {
+    counts[e.type] = (counts[e.type] || 0) + 1;
+  }
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  for (const [type, count] of sorted) {
+    console.log(`    ${type}: ${count}`);
+  }
+}
 
 function deleteIfExists(filePath: string): void {
   if (fs.existsSync(filePath)) {
@@ -143,8 +155,10 @@ function generateDummyData(): DataSet {
     regularOrg: 150,
     regularVehicle: 30,
     regularLocation: 30,
-    regularDevice: 20,
-    regularEvent: 20
+    regularPhone: 40,
+    regularEmail: 50,
+    regularDocument: 30,
+    regularAccount: 25
   };
 
   const RELATIONSHIP_TARGETS = {
@@ -236,25 +250,46 @@ function generateDummyData(): DataSet {
     });
   }
 
-  // Regular Device entities
-  for (let i = 1; i <= ENTITY_COUNTS.regularDevice; i++) {
+  // Regular Phone entities
+  for (let i = 1; i <= ENTITY_COUNTS.regularPhone; i++) {
     entities.push({
-      id: `device-${i}`,
-      labelNormalized: `${faker.commerce.productName()} (${faker.string.alphanumeric(8).toUpperCase()})`,
-      type: 'Device'
+      id: `phone-${i}`,
+      labelNormalized: faker.phone.number({ style: 'national' }),
+      type: 'Phone'
     });
   }
 
-  // Regular Event entities
-  for (let i = 1; i <= ENTITY_COUNTS.regularEvent; i++) {
+  // Regular Email entities
+  for (let i = 1; i <= ENTITY_COUNTS.regularEmail; i++) {
     entities.push({
-      id: `event-${i}`,
-      labelNormalized: `${faker.company.buzzNoun()} ${faker.helpers.arrayElement(['Summit', 'Conference', 'Workshop', 'Meetup', 'Symposium'])} ${faker.date.future().getFullYear()}`,
-      type: 'Event'
+      id: `email-${i}`,
+      labelNormalized: faker.internet.email(),
+      type: 'Email'
+    });
+  }
+
+  // Regular Document entities
+  for (let i = 1; i <= ENTITY_COUNTS.regularDocument; i++) {
+    const docType = faker.helpers.arrayElement(['Report', 'Contract', 'Invoice', 'Memo', 'Filing']);
+    entities.push({
+      id: `document-${i}`,
+      labelNormalized: `${docType} - ${faker.company.buzzNoun()} ${faker.string.alphanumeric(6).toUpperCase()}`,
+      type: 'Document'
+    });
+  }
+
+  // Regular Account entities
+  for (let i = 1; i <= ENTITY_COUNTS.regularAccount; i++) {
+    const acctType = faker.helpers.arrayElement(['Checking', 'Savings', 'Brokerage', 'Trust', 'Corporate']);
+    entities.push({
+      id: `account-${i}`,
+      labelNormalized: `${acctType} ****${faker.string.numeric(4)}`,
+      type: 'Account'
     });
   }
 
   console.log(`  Generated ${entities.length} entities`);
+  logEntityBreakdown(entities);
 
   // Get all entity IDs for relationship targets
   const allEntityIds = entities.map(e => e.id);
@@ -498,7 +533,58 @@ function generateGoogleOrgData(): DataSet {
     contractors.push(e);
   }
 
+  // Phones (100)
+  const phones: EntityRow[] = [];
+  for (let i = 0; i < 100; i++) {
+    const e: EntityRow = {
+      id: `google-phone-${i + 1}`,
+      labelNormalized: faker.phone.number({ style: 'national' }),
+      type: 'Phone'
+    };
+    entities.push(e);
+    phones.push(e);
+  }
+
+  // Emails (200)
+  const emails: EntityRow[] = [];
+  for (let i = 0; i < 200; i++) {
+    const e: EntityRow = {
+      id: `google-email-${i + 1}`,
+      labelNormalized: faker.internet.email({ provider: 'google.com' }),
+      type: 'Email'
+    };
+    entities.push(e);
+    emails.push(e);
+  }
+
+  // Documents (80)
+  const documents: EntityRow[] = [];
+  for (let i = 0; i < 80; i++) {
+    const docType = faker.helpers.arrayElement(['Report', 'Contract', 'Patent', 'Whitepaper', 'Policy']);
+    const e: EntityRow = {
+      id: `google-doc-${i + 1}`,
+      labelNormalized: `${docType} - ${faker.company.buzzNoun()} ${faker.string.alphanumeric(6).toUpperCase()}`,
+      type: 'Document'
+    };
+    entities.push(e);
+    documents.push(e);
+  }
+
+  // Accounts (50)
+  const accounts: EntityRow[] = [];
+  for (let i = 0; i < 50; i++) {
+    const acctType = faker.helpers.arrayElement(['Corporate', 'Operating', 'Revenue', 'Investment', 'Escrow']);
+    const e: EntityRow = {
+      id: `google-acct-${i + 1}`,
+      labelNormalized: `${acctType} ****${faker.string.numeric(4)}`,
+      type: 'Account'
+    };
+    entities.push(e);
+    accounts.push(e);
+  }
+
   console.log(`  Generated ${entities.length} entities`);
+  logEntityBreakdown(entities);
 
   // -- Create Relationships --
 
@@ -570,6 +656,39 @@ function generateGoogleOrgData(): DataSet {
   for (const contractor of contractors) {
     connectToPool(contractor.id, teams, 1, addRel, 'works_for');
     connectToPool(contractor.id, managers, 1, addRel, 'reports_to');
+  }
+
+  // Phones → owned by executives, directors, managers
+  for (const phone of phones) {
+    const owner = faker.helpers.arrayElement([...executives, ...directors, ...managers]);
+    addRel(owner.id, phone.id, 'owns');
+  }
+
+  // Emails → owned by employees, managers, executives
+  for (const email of emails) {
+    const owner = faker.helpers.arrayElement([...executives, ...managers, ...employees.slice(0, 200)]);
+    addRel(owner.id, email.id, 'owns');
+  }
+  // Some emails contacted_via by other people
+  for (const email of emails.slice(0, 100)) {
+    const contactor = faker.helpers.arrayElement([...managers, ...employees.slice(0, 200)]);
+    addRel(contactor.id, email.id, 'contacted_via');
+  }
+
+  // Documents → authored by executives/directors, signed by managers
+  for (const doc of documents) {
+    const author = faker.helpers.arrayElement([...executives, ...directors]);
+    addRel(author.id, doc.id, 'authored');
+    const signer = faker.helpers.arrayElement(managers);
+    addRel(signer.id, doc.id, 'part_of');
+  }
+
+  // Accounts → owned by divisions, managed by executives
+  for (const acct of accounts) {
+    const div = faker.helpers.arrayElement(divisions);
+    addRel(div.id, acct.id, 'owns');
+    const exec = faker.helpers.arrayElement(executives);
+    addRel(exec.id, acct.id, 'manages');
   }
 
   // Connect every entity to Google HQ via part_of
@@ -789,32 +908,59 @@ async function generateMicrosoftOrgData(): Promise<DataSet> {
     locations.push(e);
   }
 
-  // Company Devices (300)
-  const devices: EntityRow[] = [];
+  // Phones (300)
+  const phones: EntityRow[] = [];
   for (let i = 0; i < 300; i++) {
     const e: EntityRow = {
-      id: `ms-device-${i + 1}`,
-      labelNormalized: `${faker.commerce.productName()} (${faker.string.alphanumeric(8).toUpperCase()})`,
-      type: 'Device'
+      id: `ms-phone-${i + 1}`,
+      labelNormalized: faker.phone.number({ style: 'national' }),
+      type: 'Phone'
     };
     entities.push(e);
-    devices.push(e);
+    phones.push(e);
   }
 
-  // Company Events (100)
-  const events: EntityRow[] = [];
-  for (let i = 0; i < 100; i++) {
+  // Emails (500)
+  const emails: EntityRow[] = [];
+  for (let i = 0; i < 500; i++) {
     const e: EntityRow = {
-      id: `ms-event-${i + 1}`,
-      labelNormalized: `${faker.company.buzzNoun()} ${faker.helpers.arrayElement(['Summit', 'Conference', 'Workshop', 'Hackathon', 'Keynote'])} ${faker.date.future().getFullYear()}`,
-      type: 'Event'
+      id: `ms-email-${i + 1}`,
+      labelNormalized: faker.internet.email({ provider: 'microsoft.com' }),
+      type: 'Email'
     };
     entities.push(e);
-    events.push(e);
+    emails.push(e);
+  }
+
+  // Documents (200)
+  const documents: EntityRow[] = [];
+  for (let i = 0; i < 200; i++) {
+    const docType = faker.helpers.arrayElement(['Report', 'Contract', 'Patent', 'Spec', 'Memo']);
+    const e: EntityRow = {
+      id: `ms-doc-${i + 1}`,
+      labelNormalized: `${docType} - ${faker.company.buzzNoun()} ${faker.string.alphanumeric(6).toUpperCase()}`,
+      type: 'Document'
+    };
+    entities.push(e);
+    documents.push(e);
+  }
+
+  // Accounts (150)
+  const accounts: EntityRow[] = [];
+  for (let i = 0; i < 150; i++) {
+    const acctType = faker.helpers.arrayElement(['Corporate', 'Operating', 'Revenue', 'Investment', 'Trust']);
+    const e: EntityRow = {
+      id: `ms-acct-${i + 1}`,
+      labelNormalized: `${acctType} ****${faker.string.numeric(4)}`,
+      type: 'Account'
+    };
+    entities.push(e);
+    accounts.push(e);
   }
 
   const nonEmployeeCount = entities.length;
   console.log(`  Generated ${nonEmployeeCount} non-employee entities`);
+  logEntityBreakdown(entities);
 
   // --- Relationships (non-employee) ---
 
@@ -883,13 +1029,13 @@ async function generateMicrosoftOrgData(): Promise<DataSet> {
     );
   }
 
-  // Vehicles → owned by HQ, operated by random managers (person → operates → vehicle)
+  // Vehicles → owned by HQ, owned by random managers (person → owns → vehicle)
   for (const vehicle of vehicles) {
     addRel(msHQ.id, vehicle.id, 'owns');
   }
   for (const mgr of managers.slice(0, 200)) {
     const vehicle = faker.helpers.arrayElement(vehicles);
-    addRel(mgr.id, vehicle.id, 'operates');
+    addRel(mgr.id, vehicle.id, 'owns');
   }
 
   // Locations → HQ located_at, divisions located_at
@@ -906,26 +1052,37 @@ async function generateMicrosoftOrgData(): Promise<DataSet> {
     );
   }
 
-  // Devices → owned by random managers (person → owns → device), part_of teams
-  for (const device of devices) {
-    const mgr = faker.helpers.arrayElement(managers);
-    addRel(mgr.id, device.id, 'owns');
-    connectToPool(device.id, teams, 1, addRel, 'part_of');
+  // Phones → owned by managers, executives
+  for (const phone of phones) {
+    const owner = faker.helpers.arrayElement([...executives, ...managers.slice(0, 300)]);
+    addRel(owner.id, phone.id, 'owns');
   }
 
-  // Events → attended by executives/managers (person → attends → event), part_of divisions
-  for (const event of events) {
-    const execCount = faker.number.int({ min: 2, max: 5 });
-    for (let j = 0; j < execCount; j++) {
-      const exec = faker.helpers.arrayElement(executives);
-      addRel(exec.id, event.id, 'attends');
-    }
-    const mgrCount = faker.number.int({ min: 3, max: 10 });
-    for (let j = 0; j < mgrCount; j++) {
-      const mgr = faker.helpers.arrayElement(managers);
-      addRel(mgr.id, event.id, 'attends');
-    }
-    connectToPool(event.id, divisions, faker.number.int({ min: 1, max: 3 }), addRel, 'part_of');
+  // Emails → owned by executives/managers/contractors
+  for (const email of emails) {
+    const owner = faker.helpers.arrayElement([...executives, ...managers.slice(0, 500), ...contractors.slice(0, 200)]);
+    addRel(owner.id, email.id, 'owns');
+  }
+  // Some emails contacted_via
+  for (const email of emails.slice(0, 250)) {
+    const contactor = faker.helpers.arrayElement([...managers.slice(0, 500)]);
+    addRel(contactor.id, email.id, 'contacted_via');
+  }
+
+  // Documents → authored by directors/executives
+  for (const doc of documents) {
+    const author = faker.helpers.arrayElement([...executives, ...directors]);
+    addRel(author.id, doc.id, 'authored');
+    const reviewer = faker.helpers.arrayElement(managers);
+    addRel(reviewer.id, doc.id, 'part_of');
+  }
+
+  // Accounts → owned by divisions, managed by executives
+  for (const acct of accounts) {
+    const div = faker.helpers.arrayElement(divisions);
+    addRel(div.id, acct.id, 'owns');
+    const exec = faker.helpers.arrayElement(executives);
+    addRel(exec.id, acct.id, 'manages');
   }
 
   // Connect every non-employee entity to MS HQ via part_of
@@ -1006,6 +1163,7 @@ async function generateMicrosoftOrgData(): Promise<DataSet> {
   }
 
   console.log(`  Total: ${entities.length} entities, ${relationships.length} relationships`);
+  logEntityBreakdown(entities);
   return { entities, relationships };
 }
 
@@ -1068,6 +1226,11 @@ async function createAndPopulateDatabase(datasets: DataSet[]): Promise<void> {
   console.log(`  Inserted ${totalEntities} entities, ${totalRelationships} relationships`);
   console.log(`  SQLite write completed in ${elapsed}s`);
   console.log(`  Database: ${DB_PATH}`);
+
+  // Grand total breakdown
+  const allEntities = datasets.flatMap(d => d.entities);
+  console.log(`\n=== Grand Total: ${allEntities.length} entities ===`);
+  logEntityBreakdown(allEntities);
 }
 
 // ---------------------------------------------------------------------------
