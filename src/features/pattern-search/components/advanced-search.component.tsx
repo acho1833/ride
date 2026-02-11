@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import PatternBuilderComponent from './pattern-builder.component';
 import PatternResultsComponent from './pattern-results.component';
@@ -120,7 +121,9 @@ const AdvancedSearchComponent = () => {
       {/* Pattern Builder */}
       <ResizablePanel defaultSize={60} minSize={20}>
         <div className="flex h-full flex-col">
-          <PatternBuilderComponent />
+          <ReactFlowProvider>
+            <PatternBuilderComponent />
+          </ReactFlowProvider>
         </div>
       </ResizablePanel>
 
