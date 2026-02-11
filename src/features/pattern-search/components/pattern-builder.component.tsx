@@ -10,7 +10,8 @@ import {
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
-  MarkerType
+  MarkerType,
+  useReactFlow
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -64,6 +65,7 @@ const PatternBuilderComponent = () => {
     selectNode,
     selectEdge
   } = usePatternSearchActions();
+  const { screenToFlowPosition } = useReactFlow();
 
   // Convert store nodes to React Flow nodes
   const flowNodes: Node[] = useMemo(
@@ -154,7 +156,7 @@ const PatternBuilderComponent = () => {
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
-  // Handle entity card drop - create pre-populated pattern node
+  // Handle entity card drop - create pre-populated pattern node at drop position
   const handleCanvasDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -163,13 +165,14 @@ const PatternBuilderComponent = () => {
       try {
         const entity = JSON.parse(jsonData);
         if (entity.type && entity.labelNormalized) {
-          addNodeFromEntity(entity.type, entity.labelNormalized);
+          const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+          addNodeFromEntity(entity.type, entity.labelNormalized, position);
         }
       } catch {
         // Ignore invalid JSON
       }
     },
-    [addNodeFromEntity]
+    [addNodeFromEntity, screenToFlowPosition]
   );
 
   // Handle delete key to remove selected node or edge
