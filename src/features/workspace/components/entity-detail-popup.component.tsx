@@ -99,13 +99,7 @@ const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEn
       header={<EntityDetailHeader entity={entity} />}
       toolbar={
         <>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 shrink-0"
-            onClick={handleAddToPattern}
-            title="Add to pattern search"
-          >
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleAddToPattern} title="Add to pattern search">
             <Crosshair className="h-3 w-3" />
           </Button>
           <Button
