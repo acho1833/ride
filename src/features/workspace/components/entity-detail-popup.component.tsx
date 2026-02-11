@@ -14,11 +14,13 @@
 
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Expand } from 'lucide-react';
+import { Crosshair, Expand } from 'lucide-react';
 import { useEntityQuery } from '@/features/entity-search/hooks/useEntityQuery';
 import { useWorkspaceAddEntitiesMutation } from '@/features/workspace/hooks/useWorkspaceAddEntitiesMutation';
 import DetailPopupComponent from './detail-popup.component';
 import { EntityDetailHeader, EntityDetailBody } from './entity-detail-content.component';
+import { usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
+import { useToolbarMode, useUiActions } from '@/stores/ui/ui.selector';
 import type { Entity } from '@/models/entity.model';
 import type { Workspace } from '@/models/workspace.model';
 
@@ -46,6 +48,11 @@ const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEn
   // Mutation for adding entities to workspace
   const { mutate: addEntities, isPending } = useWorkspaceAddEntitiesMutation();
 
+  // Pattern search actions and toolbar state
+  const { addNodeFromEntity, setSearchMode } = usePatternSearchActions();
+  const { toggleToolbar } = useUiActions();
+  const toolbar = useToolbarMode();
+
   // Calculate which related entities are not yet in workspace
   const existingEntityIds = useMemo(() => new Set(workspace.entityList.map(e => e.id)), [workspace.entityList]);
 
@@ -72,6 +79,17 @@ const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEn
     }
   };
 
+  const handleAddToPattern = () => {
+    // Open entity search panel if not already showing
+    if (toolbar.left !== 'ENTITY_SEARCH') {
+      toggleToolbar('left', 'ENTITY_SEARCH');
+    }
+    // Switch to advanced mode
+    setSearchMode('advanced');
+    // Create pattern node from entity
+    addNodeFromEntity(entity.type, entity.labelNormalized);
+  };
+
   return (
     <DetailPopupComponent
       x={x}
@@ -80,16 +98,27 @@ const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEn
       onDragEnd={onDragEnd}
       header={<EntityDetailHeader entity={entity} />}
       toolbar={
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 shrink-0"
-          onClick={handleExpand}
-          disabled={isExpandDisabled}
-          title="Add related entities"
-        >
-          <Expand className="h-3 w-3" />
-        </Button>
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 shrink-0"
+            onClick={handleAddToPattern}
+            title="Add to pattern search"
+          >
+            <Crosshair className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 shrink-0"
+            onClick={handleExpand}
+            disabled={isExpandDisabled}
+            title="Add related entities"
+          >
+            <Expand className="h-3 w-3" />
+          </Button>
+        </>
       }
     >
       <EntityDetailBody entity={entity} />
