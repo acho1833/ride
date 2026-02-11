@@ -77,6 +77,7 @@ export const usePatternSearchActions = () =>
     useShallow((state: PatternSearchSlice) => ({
       setSearchMode: state.setSearchMode,
       addNode: state.addNode,
+      addNodeFromEntity: state.addNodeFromEntity,
       updateNode: state.updateNode,
       deleteNode: state.deleteNode,
       addNodeFilter: state.addNodeFilter,

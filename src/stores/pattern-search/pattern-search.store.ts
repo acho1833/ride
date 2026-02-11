@@ -34,6 +34,8 @@ export interface PatternSearchActions {
   setSearchMode: (mode: SearchMode) => void;
   /** Add a new node to the pattern */
   addNode: () => void;
+  /** Add a new node pre-populated from an entity (type + name filter) */
+  addNodeFromEntity: (entityType: string, entityName: string) => void;
   /** Update an existing node */
   updateNode: (id: string, updates: Partial<Omit<PatternNode, 'id'>>) => void;
   /** Delete a node and its connected edges */
@@ -111,6 +113,25 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
         label: getNextNodeLabel(state.patternSearch.nodes),
         type: null,
         filters: [],
+        position: getNextNodePosition(state.patternSearch.nodes)
+      };
+      return {
+        patternSearch: {
+          ...state.patternSearch,
+          nodes: [...state.patternSearch.nodes, newNode],
+          selectedNodeId: newNode.id,
+          selectedEdgeId: null
+        }
+      };
+    }),
+
+  addNodeFromEntity: (entityType, entityName) =>
+    set(state => {
+      const newNode: PatternNode = {
+        id: `node-${Date.now()}`,
+        label: getNextNodeLabel(state.patternSearch.nodes),
+        type: entityType,
+        filters: [{ attribute: 'labelNormalized', patterns: [entityName] }],
         position: getNextNodePosition(state.patternSearch.nodes)
       };
       return {
