@@ -52,6 +52,7 @@ const PatternBuilderComponent = () => {
   const selectedEdge = useSelectedEdge();
   const {
     addNode,
+    addNodeFromEntity,
     updateNode,
     deleteNode,
     addNodeFilter,
@@ -147,6 +148,30 @@ const PatternBuilderComponent = () => {
     selectEdge(null);
   }, [selectNode, selectEdge]);
 
+  // Allow entity cards to be dropped on the canvas
+  const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  // Handle entity card drop - create pre-populated pattern node
+  const handleCanvasDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const jsonData = e.dataTransfer.getData('application/json');
+      if (!jsonData) return;
+      try {
+        const entity = JSON.parse(jsonData);
+        if (entity.type && entity.labelNormalized) {
+          addNodeFromEntity(entity.type, entity.labelNormalized);
+        }
+      } catch {
+        // Ignore invalid JSON
+      }
+    },
+    [addNodeFromEntity]
+  );
+
   // Handle delete key to remove selected node or edge
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -183,7 +208,7 @@ const PatternBuilderComponent = () => {
       {/* Canvas + Config Panel */}
       <div className="flex min-h-0 flex-1">
         {/* React Flow Canvas */}
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1" onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop}>
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
