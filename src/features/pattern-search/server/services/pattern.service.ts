@@ -14,33 +14,29 @@ function globToLike(pattern: string): string {
 function buildPatternQuery(
   nodes: PatternNode[],
   edges: PatternEdge[],
-  options: { countOnly?: boolean; sortDirection?: 'asc' | 'desc'; limit?: number; offset?: number }
+  options: { sortDirection?: 'asc' | 'desc'; limit?: number; offset?: number }
 ): { sql: string; params: unknown[] } {
   const sortedNodes = [...nodes].sort((a, b) => a.label.localeCompare(b.label));
   const nodeIndexMap = new Map(sortedNodes.map((n, i) => [n.id, i]));
   const params: unknown[] = [];
 
-  // SELECT
-  let select: string;
-  if (options.countOnly) {
-    select = 'SELECT COUNT(*) as count';
-  } else {
-    const cols: string[] = [];
-    for (let i = 0; i < sortedNodes.length; i++) {
-      cols.push(`e${i}.id as e${i}_id, e${i}.label_normalized as e${i}_label, e${i}.type as e${i}_type`);
-    }
-    for (let i = 0; i < edges.length; i++) {
-      cols.push(
-        `r${i}.relationship_id as r${i}_rid, r${i}.predicate as r${i}_pred, r${i}.source_entity_id as r${i}_src, r${i}.related_entity_id as r${i}_rel`
-      );
-    }
-    select = `SELECT ${cols.join(', ')}`;
+  // SELECT — always include COUNT(*) OVER() for total
+  const cols: string[] = [];
+  for (let i = 0; i < sortedNodes.length; i++) {
+    cols.push(`e${i}.id as e${i}_id, e${i}.label_normalized as e${i}_label, e${i}.type as e${i}_type`);
   }
+  for (let i = 0; i < edges.length; i++) {
+    cols.push(
+      `r${i}.relationship_id as r${i}_rid, r${i}.predicate as r${i}_pred, r${i}.from_entity_id as r${i}_src, r${i}.to_entity_id as r${i}_rel`
+    );
+  }
+  cols.push('COUNT(*) OVER() as total_count');
+  const select = `SELECT ${cols.join(', ')}`;
 
   // FROM
   const from = `FROM entity e0`;
 
-  // JOINs
+  // JOINs — simple directional joins using relationship_directed
   const joins: string[] = [];
   const joinedNodeIndexes = new Set<number>([0]);
 
@@ -52,8 +48,8 @@ function buildPatternQuery(
     const knownIdx = joinedNodeIndexes.has(srcIdx) ? srcIdx : tgtIdx;
     const newIdx = knownIdx === srcIdx ? tgtIdx : srcIdx;
 
-    // Join relationship (bidirectional) - wrap OR in parens so predicate filter applies to both directions
-    let relJoin = `JOIN relationship r${i} ON ((r${i}.source_entity_id = e${knownIdx}.id AND r${i}.related_entity_id = e${newIdx}.id) OR (r${i}.source_entity_id = e${newIdx}.id AND r${i}.related_entity_id = e${knownIdx}.id))`;
+    // Simple directional join — no OR needed
+    let relJoin = `JOIN relationship_directed r${i} ON r${i}.from_entity_id = e${knownIdx}.id`;
 
     if (edge.predicates.length > 0) {
       relJoin += ` AND r${i}.predicate IN (${edge.predicates.map(() => '?').join(', ')})`;
@@ -62,12 +58,12 @@ function buildPatternQuery(
 
     if (!joinedNodeIndexes.has(newIdx)) {
       joins.push(relJoin);
-      joins.push(
-        `JOIN entity e${newIdx} ON e${newIdx}.id = CASE WHEN r${i}.source_entity_id = e${knownIdx}.id THEN r${i}.related_entity_id ELSE r${i}.source_entity_id END`
-      );
+      // Simple equality join — no CASE needed
+      joins.push(`JOIN entity e${newIdx} ON e${newIdx}.id = r${i}.to_entity_id`);
       joinedNodeIndexes.add(newIdx);
     } else {
-      joins.push(relJoin);
+      // Both nodes already joined — add relationship with both endpoints constrained
+      joins.push(relJoin + ` AND r${i}.to_entity_id = e${newIdx}.id`);
     }
   }
 
@@ -108,14 +104,11 @@ function buildPatternQuery(
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  let orderBy = '';
+  const orderBy = `ORDER BY e0.label_normalized COLLATE NOCASE ${options.sortDirection === 'desc' ? 'DESC' : 'ASC'}`;
   let limitOffset = '';
-  if (!options.countOnly) {
-    orderBy = `ORDER BY e0.label_normalized COLLATE NOCASE ${options.sortDirection === 'desc' ? 'DESC' : 'ASC'}`;
-    if (options.limit !== undefined) {
-      limitOffset = `LIMIT ? OFFSET ?`;
-      params.push(options.limit, options.offset ?? 0);
-    }
+  if (options.limit !== undefined) {
+    limitOffset = `LIMIT ? OFFSET ?`;
+    params.push(options.limit, options.offset ?? 0);
   }
 
   const sql = [select, from, ...joins, where, orderBy, limitOffset].filter(Boolean).join('\n');
@@ -136,30 +129,31 @@ export async function searchPattern(params: PatternSearchParams): Promise<Patter
   const db = getDb();
   const offset = (pageNumber - 1) * pageSize;
 
-  const countQuery = buildPatternQuery(pattern.nodes, pattern.edges, { countOnly: true });
-  const totalCount = (db.prepare(countQuery.sql).get(...countQuery.params) as { count: number }).count;
-
-  const dataQuery = buildPatternQuery(pattern.nodes, pattern.edges, {
+  // Single query — COUNT(*) OVER() provides totalCount without a separate query
+  const query = buildPatternQuery(pattern.nodes, pattern.edges, {
     sortDirection,
     limit: pageSize,
     offset
   });
 
-  const rows = db.prepare(dataQuery.sql).all(...dataQuery.params) as Record<string, string>[];
+  const rows = db.prepare(query.sql).all(...query.params) as Record<string, string | number>[];
   const sortedNodes = [...pattern.nodes].sort((a, b) => a.label.localeCompare(b.label));
+
+  // Extract totalCount from window function (same value on every row, 0 if no rows)
+  const totalCount = rows.length > 0 ? Number(rows[0].total_count) : 0;
 
   const matches: PatternMatch[] = rows.map(row => {
     const entities: Entity[] = sortedNodes.map((_, i) => ({
-      id: row[`e${i}_id`],
-      labelNormalized: row[`e${i}_label`],
-      type: row[`e${i}_type`]
+      id: row[`e${i}_id`] as string,
+      labelNormalized: row[`e${i}_label`] as string,
+      type: row[`e${i}_type`] as string
     }));
 
     const relationships: Relationship[] = pattern.edges.map((_, i) => ({
-      relationshipId: row[`r${i}_rid`],
-      predicate: row[`r${i}_pred`],
-      sourceEntityId: row[`r${i}_src`],
-      relatedEntityId: row[`r${i}_rel`]
+      relationshipId: row[`r${i}_rid`] as string,
+      predicate: row[`r${i}_pred`] as string,
+      sourceEntityId: row[`r${i}_src`] as string,
+      relatedEntityId: row[`r${i}_rel`] as string
     }));
 
     return { entities, relationships };

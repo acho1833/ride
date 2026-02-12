@@ -136,6 +136,29 @@ describe('pattern.service', () => {
       const page2Ids = page2.matches.map(m => m.entities[0].id);
       expect(page1Ids).not.toEqual(page2Ids);
     });
+
+    it('returns correct totalCount with window function', async () => {
+      const result = await searchPattern({
+        pattern: {
+          nodes: [
+            {
+              id: 'n1',
+              label: 'Node A',
+              type: 'Person',
+              filters: [],
+              position: { x: 0, y: 0 }
+            }
+          ],
+          edges: []
+        },
+        pageSize: 5,
+        pageNumber: 1
+      });
+
+      // totalCount should be greater than pageSize (we have more than 5 Person entities)
+      expect(result.totalCount).toBeGreaterThan(5);
+      expect(result.matches.length).toBe(5);
+    });
   });
 
   describe('getPredicates', () => {
