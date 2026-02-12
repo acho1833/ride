@@ -2,9 +2,9 @@
  * @jest-environment node
  */
 
-import { searchPattern, getPredicates } from './pattern.service';
+import { searchPattern, getPredicates } from './pattern-mock.service';
 
-describe('pattern.service', () => {
+describe('pattern-mock.service', () => {
   describe('searchPattern', () => {
     it('returns empty for empty pattern', async () => {
       const result = await searchPattern({
