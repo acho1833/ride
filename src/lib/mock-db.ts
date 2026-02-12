@@ -168,9 +168,7 @@ export async function initMockDb(): Promise<void> {
   dbWrapper.exec(DDL);
 
   // Populate relationship_directed if empty (both directions of each relationship)
-  const rdCount = dbWrapper.prepare('SELECT COUNT(*) as c FROM relationship_directed').get() as
-    | { c: number }
-    | undefined;
+  const rdCount = dbWrapper.prepare('SELECT COUNT(*) as c FROM relationship_directed').get() as { c: number } | undefined;
   if (!rdCount || rdCount.c === 0) {
     dbWrapper.exec(`
       INSERT INTO relationship_directed (relationship_id, predicate, from_entity_id, to_entity_id)
