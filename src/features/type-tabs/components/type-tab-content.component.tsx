@@ -20,8 +20,10 @@ interface Props {
 const TypeTabContent = ({ tab }: Props) => {
   // Route to appropriate component based on type
   switch (tab.type) {
-    case 'SPREADLINE':
-      return <SpreadlineComponent tabId={tab.id} tabName={tab.name} data={tab.data as SpreadlineData} />;
+    case 'SPREADLINE': {
+      const spreadlineData = tab.data as SpreadlineData;
+      return <SpreadlineComponent workspaceId={spreadlineData.workspaceId} workspaceName={spreadlineData.workspaceName} />;
+    }
 
     case 'DASHBOARD': {
       const data = tab.data as DashboardData;

@@ -30,9 +30,11 @@ interface Props {
   selectedEntityCount: number;
   /** Called when delete is clicked */
   onDelete: () => void;
+  /** Called when Spreadline is clicked */
+  onSpreadline: () => void;
 }
 
-const WorkspaceContextMenuComponent = ({ position, onClose, selectedEntityCount, onDelete }: Props) => {
+const WorkspaceContextMenuComponent = ({ position, onClose, selectedEntityCount, onDelete, onSpreadline }: Props) => {
   const triggerRef = useRef<HTMLDivElement>(null);
   const openRef = useRef(false);
 
@@ -74,10 +76,6 @@ const WorkspaceContextMenuComponent = ({ position, onClose, selectedEntityCount,
     toast.info('Paste: Not implemented');
   };
 
-  const handleSpreadline = () => {
-    toast.info('Analytics > Spreadline: Not implemented');
-  };
-
   return (
     <ContextMenu onOpenChange={handleOpenChange}>
       <ContextMenuTrigger asChild>
@@ -103,12 +101,12 @@ const WorkspaceContextMenuComponent = ({ position, onClose, selectedEntityCount,
           </>
         )}
         <ContextMenuSub>
-          <ContextMenuSubTrigger disabled>
+          <ContextMenuSubTrigger>
             <BarChart3 className="mr-2 h-4 w-4" />
             Analytics
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="w-40">
-            <ContextMenuItem onClick={handleSpreadline} disabled>
+            <ContextMenuItem onClick={onSpreadline}>
               <TrendingUp className="mr-2 h-4 w-4" />
               Spreadline
             </ContextMenuItem>

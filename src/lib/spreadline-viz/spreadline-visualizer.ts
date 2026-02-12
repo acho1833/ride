@@ -24,7 +24,16 @@ import {
   HopSectionInfo,
   createDefaultConfig
 } from './spreadline-types';
-import { arraysEqual, _compute_embedding, getTextWidth, wrap, createStyleElementFromCSS, debounce } from './spreadline-d3-utils';
+import {
+  arraysEqual,
+  _compute_embedding,
+  getTextWidth,
+  wrap,
+  createStyleElementFromCSS,
+  debounce,
+  getThemeColors,
+  ThemeColors
+} from './spreadline-d3-utils';
 
 export class SpreadLinesVisualizer {
   // Data
@@ -49,6 +58,7 @@ export class SpreadLinesVisualizer {
   actors: Record<number, Expander | Collapser> = {};
   force = true;
   nodeColorScale: d3.ScaleThreshold<number, string>;
+  theme: ThemeColors;
 
   // Track collapsed hop sections: blockId -> Set of collapsed sections ('top' | 'bottom')
   collapsedSections: Map<number, Set<'top' | 'bottom'>> = new Map();
@@ -69,6 +79,7 @@ export class SpreadLinesVisualizer {
   onBlockExpand?: (blockId: number, expanded: boolean) => void;
 
   constructor(json: SpreadLineData, config?: Partial<SpreadLineConfig>) {
+    this.theme = getThemeColors();
     this.data = json;
     this.config = { ...createDefaultConfig(), ...config };
     this.storylines = json.storylines.map(s => ({ ...s }));
@@ -186,7 +197,7 @@ export class SpreadLinesVisualizer {
       .attr('xoverflow', 'visible')
       .append('path')
       .attr('d', 'M0,-4 L10,0 L0,4 Z')
-      .style('fill', '#424242');
+      .style('fill', this.theme.foreground);
   }
 
   /**
@@ -213,7 +224,7 @@ export class SpreadLinesVisualizer {
       .attr('y', (_, i) =>
         i === 0 ? egoLabel.posY - (egoLabel.posY - heightExtents[0]) * 0.5 : egoLabel.posY + (heightExtents[1] - egoLabel.posY) * 0.5
       )
-      .attr('fill', '#c2c2c2')
+      .attr('fill', self.theme.mutedForeground)
       .style('opacity', 0.25)
       .style('font-size', config.directionFontSize)
       .style('text-anchor', 'start');
@@ -238,7 +249,7 @@ export class SpreadLinesVisualizer {
           .attr('y', this.margin.top / 2)
           .attr('fill', d => {
             const annotation = config.annotations.find(e => e.time === d.label);
-            return annotation ? annotation.color : '#000000';
+            return annotation ? annotation.color : self.theme.foreground;
           })
           .style('cursor', 'pointer')
           .on('click', function (event: MouseEvent, d: TimeLabel) {
@@ -256,7 +267,7 @@ export class SpreadLinesVisualizer {
           .attr('x2', d => d.posX)
           .attr('y1', this.margin.top / 2 + 5)
           .attr('y2', heightExtents[1] + 20)
-          .attr('stroke', '#757575')
+          .attr('stroke', self.theme.border)
           .style('opacity', 0.2)
           .style('stroke-dasharray', '2, 2');
 
@@ -531,7 +542,7 @@ export class SpreadLinesVisualizer {
           .attr('cx', d => d.posX)
           .attr('cy', d => d.posY)
           .attr('r', 6)
-          .attr('fill', e => (e.label === '-100' ? '#ffffff' : nodeColorScale(+e.label)))
+          .attr('fill', e => (e.label === '-100' ? self.theme.background : nodeColorScale(+e.label)))
           .attr('transform', 'translate(0, 0)')
           .style('visibility', d => d.visibility)
           .style('cursor', d => (self.visibility[d.name] === false ? 'default' : 'pointer'))
@@ -570,8 +581,8 @@ export class SpreadLinesVisualizer {
               .attr('width', 20)
               .attr('height', 16)
               .attr('rx', 3)
-              .attr('fill', '#f0f0f0')
-              .attr('stroke', '#999')
+              .attr('fill', self.theme.muted)
+              .attr('stroke', self.theme.border)
               .attr('stroke-width', 1)
               .style('cursor', 'pointer');
 
@@ -581,7 +592,7 @@ export class SpreadLinesVisualizer {
               .attr('y', 4)
               .attr('text-anchor', 'middle')
               .attr('font-size', '12px')
-              .attr('fill', '#666')
+              .attr('fill', self.theme.mutedForeground)
               .style('cursor', 'pointer')
               .style('user-select', 'none')
               .text('−');
@@ -594,8 +605,8 @@ export class SpreadLinesVisualizer {
               .attr('width', 20)
               .attr('height', 16)
               .attr('rx', 3)
-              .attr('fill', '#f0f0f0')
-              .attr('stroke', '#999')
+              .attr('fill', self.theme.muted)
+              .attr('stroke', self.theme.border)
               .attr('stroke-width', 1)
               .style('cursor', 'pointer')
               .style('visibility', 'hidden');
@@ -606,7 +617,7 @@ export class SpreadLinesVisualizer {
               .attr('y', 4)
               .attr('text-anchor', 'middle')
               .attr('font-size', '12px')
-              .attr('fill', '#666')
+              .attr('fill', self.theme.mutedForeground)
               .style('cursor', 'pointer')
               .style('user-select', 'none')
               .style('visibility', 'hidden')
@@ -618,8 +629,8 @@ export class SpreadLinesVisualizer {
               .attr('cx', 0)
               .attr('cy', 20)
               .attr('r', 12)
-              .attr('fill', '#e0e0e0')
-              .attr('stroke', '#999')
+              .attr('fill', self.theme.muted)
+              .attr('stroke', self.theme.border)
               .attr('stroke-width', 1)
               .style('cursor', 'pointer')
               .style('visibility', 'hidden');
@@ -631,7 +642,7 @@ export class SpreadLinesVisualizer {
               .attr('text-anchor', 'middle')
               .attr('font-size', '11px')
               .attr('font-weight', 'bold')
-              .attr('fill', '#555')
+              .attr('fill', self.theme.mutedForeground)
               .style('cursor', 'pointer')
               .style('user-select', 'none')
               .style('visibility', 'hidden')
@@ -668,8 +679,8 @@ export class SpreadLinesVisualizer {
               .attr('width', 20)
               .attr('height', 16)
               .attr('rx', 3)
-              .attr('fill', '#f0f0f0')
-              .attr('stroke', '#999')
+              .attr('fill', self.theme.muted)
+              .attr('stroke', self.theme.border)
               .attr('stroke-width', 1)
               .style('cursor', 'pointer');
 
@@ -679,7 +690,7 @@ export class SpreadLinesVisualizer {
               .attr('y', 4)
               .attr('text-anchor', 'middle')
               .attr('font-size', '12px')
-              .attr('fill', '#666')
+              .attr('fill', self.theme.mutedForeground)
               .style('cursor', 'pointer')
               .style('user-select', 'none')
               .text('−');
@@ -692,8 +703,8 @@ export class SpreadLinesVisualizer {
               .attr('width', 20)
               .attr('height', 16)
               .attr('rx', 3)
-              .attr('fill', '#f0f0f0')
-              .attr('stroke', '#999')
+              .attr('fill', self.theme.muted)
+              .attr('stroke', self.theme.border)
               .attr('stroke-width', 1)
               .style('cursor', 'pointer')
               .style('visibility', 'hidden');
@@ -704,7 +715,7 @@ export class SpreadLinesVisualizer {
               .attr('y', 4)
               .attr('text-anchor', 'middle')
               .attr('font-size', '12px')
-              .attr('fill', '#666')
+              .attr('fill', self.theme.mutedForeground)
               .style('cursor', 'pointer')
               .style('user-select', 'none')
               .style('visibility', 'hidden')
@@ -716,8 +727,8 @@ export class SpreadLinesVisualizer {
               .attr('cx', 0)
               .attr('cy', -20)
               .attr('r', 12)
-              .attr('fill', '#e0e0e0')
-              .attr('stroke', '#999')
+              .attr('fill', self.theme.muted)
+              .attr('stroke', self.theme.border)
               .attr('stroke-width', 1)
               .style('cursor', 'pointer')
               .style('visibility', 'hidden');
@@ -729,7 +740,7 @@ export class SpreadLinesVisualizer {
               .attr('text-anchor', 'middle')
               .attr('font-size', '11px')
               .attr('font-weight', 'bold')
-              .attr('fill', '#555')
+              .attr('fill', self.theme.mutedForeground)
               .style('cursor', 'pointer')
               .style('user-select', 'none')
               .style('visibility', 'hidden')
@@ -796,7 +807,7 @@ export class SpreadLinesVisualizer {
           .attr('y', e => e.posY)
           .attr('transform', 'translate(0, 0)')
           .style('text-anchor', 'middle')
-          .attr('stroke', '#ffffff')
+          .attr('stroke', this.theme.background)
           .attr('stroke-width', '4px')
           .attr('dy', '4px');
 
@@ -918,7 +929,7 @@ export class SpreadLinesVisualizer {
             .style('visibility', 'visible');
         }
         elem.setAttribute('status', status === 'revealed' ? 'hidden' : 'revealed');
-        elem.setAttribute('fill', status === 'revealed' ? '#757575' : color);
+        elem.setAttribute('fill', status === 'revealed' ? self.theme.mutedForeground : color);
       });
 
     // Labels
@@ -965,7 +976,7 @@ export class SpreadLinesVisualizer {
       .attr('width', swatchSize * swatchWidth)
       .attr('height', swatchSize)
       .attr('fill', d => d)
-      .attr('stroke', d => (d === '#ffffff' ? '#cccccc' : ''))
+      .attr('stroke', d => (d === '#ffffff' ? this.theme.border : ''))
       .attr('stroke-width', d => (d === '#ffffff' ? 0.4 : 0))
       .attr('transform', (_, i) =>
         i === colors.length - 1

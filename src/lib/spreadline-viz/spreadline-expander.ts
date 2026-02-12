@@ -12,7 +12,7 @@
 
 import * as d3 from 'd3';
 import { Block, BrushComponent, ForceNode, SpreadLineConfig } from './spreadline-types';
-import { _compute_embedding, _compute_elliptical_arc, growLineAnimation, arraysEqual } from './spreadline-d3-utils';
+import { _compute_embedding, _compute_elliptical_arc, growLineAnimation, arraysEqual, getThemeColors } from './spreadline-d3-utils';
 
 interface ExpanderSupplement {
   nodeColorScale: d3.ScaleThreshold<number, string>;
@@ -35,7 +35,9 @@ export class Expander {
   private _block_id: number;
   private _moveX: number;
   private _nodeColorScale: d3.ScaleThreshold<number, string>;
-  private linkColor = '#424242';
+  private get linkColor() {
+    return getThemeColors().foreground;
+  }
   private force: boolean;
   private forceMode = 'circle';
   private drawLinks: boolean;
@@ -325,7 +327,7 @@ export class Expander {
       .attr('x', bbox.x)
       .attr('y', bbox.y + strokeWidth / 2)
       .attr('height', bbox.height - strokeWidth)
-      .attr('fill', '#ffffff')
+      .attr('fill', getThemeColors().background)
       .attr('transform', `translate(${currX}, 0)`)
       .style('cursor', 'pointer')
       .transition(animation)

@@ -23,7 +23,7 @@ import {
 } from '@/stores/workspace-graph/workspace-graph.selector';
 import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
 import { useTypeTabActions } from '@/stores/type-tabs/type-tabs.selector';
-import type { DashboardData } from '@/stores/type-tabs/type-tabs.store';
+import type { DashboardData, SpreadlineData } from '@/stores/type-tabs/type-tabs.store';
 import { useHighlightedEntityIds, usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
 import { toast } from 'sonner';
 import WorkspaceGraphComponent from './workspace-graph.component';
@@ -343,6 +343,17 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
     toggleToolbar('bottom', 'CHARTS');
   }, [workspaceId, workspace?.name, openChartTab, toggleToolbar]);
 
+  const handleSpreadline = useCallback(() => {
+    const tab = {
+      id: `spreadline-${workspaceId}`,
+      name: `Spreadline: ${workspace?.name ?? 'Workspace'}`,
+      type: 'SPREADLINE' as const,
+      data: { workspaceId, workspaceName: workspace?.name ?? 'Workspace' } satisfies SpreadlineData
+    };
+    openChartTab(tab);
+    toggleToolbar('bottom', 'CHARTS');
+  }, [workspaceId, workspace?.name, openChartTab, toggleToolbar]);
+
   const handleContextMenuClose = useCallback(() => {
     setContextMenuPosition(null);
   }, []);
@@ -486,6 +497,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
           onClose={handleContextMenuClose}
           selectedEntityCount={selectedEntityIds.length}
           onDelete={handleDeleteClick}
+          onSpreadline={handleSpreadline}
         />
         <DeleteEntitiesDialogComponent
           open={deleteDialogOpen}

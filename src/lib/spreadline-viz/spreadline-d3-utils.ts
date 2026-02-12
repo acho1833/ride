@@ -6,6 +6,47 @@
 import * as d3 from 'd3';
 
 // ============================================
+// Theme Colors
+// ============================================
+
+export interface ThemeColors {
+  foreground: string;
+  background: string;
+  muted: string;
+  mutedForeground: string;
+  border: string;
+  card: string;
+  textShadow: string;
+}
+
+/**
+ * Returns theme-aware colors based on whether dark mode is active.
+ * Checks the `dark` class on `<html>` (standard Tailwind dark mode).
+ */
+export function getThemeColors(): ThemeColors {
+  const dark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  return dark
+    ? {
+        foreground: '#e8e8e8',
+        background: '#1a1a1a',
+        muted: '#2a2a2a',
+        mutedForeground: '#999999',
+        border: '#444444',
+        card: '#262626',
+        textShadow: '#1a1a1a'
+      }
+    : {
+        foreground: '#000000',
+        background: '#ffffff',
+        muted: '#f0f0f0',
+        mutedForeground: '#666666',
+        border: '#e0e0e0',
+        card: '#ffffff',
+        textShadow: '#ffffff'
+      };
+}
+
+// ============================================
 // Embedding & Position Calculations
 // ============================================
 
@@ -236,12 +277,12 @@ export function createStyleElementFromCSS(): SVGStyleElement {
     .storyline-label-dehighlight { opacity: 0; }
     .storyline-pin, .storyline-hover { opacity: 1 !important; }
 
-    /* Station arcs (blocks) - original light theme */
+    /* Station arcs (blocks) */
     .station-arcs {
       fill: none;
       stroke-width: 4px;
       cursor: pointer;
-      stroke: #424242;
+      stroke: var(--foreground);
       pointer-events: all;
     }
 
@@ -251,9 +292,9 @@ export function createStyleElementFromCSS(): SVGStyleElement {
       pointer-events: all;
     }
 
-    /* Points - original styling */
+    /* Points */
     .points {
-      stroke: #424242;
+      stroke: var(--foreground);
       stroke-width: 0.5px;
       pointer-events: all;
     }
@@ -265,14 +306,14 @@ export function createStyleElementFromCSS(): SVGStyleElement {
     .text-display { font-weight: bold; font-size: 14px; }
     .stroked-text {
       text-shadow:
-        -1px -1px 0 #fff,
-        0px -1px 0 #fff,
-        1px -1px 0 #fff,
-        1px 0px 0 #fff,
-        1px 1px 0 #fff,
-        0px 1px 0 #fff,
-        -1px 1px 0 #fff,
-        -1px 0px 0 #fff;
+        -1px -1px 0 var(--background),
+        0px -1px 0 var(--background),
+        1px -1px 0 var(--background),
+        1px 0px 0 var(--background),
+        1px 1px 0 var(--background),
+        0px 1px 0 var(--background),
+        -1px 1px 0 var(--background),
+        -1px 0px 0 var(--background);
     }
 
     /* Time labels */
@@ -284,27 +325,27 @@ export function createStyleElementFromCSS(): SVGStyleElement {
     /* Horizontal bars */
     .horizontal-bars { opacity: 1; }
 
-    /* Tooltip - light theme */
+    /* Tooltip */
     .content-tooltip {
       position: absolute;
       pointer-events: none;
       left: 0;
       top: 0;
-      background: #ffffff;
+      background: var(--card);
       border-radius: .2rem;
       padding: .5rem .5rem;
       font-size: 0.7rem;
       text-overflow: ellipsis;
-      color: #212121;
+      color: var(--card-foreground);
       z-index: 300;
       visibility: hidden;
-      box-shadow: 0 0 5px rgba(0, 0, 0, .15);
+      box-shadow: 0 0 5px rgba(0, 0, 0, .25);
       text-align: center;
     }
 
     /* Board text for expanded blocks */
     .board-text {
-      fill: #ffffff;
+      fill: var(--foreground);
       opacity: 0.8;
       text-anchor: middle;
       font-weight: bold;

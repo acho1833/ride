@@ -21,12 +21,10 @@ export interface Tab<T = unknown> {
   data: T;
 }
 
-/** Spreadline-specific data */
+/** Spreadline-specific data - references a workspace for context */
 export interface SpreadlineData {
-  // Add spreadline-specific fields here
-  // Example placeholder:
-  values?: number[];
-  labels?: string[];
+  workspaceId: string;
+  workspaceName: string;
 }
 
 /** Dashboard-specific data - references a workspace by ID */
@@ -74,35 +72,7 @@ export type TypeTabSlice = TypeTabState & TypeTabActions;
 export const createTypeTabSlice: StateCreator<TypeTabSlice, [], [], TypeTabSlice> = set => ({
   typeTabs: {
     charts: {
-      tabs: [
-        {
-          id: 'chart-123',
-          name: 'SPREADLINE-sample1',
-          type: 'SPREADLINE',
-          data: {
-            values: [100, 200],
-            labels: ['X', 'Y']
-          }
-        },
-        {
-          id: 'chart-222',
-          name: 'SPREADLINE-sample2',
-          type: 'SPREADLINE',
-          data: {
-            values: [150, 250],
-            labels: ['A', 'B']
-          }
-        },
-        {
-          id: 'chart-333',
-          name: 'SPREADLINE-sample3',
-          type: 'SPREADLINE',
-          data: {
-            values: [200, 300],
-            labels: ['P', 'Q']
-          }
-        }
-      ],
+      tabs: [],
       activeTabId: null
     }
   },
