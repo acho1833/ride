@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import * as d3 from 'd3';
 import type { SpreadLineData } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import { SpreadLine } from '@/lib/spreadline';
@@ -86,46 +85,18 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
     setResetKey(k => k + 1);
     setYearsFilter(1);
     setCrossingOnly(false);
+    setZoomLevel(100);
   }, []);
 
   const zoomContainerRef = useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
 
-  // Attach d3.zoom to the SVG via a <g> wrapper
+  // Apply zoom by widening the container — SVG fills it via width="100%", viewBox scales content
   useEffect(() => {
     const container = zoomContainerRef.current;
-    if (!container || !computedData) return;
-
-    const svg = container.querySelector('svg') as SVGSVGElement;
-    if (!svg) return;
-
-    // Wrap all SVG children in a <g> for zoom transforms
-    let zoomGroup = svg.querySelector('g.zoom-layer') as SVGGElement;
-    if (!zoomGroup) {
-      zoomGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      zoomGroup.classList.add('zoom-layer');
-      while (svg.firstChild) {
-        zoomGroup.appendChild(svg.firstChild);
-      }
-      svg.appendChild(zoomGroup);
-    }
-
-    const zoom = d3
-      .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 10])
-      .filter((event: Event) => event.type === 'wheel')
-      .on('zoom', event => {
-        zoomGroup.setAttribute('transform', event.transform.toString());
-        setZoomLevel(Math.round(event.transform.k * 100));
-      });
-
-    const svgSelection = d3.select(svg);
-    svgSelection.call(zoom);
-
-    return () => {
-      svgSelection.on('.zoom', null);
-    };
-  }, [computedData, resetKey]);
+    if (!container) return;
+    container.style.width = zoomLevel === 100 ? '' : `${zoomLevel}%`;
+  }, [zoomLevel, computedData, resetKey]);
 
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
 
@@ -173,7 +144,7 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
   return (
     <div className="bg-background">
       {/* Toolbar */}
-      <div className="border-border sticky top-0 z-10 flex items-center gap-4 border-b px-3 py-1.5 text-xs">
+      <div className="bg-background border-border sticky top-0 z-10 flex items-center gap-4 border-b px-3 py-1.5 text-xs">
         <span className="text-muted-foreground">
           {computedData.storylines.length} entities | {computedData.blocks.length} blocks | Ego: {computedData.ego}
           {computeTime && <span className="text-primary ml-1">({computeTime.toFixed(0)}ms)</span>}
@@ -194,13 +165,35 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
           <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
           <label className="text-muted-foreground">Crossing only</label>
         </div>
-        <span className="text-muted-foreground ml-auto">{zoomLevel}%</span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setZoomLevel(z => Math.max(50, z - 25))}
+            className="text-muted-foreground hover:text-foreground rounded px-1"
+          >
+            −
+          </button>
+          <input
+            type="range"
+            min="50"
+            max="500"
+            value={zoomLevel}
+            onChange={e => setZoomLevel(Number(e.target.value))}
+            className="w-20 accent-current"
+          />
+          <button
+            onClick={() => setZoomLevel(z => Math.min(500, z + 25))}
+            className="text-muted-foreground hover:text-foreground rounded px-1"
+          >
+            +
+          </button>
+          <span className="text-muted-foreground w-8 text-center">{zoomLevel}%</span>
+        </div>
         <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground">
           Refresh
         </button>
       </div>
 
-      {/* Chart with zoom (viewBox handles sizing, scroll via parent ScrollArea) */}
+      {/* Chart with zoom */}
       <div ref={zoomContainerRef}>
         <SpreadLineChart
           key={resetKey}

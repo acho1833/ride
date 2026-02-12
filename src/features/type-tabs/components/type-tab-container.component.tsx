@@ -13,7 +13,7 @@ import TypeTabContent from './type-tab-content.component';
 import { useChartActiveTab } from '@/stores/type-tabs/type-tabs.selector';
 import { ToolbarPositions } from '@/stores/ui/ui.store';
 import MainPanelsComponent from '@/components/main-panels/main-panels.component';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface Props {
   pos: ToolbarPositions;
@@ -41,6 +41,7 @@ const TypeTabContainer = ({ pos }: Props) => {
                 </div>
               </div>
             )}
+            <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </div>
       </div>
