@@ -14,6 +14,7 @@ import { projectRouter } from '@/features/projects/server/routers';
 import { todoRouter } from '@/features/todos/server/routers';
 import { workspaceRouter } from '@/features/workspace/server/routers';
 import { patternRouter } from '@/features/pattern-search/server/routers';
+import { spreadlineRouter } from '@/features/spreadlines/server/routers';
 
 /** Main application router combining all feature routers */
 export const router = {
@@ -24,7 +25,8 @@ export const router = {
   project: projectRouter,
   todo: todoRouter,
   workspace: workspaceRouter,
-  pattern: patternRouter
+  pattern: patternRouter,
+  spreadline: spreadlineRouter
 };
 
 /** Type-safe client interface inferred from the router definition */
