@@ -142,15 +142,15 @@ export default function SpreadLineChart({
     // Render visualization
     visualizer.visualize(svgRef.current);
 
-    // Convert SVG to viewBox-based scaling so it fits its container
+    // Set viewBox so SVG scales to fit container width, height from aspect ratio
     const svg = svgRef.current;
     const w = svg.getAttribute('width');
     const h = svg.getAttribute('height');
     if (w && h) {
       svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
       svg.setAttribute('width', '100%');
-      svg.setAttribute('height', '100%');
-      svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+      svg.removeAttribute('height');
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     }
 
     // Apply initial filter settings using refs (doesn't add to dependencies)

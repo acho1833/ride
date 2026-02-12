@@ -7,7 +7,8 @@
  * Fetches raw data via ORPC, computes layout client-side, renders with D3.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import * as d3 from 'd3';
 import type { SpreadLineData } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import { SpreadLine } from '@/lib/spreadline';
@@ -87,6 +88,45 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
     setCrossingOnly(false);
   }, []);
 
+  const zoomContainerRef = useRef<HTMLDivElement>(null);
+  const [zoomLevel, setZoomLevel] = useState(100);
+
+  // Attach d3.zoom to the SVG via a <g> wrapper
+  useEffect(() => {
+    const container = zoomContainerRef.current;
+    if (!container || !computedData) return;
+
+    const svg = container.querySelector('svg') as SVGSVGElement;
+    if (!svg) return;
+
+    // Wrap all SVG children in a <g> for zoom transforms
+    let zoomGroup = svg.querySelector('g.zoom-layer') as SVGGElement;
+    if (!zoomGroup) {
+      zoomGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      zoomGroup.classList.add('zoom-layer');
+      while (svg.firstChild) {
+        zoomGroup.appendChild(svg.firstChild);
+      }
+      svg.appendChild(zoomGroup);
+    }
+
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([1, 10])
+      .filter((event: Event) => event.type === 'wheel')
+      .on('zoom', event => {
+        zoomGroup.setAttribute('transform', event.transform.toString());
+        setZoomLevel(Math.round(event.transform.k * 100));
+      });
+
+    const svgSelection = d3.select(svg);
+    svgSelection.call(zoom);
+
+    return () => {
+      svgSelection.on('.zoom', null);
+    };
+  }, [computedData, resetKey]);
+
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
 
   const config = useMemo(
@@ -131,9 +171,9 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
   }
 
   return (
-    <div className="bg-background flex h-full flex-col">
+    <div className="bg-background">
       {/* Toolbar */}
-      <div className="border-border flex items-center gap-4 border-b px-3 py-1.5 text-xs">
+      <div className="border-border sticky top-0 z-10 flex items-center gap-4 border-b px-3 py-1.5 text-xs">
         <span className="text-muted-foreground">
           {computedData.storylines.length} entities | {computedData.blocks.length} blocks | Ego: {computedData.ego}
           {computeTime && <span className="text-primary ml-1">({computeTime.toFixed(0)}ms)</span>}
@@ -154,18 +194,18 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
           <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
           <label className="text-muted-foreground">Crossing only</label>
         </div>
-        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground ml-auto">
+        <span className="text-muted-foreground ml-auto">{zoomLevel}%</span>
+        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground">
           Refresh
         </button>
       </div>
 
-      {/* Chart */}
-      <div className="relative flex-1 overflow-auto">
+      {/* Chart with zoom (viewBox handles sizing, scroll via parent ScrollArea) */}
+      <div ref={zoomContainerRef}>
         <SpreadLineChart
           key={resetKey}
           data={computedData}
           config={config}
-          className="min-w-full"
           resetKey={resetKey}
           yearsFilter={yearsFilter}
           crossingOnly={crossingOnly}
