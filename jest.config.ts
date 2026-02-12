@@ -14,7 +14,8 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/__mocks__/server-only.ts'
   },
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts']
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  maxWorkers: 1
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
