@@ -4,6 +4,7 @@ import { getDb } from '@/lib/mock-db';
 import type { Entity } from '@/models/entity.model';
 import type { Relationship } from '@/models/relationship.model';
 import type { PatternSearchParams, PatternSearchResponse, PatternMatch, PatternNode, PatternEdge } from '../../types';
+import { RESULT_COUNT_CAP } from '../../const';
 
 /** Convert glob pattern to SQL LIKE pattern */
 function globToLike(pattern: string): string {
@@ -14,13 +15,13 @@ function globToLike(pattern: string): string {
 function buildPatternQuery(
   nodes: PatternNode[],
   edges: PatternEdge[],
-  options: { sortDirection?: 'asc' | 'desc'; limit?: number; offset?: number }
+  options: { sortDirection?: 'asc' | 'desc'; limit?: number }
 ): { sql: string; params: unknown[] } {
   const sortedNodes = [...nodes].sort((a, b) => a.label.localeCompare(b.label));
   const nodeIndexMap = new Map(sortedNodes.map((n, i) => [n.id, i]));
   const params: unknown[] = [];
 
-  // SELECT — always include COUNT(*) OVER() for total
+  // SELECT
   const cols: string[] = [];
   for (let i = 0; i < sortedNodes.length; i++) {
     cols.push(`e${i}.id as e${i}_id, e${i}.label_normalized as e${i}_label, e${i}.type as e${i}_type`);
@@ -30,7 +31,6 @@ function buildPatternQuery(
       `r${i}.relationship_id as r${i}_rid, r${i}.predicate as r${i}_pred, r${i}.from_entity_id as r${i}_src, r${i}.to_entity_id as r${i}_rel`
     );
   }
-  cols.push('COUNT(*) OVER() as total_count');
   const select = `SELECT ${cols.join(', ')}`;
 
   // FROM
@@ -105,13 +105,13 @@ function buildPatternQuery(
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const orderBy = `ORDER BY e0.label_normalized COLLATE NOCASE ${options.sortDirection === 'desc' ? 'DESC' : 'ASC'}`;
-  let limitOffset = '';
+  let limitClause = '';
   if (options.limit !== undefined) {
-    limitOffset = `LIMIT ? OFFSET ?`;
-    params.push(options.limit, options.offset ?? 0);
+    limitClause = `LIMIT ?`;
+    params.push(options.limit);
   }
 
-  const sql = [select, from, ...joins, where, orderBy, limitOffset].filter(Boolean).join('\n');
+  const sql = [select, from, ...joins, where, orderBy, limitClause].filter(Boolean).join('\n');
   return { sql, params };
 }
 
@@ -129,20 +129,19 @@ export async function searchPattern(params: PatternSearchParams): Promise<Patter
   const db = getDb();
   const offset = (pageNumber - 1) * pageSize;
 
-  // Single query — COUNT(*) OVER() provides totalCount without a separate query
+  // Fetch up to RESULT_COUNT_CAP rows — short-circuits expensive queries with high-connectivity entities
   const query = buildPatternQuery(pattern.nodes, pattern.edges, {
     sortDirection,
-    limit: pageSize,
-    offset
+    limit: RESULT_COUNT_CAP
   });
 
-  const rows = db.prepare(query.sql).all(...query.params) as Record<string, string | number>[];
+  const allRows = db.prepare(query.sql).all(...query.params) as Record<string, string | number>[];
   const sortedNodes = [...pattern.nodes].sort((a, b) => a.label.localeCompare(b.label));
 
-  // Extract totalCount from window function (same value on every row, 0 if no rows)
-  const totalCount = rows.length > 0 ? Number(rows[0].total_count) : 0;
+  const totalCount = allRows.length;
+  const pageRows = allRows.slice(offset, offset + pageSize);
 
-  const matches: PatternMatch[] = rows.map(row => {
+  const matches: PatternMatch[] = pageRows.map(row => {
     const entities: Entity[] = sortedNodes.map((_, i) => ({
       id: row[`e${i}_id`] as string,
       labelNormalized: row[`e${i}_label`] as string,

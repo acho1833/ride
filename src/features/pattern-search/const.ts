@@ -52,3 +52,6 @@ export const DEFAULT_SORT_ATTRIBUTE = 'label';
 
 /** Default sort direction */
 export const DEFAULT_SORT_DIRECTION = 'asc' as const;
+
+/** Maximum results to compute before short-circuiting (keeps queries fast for high-connectivity patterns) */
+export const RESULT_COUNT_CAP = 2000;
