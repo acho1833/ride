@@ -24,6 +24,16 @@ const DDL = `
   CREATE INDEX IF NOT EXISTS idx_rel_related ON relationship(related_entity_id);
   CREATE INDEX IF NOT EXISTS idx_rel_predicate ON relationship(predicate);
 
+  CREATE TABLE IF NOT EXISTS relationship_directed (
+    relationship_id TEXT NOT NULL,
+    predicate TEXT NOT NULL,
+    from_entity_id TEXT NOT NULL,
+    to_entity_id TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_rd_from ON relationship_directed(from_entity_id);
+  CREATE INDEX IF NOT EXISTS idx_rd_from_to ON relationship_directed(from_entity_id, to_entity_id);
+  CREATE INDEX IF NOT EXISTS idx_rd_from_pred ON relationship_directed(from_entity_id, predicate);
+
   CREATE TABLE IF NOT EXISTS workspace_entity (
     sid TEXT NOT NULL,
     workspace_id TEXT NOT NULL,
@@ -156,6 +166,22 @@ export async function initMockDb(): Promise<void> {
 
   const dbWrapper = new DatabaseWrapper(sqlJsDb);
   dbWrapper.exec(DDL);
+
+  // Populate relationship_directed if empty (both directions of each relationship)
+  const rdCount = dbWrapper.prepare('SELECT COUNT(*) as c FROM relationship_directed').get() as
+    | { c: number }
+    | undefined;
+  if (!rdCount || rdCount.c === 0) {
+    dbWrapper.exec(`
+      INSERT INTO relationship_directed (relationship_id, predicate, from_entity_id, to_entity_id)
+      SELECT relationship_id, predicate, source_entity_id, related_entity_id FROM relationship
+    `);
+    dbWrapper.exec(`
+      INSERT INTO relationship_directed (relationship_id, predicate, from_entity_id, to_entity_id)
+      SELECT relationship_id, predicate, related_entity_id, source_entity_id FROM relationship
+    `);
+  }
+
   global.mockDb = dbWrapper;
 }
 
