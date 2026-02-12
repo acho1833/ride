@@ -1196,6 +1196,15 @@ async function createAndPopulateDatabase(datasets: DataSet[]): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_rel_source ON relationship(source_entity_id);
     CREATE INDEX IF NOT EXISTS idx_rel_related ON relationship(related_entity_id);
     CREATE INDEX IF NOT EXISTS idx_rel_predicate ON relationship(predicate);
+    CREATE TABLE IF NOT EXISTS relationship_directed (
+      relationship_id TEXT NOT NULL,
+      predicate TEXT NOT NULL,
+      from_entity_id TEXT NOT NULL,
+      to_entity_id TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_rd_from ON relationship_directed(from_entity_id);
+    CREATE INDEX IF NOT EXISTS idx_rd_from_to ON relationship_directed(from_entity_id, to_entity_id);
+    CREATE INDEX IF NOT EXISTS idx_rd_from_pred ON relationship_directed(from_entity_id, predicate);
   `);
 
   let totalEntities = 0;
@@ -1212,6 +1221,14 @@ async function createAndPopulateDatabase(datasets: DataSet[]): Promise<void> {
       db.run(
         'INSERT OR IGNORE INTO relationship (relationship_id, predicate, source_entity_id, related_entity_id) VALUES (?, ?, ?, ?)',
         [r.relationshipId, r.predicate, r.sourceEntityId, r.relatedEntityId]
+      );
+      db.run(
+        'INSERT OR IGNORE INTO relationship_directed (relationship_id, predicate, from_entity_id, to_entity_id) VALUES (?, ?, ?, ?)',
+        [r.relationshipId, r.predicate, r.sourceEntityId, r.relatedEntityId]
+      );
+      db.run(
+        'INSERT OR IGNORE INTO relationship_directed (relationship_id, predicate, from_entity_id, to_entity_id) VALUES (?, ?, ?, ?)',
+        [r.relationshipId, r.predicate, r.relatedEntityId, r.sourceEntityId]
       );
     }
     totalRelationships += dataset.relationships.length;
