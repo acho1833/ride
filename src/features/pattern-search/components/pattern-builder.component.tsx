@@ -54,6 +54,7 @@ const PatternBuilderComponent = () => {
   const {
     addNode,
     addNodeFromEntity,
+    updateNodeFromEntity,
     updateNode,
     deleteNode,
     addNodeFilter,
@@ -78,10 +79,12 @@ const PatternBuilderComponent = () => {
           label: node.label,
           type: node.type,
           filters: node.filters,
-          selected: selectedNode?.id === node.id
+          selected: selectedNode?.id === node.id,
+          nodeId: node.id,
+          updateNodeFromEntity
         }
       })),
-    [patternNodes, selectedNode]
+    [patternNodes, selectedNode, updateNodeFromEntity]
   );
 
   // Convert store edges to React Flow edges

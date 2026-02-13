@@ -36,6 +36,8 @@ export interface PatternSearchActions {
   addNode: () => void;
   /** Add a new node pre-populated from an entity (type + name filter) */
   addNodeFromEntity: (entityType: string, entityName: string, position?: { x: number; y: number }) => void;
+  /** Update an existing node with entity data (replaces type and filters, selects node) */
+  updateNodeFromEntity: (nodeId: string, entityType: string, entityName: string) => void;
   /** Update an existing node */
   updateNode: (id: string, updates: Partial<Omit<PatternNode, 'id'>>) => void;
   /** Delete a node and its connected edges */
@@ -143,6 +145,18 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
         }
       };
     }),
+
+  updateNodeFromEntity: (nodeId, entityType, entityName) =>
+    set(state => ({
+      patternSearch: {
+        ...state.patternSearch,
+        nodes: state.patternSearch.nodes.map(n =>
+          n.id === nodeId ? { ...n, type: entityType, filters: [{ attribute: 'labelNormalized', patterns: [entityName] }] } : n
+        ),
+        selectedNodeId: nodeId,
+        selectedEdgeId: null
+      }
+    })),
 
   updateNode: (id, updates) =>
     set(state => ({

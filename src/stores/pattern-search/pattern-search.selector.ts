@@ -78,6 +78,7 @@ export const usePatternSearchActions = () =>
       setSearchMode: state.setSearchMode,
       addNode: state.addNode,
       addNodeFromEntity: state.addNodeFromEntity,
+      updateNodeFromEntity: state.updateNodeFromEntity,
       updateNode: state.updateNode,
       deleteNode: state.deleteNode,
       addNodeFilter: state.addNodeFilter,
