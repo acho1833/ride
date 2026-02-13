@@ -12,7 +12,7 @@
  */
 
 import { useShallow } from 'zustand/react/shallow';
-import { FocusedPanelType, UiSlice } from './ui.store';
+import { DEFAULT_PANEL_SIZES, FocusedPanelType, PanelGroup, UiSlice } from './ui.store';
 import { useAppStore } from '@/stores/app.store';
 
 // ============================================================================
@@ -41,6 +41,10 @@ export const useFocusedPanel = (): FocusedPanelType => useAppStore((state: UiSli
 export const useIsEditorGroupFocused = (groupId: string): boolean =>
   useAppStore((state: UiSlice): boolean => state.ui.focusedPanel === `editor-group-${groupId}`);
 
+/** Get persisted panel sizes for a layout group (falls back to defaults for stale sessionStorage) */
+export const usePanelSizes = (group: PanelGroup): number[] =>
+  useAppStore((state: UiSlice) => state.ui.panelSizes?.[group] ?? DEFAULT_PANEL_SIZES[group]);
+
 // ============================================================================
 // Action Selector
 // ============================================================================
@@ -55,6 +59,7 @@ export const useUiActions = () =>
       setToggleMode: state.setToggleMode,
       toggleToolbar: state.toggleToolbar,
       toggleSelectOpenedFiles: state.toggleSelectOpenedFiles,
-      setFocusedPanel: state.setFocusedPanel
+      setFocusedPanel: state.setFocusedPanel,
+      setPanelSizes: state.setPanelSizes
     }))
   );

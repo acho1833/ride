@@ -9,7 +9,7 @@ import ShowToolbarComponent from '@/features/main/components/show-toolbar.compon
 import Workspaces from '@/features/workspaces/components/workspaces.component';
 import QuickOpenComponent from '@/features/quick-open/components/quick-open.component';
 import ProjectSelectorViewComponent from '@/features/projects/views/project-selector-view.component';
-import { useToolbarMode, useUiActions } from '@/stores/ui/ui.selector';
+import { useToolbarMode, useUiActions, usePanelSizes } from '@/stores/ui/ui.selector';
 import { useViewSettings, useActiveProjectId } from '@/stores/app-settings/app-settings.selector';
 import { useProjectActions, useCurrentProject, useProjectLoading } from '@/stores/projects/projects.selector';
 import { useFilesIsLoaded } from '@/stores/files/files.selector';
@@ -25,7 +25,9 @@ import {
 const MainView = () => {
   const toolbarMode = useToolbarMode();
   const viewSettings = useViewSettings();
-  const { toggleToolbar } = useUiActions();
+  const { toggleToolbar, setPanelSizes } = useUiActions();
+  const verticalSizes = usePanelSizes('vertical');
+  const horizontalSizes = usePanelSizes('horizontal');
 
   // Project state
   const activeProjectId = useActiveProjectId();
@@ -136,12 +138,16 @@ const MainView = () => {
         </div>
         <div className="flex-1">
           <div className="h-full pb-1">
-            <ResizablePanelGroup direction="vertical">
-              <ResizablePanel defaultSize={70} className="min-h-[200px]">
-                <ResizablePanelGroup direction="horizontal">
+            <ResizablePanelGroup direction="vertical" onLayout={sizes => setPanelSizes('vertical', sizes)}>
+              <ResizablePanel defaultSize={verticalSizes[0]} className="min-h-[200px]">
+                <ResizablePanelGroup direction="horizontal" onLayout={sizes => setPanelSizes('horizontal', sizes)}>
                   {showLeftPanel && (
                     <>
-                      <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.left && 'hidden')} collapsible>
+                      <ResizablePanel
+                        defaultSize={horizontalSizes[0]}
+                        className={cn('min-w-[100px]', !toolbarMode.left && 'hidden')}
+                        collapsible
+                      >
                         <div className="h-full">
                           <ShowToolbarComponent toolType={toolbarMode.left} pos="left" />
                         </div>
@@ -149,13 +155,13 @@ const MainView = () => {
                       <ResizableHandle className="bg-transparent" />
                     </>
                   )}
-                  <ResizablePanel defaultSize={70} className="min-w-[100px]">
+                  <ResizablePanel defaultSize={horizontalSizes[1]} className="min-w-[100px]">
                     <Workspaces />
                   </ResizablePanel>
                   {showRightPanel && (
                     <>
                       <ResizableHandle className="bg-transparent" />
-                      <ResizablePanel defaultSize={15} className={cn('min-w-[100px]', !toolbarMode.right && 'hidden')}>
+                      <ResizablePanel defaultSize={horizontalSizes[2]} className={cn('min-w-[100px]', !toolbarMode.right && 'hidden')}>
                         <ShowToolbarComponent toolType={toolbarMode.right} pos="right" />
                       </ResizablePanel>
                     </>
@@ -165,7 +171,7 @@ const MainView = () => {
               {showBottomPanel && (
                 <>
                   <ResizableHandle className="bg-transparent" />
-                  <ResizablePanel defaultSize={30} className={cn('min-h-[100px]', !toolbarMode.bottom && 'hidden')}>
+                  <ResizablePanel defaultSize={verticalSizes[1]} className={cn('min-h-[100px]', !toolbarMode.bottom && 'hidden')}>
                     <ShowToolbarComponent toolType={toolbarMode.bottom} pos="bottom" />
                   </ResizablePanel>
                 </>

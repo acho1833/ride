@@ -26,6 +26,15 @@ export type ToolbarPositions = 'left' | 'right' | 'bottom';
 // Re-export for consumers
 export type { FocusedPanelType } from '@/features/toolbars/types';
 
+/** Panel group identifiers for the main layout */
+export type PanelGroup = 'vertical' | 'horizontal';
+
+/** Default panel sizes for the main layout */
+export const DEFAULT_PANEL_SIZES: Record<PanelGroup, number[]> = {
+  vertical: [70, 30],
+  horizontal: [15, 70, 15]
+};
+
 /** UI component state interface */
 export interface UiComponentState {
   ui: {
@@ -39,6 +48,8 @@ export interface UiComponentState {
     selectOpenedFiles: boolean;
     /** Currently focused panel for visual highlighting */
     focusedPanel: FocusedPanelType;
+    /** Persisted panel sizes for the main layout */
+    panelSizes: Record<PanelGroup, number[]>;
   };
 }
 
@@ -50,6 +61,8 @@ export interface UiActions {
   toggleSelectOpenedFiles: () => void;
   /** Set the currently focused panel */
   setFocusedPanel: (panel: FocusedPanelType) => void;
+  /** Persist panel sizes for a layout group */
+  setPanelSizes: (group: PanelGroup, sizes: number[]) => void;
 }
 
 /** Combined UI store type */
@@ -67,7 +80,8 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
       bottom: 'CHARTS' as ToolType
     },
     selectOpenedFiles: false,
-    focusedPanel: null
+    focusedPanel: null,
+    panelSizes: { ...DEFAULT_PANEL_SIZES }
   },
 
   setToggleMode: (toggleMode: boolean) =>
@@ -111,5 +125,10 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
       // Skip update if already focused on this panel
       if (state.ui.focusedPanel === focusedPanel) return state;
       return { ui: { ...state.ui, focusedPanel } };
-    })
+    }),
+
+  setPanelSizes: (group: PanelGroup, sizes: number[]) =>
+    set(state => ({
+      ui: { ...state.ui, panelSizes: { ...state.ui.panelSizes, [group]: sizes } }
+    }))
 });
