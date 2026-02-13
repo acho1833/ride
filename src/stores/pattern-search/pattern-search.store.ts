@@ -92,9 +92,10 @@ function getNextNodePosition(nodes: PatternNode[]): { x: number; y: number } {
 }
 
 /** Find the tail node of the chain (node with no outgoing edges).
- *  Returns null if there are no edges (pattern is not connected). */
+ *  Returns null only if there are no nodes at all. */
 function getChainTailNodeId(nodes: PatternNode[], edges: PatternEdge[]): string | null {
-  if (edges.length === 0) return null;
+  if (nodes.length === 0) return null;
+  if (edges.length === 0) return nodes[nodes.length - 1].id;
 
   const sourceIds = new Set(edges.map(e => e.sourceNodeId));
 

@@ -14,7 +14,7 @@
 
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Crosshair, Expand } from 'lucide-react';
+import { Waypoints, Expand } from 'lucide-react';
 import { useEntityQuery } from '@/features/entity-search/hooks/useEntityQuery';
 import { useWorkspaceAddEntitiesMutation } from '@/features/workspace/hooks/useWorkspaceAddEntitiesMutation';
 import DetailPopupComponent from './detail-popup.component';
@@ -100,7 +100,7 @@ const EntityDetailPopupComponent = ({ entity, x, y, workspace, onClose, onDragEn
       toolbar={
         <>
           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleAddToPattern} title="Add to pattern search">
-            <Crosshair className="h-3 w-3" />
+            <Waypoints className="h-3 w-3" />
           </Button>
           <Button
             variant="ghost"

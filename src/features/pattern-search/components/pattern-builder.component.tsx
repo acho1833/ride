@@ -17,7 +17,7 @@ import '@xyflow/react/dist/style.css';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, Trash2Icon } from 'lucide-react';
 import PatternNodeComponent from './pattern-node.component';
 import PatternEdgeComponent from './pattern-edge.component';
 import NodeConfigPanelComponent from './node-config-panel.component';
@@ -64,7 +64,8 @@ const PatternBuilderComponent = () => {
     updateEdge,
     deleteEdge,
     selectNode,
-    selectEdge
+    selectEdge,
+    clearPattern
   } = usePatternSearchActions();
   const { screenToFlowPosition } = useReactFlow();
 
@@ -207,6 +208,12 @@ const PatternBuilderComponent = () => {
           <PlusIcon className="mr-1 h-3 w-3" />
           Add Node
         </Button>
+        {patternNodes.length > 0 && (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={clearPattern}>
+            <Trash2Icon className="mr-1 h-3 w-3" />
+            Clear
+          </Button>
+        )}
       </div>
 
       <Separator />
