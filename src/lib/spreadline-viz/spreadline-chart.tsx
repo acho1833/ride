@@ -11,7 +11,8 @@
  * This ensures smooth D3 animations without React interference.
  */
 
-import { useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { useEffect, useRef, useCallback, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
+import * as d3 from 'd3';
 import { SpreadLinesVisualizer } from './spreadline-visualizer';
 import { SpreadLineData, SpreadLineConfig, createDefaultConfig } from './spreadline-types';
 
@@ -36,6 +37,13 @@ function useValueRef<T>(value: T): React.MutableRefObject<T> {
     ref.current = value;
   }, [value]);
   return ref;
+}
+
+export interface SpreadLineChartHandle {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  zoomToFit: () => void;
+  getZoomLevel: () => number;
 }
 
 interface SpreadLineChartProps {
@@ -78,29 +86,72 @@ interface SpreadLineChartProps {
    * Show only crossing lines
    */
   crossingOnly?: boolean;
+
+  /**
+   * Callback when zoom level changes (percentage, e.g. 100 = 100%)
+   */
+  onZoomChange?: (level: number) => void;
 }
 
-export default function SpreadLineChart({
-  data,
-  config,
-  onBlockExpand,
-  onFilterChange,
-  className = '',
-  resetKey = 0,
-  yearsFilter = 1,
-  crossingOnly = false
-}: SpreadLineChartProps) {
+const ZOOM_SCALE_EXTENT: [number, number] = [0.1, 10];
+const ZOOM_STEP = 1.3;
+const ZOOM_TRANSITION_MS = 300;
+
+const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(function SpreadLineChart(
+  {
+    data,
+    config,
+    onBlockExpand,
+    onFilterChange,
+    className = '',
+    resetKey = 0,
+    yearsFilter = 1,
+    crossingOnly = false,
+    onZoomChange
+  },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const visualizerRef = useRef<SpreadLinesVisualizer | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const zoomTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
 
   // Refs for callbacks - prevents re-init when callback identity changes
   const onBlockExpandRef = useCallbackRef(onBlockExpand);
   const onFilterChangeRef = useCallbackRef(onFilterChange);
+  const onZoomChangeRef = useCallbackRef(onZoomChange);
 
   // Refs for filter values - allows D3 to access current values without triggering React re-init
   const yearsFilterRef = useValueRef(yearsFilter);
   const crossingOnlyRef = useValueRef(crossingOnly);
+
+  // Expose zoom methods to parent via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      zoomIn: () => {
+        const svg = svgRef.current;
+        const zoom = zoomBehaviorRef.current;
+        if (!svg || !zoom) return;
+        d3.select(svg).transition().duration(ZOOM_TRANSITION_MS).call(zoom.scaleBy, ZOOM_STEP);
+      },
+      zoomOut: () => {
+        const svg = svgRef.current;
+        const zoom = zoomBehaviorRef.current;
+        if (!svg || !zoom) return;
+        d3.select(svg).transition().duration(ZOOM_TRANSITION_MS).call(zoom.scaleBy, 1 / ZOOM_STEP);
+      },
+      zoomToFit: () => {
+        const svg = svgRef.current;
+        const zoom = zoomBehaviorRef.current;
+        if (!svg || !zoom) return;
+        d3.select(svg).transition().duration(ZOOM_TRANSITION_MS).call(zoom.transform, d3.zoomIdentity);
+      },
+      getZoomLevel: () => Math.round(zoomTransformRef.current.k * 100)
+    }),
+    []
+  );
 
   /**
    * Initialize or reinitialize the D3 visualization.
@@ -118,8 +169,10 @@ export default function SpreadLineChart({
       visualizerRef.current = null;
     }
 
-    // Clear SVG
+    // Clear SVG and remove old zoom behavior
     svgRef.current.innerHTML = '';
+    zoomBehaviorRef.current = null;
+    zoomTransformRef.current = d3.zoomIdentity;
 
     // Create merged config - ensure content settings are properly merged
     const defaultConfig = createDefaultConfig();
@@ -139,7 +192,7 @@ export default function SpreadLineChart({
     visualizer.onBlockExpand = (blockId, expanded) => onBlockExpandRef.current?.(blockId, expanded);
     visualizer.onFilterChange = names => onFilterChangeRef.current?.(names);
 
-    // Render visualization
+    // Render visualization into SVG
     visualizer.visualize(svgRef.current);
 
     // Set viewBox so SVG scales to fit container width, height from aspect ratio
@@ -152,6 +205,47 @@ export default function SpreadLineChart({
       svg.removeAttribute('height');
       svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     }
+
+    // Wrap all existing SVG children in a zoom-layer <g>
+    const svgSelection = d3.select(svg);
+    const zoomLayer = svgSelection.append('g').attr('class', 'zoom-layer');
+    // Move all children except the zoom-layer itself into it
+    const children = Array.from(svg.childNodes).filter(
+      node => node !== zoomLayer.node()
+    );
+    children.forEach(child => zoomLayer.node()!.appendChild(child));
+
+    // Set up d3-zoom on the SVG
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent(ZOOM_SCALE_EXTENT)
+      .filter((event: Event) => {
+        // Only allow zoom/pan when Ctrl key is held
+        if (event instanceof WheelEvent || event instanceof MouseEvent) {
+          return event.ctrlKey || event.metaKey;
+        }
+        return false;
+      })
+      .wheelDelta((event: WheelEvent) => {
+        const direction = event.deltaY > 0 ? -1 : 1;
+        return direction * Math.log(ZOOM_STEP);
+      })
+      .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+        zoomLayer.attr('transform', event.transform.toString());
+        zoomTransformRef.current = event.transform;
+        onZoomChangeRef.current?.(Math.round(event.transform.k * 100));
+      });
+
+    svgSelection.call(zoom);
+    // Prevent Ctrl+wheel from also scrolling/zooming the page
+    // Use a separate namespace so we don't overwrite d3-zoom's own wheel.zoom handler
+    svgSelection.on('wheel.preventCtrl', function (event: WheelEvent) {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+      }
+    }, { passive: false } as any);
+
+    zoomBehaviorRef.current = zoom;
 
     // Apply initial filter settings using refs (doesn't add to dependencies)
     visualizer.applyFilter(yearsFilterRef.current, crossingOnlyRef.current);
@@ -204,13 +298,15 @@ export default function SpreadLineChart({
         ref={svgRef}
         className="spreadline-svg"
         style={{
-          overflow: 'visible',
+          overflow: 'hidden',
           fontFamily: 'system-ui, -apple-system, sans-serif'
         }}
       />
     </div>
   );
-}
+});
+
+export default SpreadLineChart;
 
 /**
  * Utility hook to access the D3 visualizer instance

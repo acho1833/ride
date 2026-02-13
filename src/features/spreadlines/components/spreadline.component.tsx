@@ -5,14 +5,18 @@
  *
  * Renders a SpreadLine ego-network visualization in a bottom panel tab.
  * Fetches raw data via ORPC, computes layout client-side, renders with D3.
+ * Pan/zoom via Ctrl+wheel / Ctrl+drag; floating controls at lower-right.
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Minus, Plus, Maximize } from 'lucide-react';
 import type { SpreadLineData } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
+import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-chart';
 import { SpreadLine } from '@/lib/spreadline';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import { SPREADLINE_DEFAULT_EGO, SPREADLINE_MIN_WIDTH_PER_TIMESTAMP, SPREADLINE_CHART_HEIGHT } from '@/features/spreadlines/const';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   workspaceId: string;
@@ -30,6 +34,20 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
   const [yearsFilter, setYearsFilter] = useState(1);
   const [crossingOnly, setCrossingOnly] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+
+  const chartRef = useRef<SpreadLineChartHandle>(null);
+  const [zoomLevel, setZoomLevel] = useState(100);
+
+  const handleZoomChange = useCallback((level: number) => {
+    setZoomLevel(level);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    setResetKey(k => k + 1);
+    setYearsFilter(1);
+    setCrossingOnly(false);
+    setZoomLevel(100);
+  }, []);
 
   // Compute SpreadLine layout when raw data arrives
   useEffect(() => {
@@ -81,23 +99,6 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
     computeLayout();
   }, [rawData]);
 
-  const handleRefresh = useCallback(() => {
-    setResetKey(k => k + 1);
-    setYearsFilter(1);
-    setCrossingOnly(false);
-    setZoomLevel(100);
-  }, []);
-
-  const zoomContainerRef = useRef<HTMLDivElement>(null);
-  const [zoomLevel, setZoomLevel] = useState(100);
-
-  // Apply zoom by widening the container — SVG fills it via width="100%", viewBox scales content
-  useEffect(() => {
-    const container = zoomContainerRef.current;
-    if (!container) return;
-    container.style.width = zoomLevel === 100 ? '' : `${zoomLevel}%`;
-  }, [zoomLevel, computedData, resetKey]);
-
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
 
   const config = useMemo(
@@ -142,9 +143,9 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
   }
 
   return (
-    <div className="bg-background">
+    <div className="relative flex h-full flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="bg-background border-border sticky top-0 z-10 flex items-center gap-4 border-b px-3 py-1.5 text-xs">
+      <div className="bg-background border-border flex shrink-0 items-center gap-4 border-b px-3 py-1.5 text-xs">
         <span className="text-muted-foreground">
           {computedData.storylines.length} entities | {computedData.blocks.length} blocks | Ego: {computedData.ego}
           {computeTime && <span className="text-primary ml-1">({computeTime.toFixed(0)}ms)</span>}
@@ -165,44 +166,37 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
           <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
           <label className="text-muted-foreground">Crossing only</label>
         </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            onClick={() => setZoomLevel(z => Math.max(50, z - 25))}
-            className="text-muted-foreground hover:text-foreground rounded px-1"
-          >
-            −
-          </button>
-          <input
-            type="range"
-            min="50"
-            max="500"
-            value={zoomLevel}
-            onChange={e => setZoomLevel(Number(e.target.value))}
-            className="w-20 accent-current"
-          />
-          <button
-            onClick={() => setZoomLevel(z => Math.min(500, z + 25))}
-            className="text-muted-foreground hover:text-foreground rounded px-1"
-          >
-            +
-          </button>
-          <span className="text-muted-foreground w-8 text-center">{zoomLevel}%</span>
-        </div>
-        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground">
+        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground ml-auto">
           Refresh
         </button>
       </div>
 
-      {/* Chart with zoom */}
-      <div ref={zoomContainerRef}>
+      {/* Chart with d3-zoom */}
+      <div className="relative min-h-0 flex-1">
         <SpreadLineChart
+          ref={chartRef}
           key={resetKey}
           data={computedData}
           config={config}
           resetKey={resetKey}
           yearsFilter={yearsFilter}
           crossingOnly={crossingOnly}
+          onZoomChange={handleZoomChange}
         />
+
+        {/* Floating zoom controls */}
+        <div className="bg-background/80 border-border absolute bottom-2 right-2 flex items-center gap-0.5 rounded-lg border px-1 py-0.5">
+          <Button variant="ghost" size="icon-xs" onClick={() => chartRef.current?.zoomOut()}>
+            <Minus />
+          </Button>
+          <span className="text-muted-foreground w-10 text-center text-xs tabular-nums">{zoomLevel}%</span>
+          <Button variant="ghost" size="icon-xs" onClick={() => chartRef.current?.zoomIn()}>
+            <Plus />
+          </Button>
+          <Button variant="ghost" size="icon-xs" onClick={() => chartRef.current?.zoomToFit()}>
+            <Maximize />
+          </Button>
+        </div>
       </div>
     </div>
   );
