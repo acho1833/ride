@@ -340,7 +340,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
       data: { workspaceId, workspaceName: workspace?.name ?? 'Workspace' } satisfies DashboardData
     };
     openChartTab(tab);
-    toggleToolbar('bottom', 'CHARTS');
+    toggleToolbar('bottom', 'CHARTS', true);
   }, [workspaceId, workspace?.name, openChartTab, toggleToolbar]);
 
   const handleSpreadline = useCallback(() => {
@@ -351,7 +351,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
       data: { workspaceId, workspaceName: workspace?.name ?? 'Workspace' } satisfies SpreadlineData
     };
     openChartTab(tab);
-    toggleToolbar('bottom', 'CHARTS');
+    toggleToolbar('bottom', 'CHARTS', true);
   }, [workspaceId, workspace?.name, openChartTab, toggleToolbar]);
 
   const handleContextMenuClose = useCallback(() => {

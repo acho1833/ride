@@ -56,7 +56,7 @@ export interface UiComponentState {
 /** UI action methods */
 export interface UiActions {
   setToggleMode: (mode: boolean) => void;
-  toggleToolbar: (position: ToolbarPositions, toolType: ToolType | null) => void;
+  toggleToolbar: (position: ToolbarPositions, toolType: ToolType | null, open?: boolean) => void;
   /** Toggle the "Select Opened Files" sync feature */
   toggleSelectOpenedFiles: () => void;
   /** Set the currently focused panel */
@@ -89,9 +89,9 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = set => ({
       ui: { ...state.ui, toggleMode }
     })),
 
-  toggleToolbar: (pos: ToolbarPositions, toolType: ToolType | null) =>
+  toggleToolbar: (pos: ToolbarPositions, toolType: ToolType | null, open?: boolean) =>
     set(state => {
-      const isClosing = state.ui.toolbar[pos] === toolType;
+      const isClosing = open !== undefined ? !open : state.ui.toolbar[pos] === toolType;
       const newToolType = isClosing ? null : toolType;
 
       // Set focus when opening a panel, clear focus when closing
