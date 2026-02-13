@@ -91,6 +91,23 @@ function getNextNodePosition(nodes: PatternNode[]): { x: number; y: number } {
   };
 }
 
+/** Find the tail node of the chain (node with no outgoing edges).
+ *  Returns null if there are no edges (pattern is not connected). */
+function getChainTailNodeId(nodes: PatternNode[], edges: PatternEdge[]): string | null {
+  if (edges.length === 0) return null;
+
+  const sourceIds = new Set(edges.map(e => e.sourceNodeId));
+
+  // Tail = last node (by array order) that is part of the graph but has no outgoing edge
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const nodeId = nodes[i].id;
+    const isInGraph = sourceIds.has(nodeId) || edges.some(e => e.targetNodeId === nodeId);
+    if (isInGraph && !sourceIds.has(nodeId)) return nodeId;
+  }
+
+  return null;
+}
+
 /** Creates the pattern search slice */
 export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], PatternSearchSlice> = set => ({
   patternSearch: {
@@ -110,17 +127,23 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
 
   addNode: () =>
     set(state => {
+      const { nodes, edges } = state.patternSearch;
+      const tailNodeId = getChainTailNodeId(nodes, edges);
       const newNode: PatternNode = {
         id: `node-${Date.now()}`,
-        label: getNextNodeLabel(state.patternSearch.nodes),
+        label: getNextNodeLabel(nodes),
         type: null,
         filters: [],
-        position: getNextNodePosition(state.patternSearch.nodes)
+        position: getNextNodePosition(nodes)
       };
+      const newEdges = tailNodeId
+        ? [...edges, { id: `edge-${Date.now()}-auto`, sourceNodeId: tailNodeId, targetNodeId: newNode.id, predicates: [] }]
+        : edges;
       return {
         patternSearch: {
           ...state.patternSearch,
-          nodes: [...state.patternSearch.nodes, newNode],
+          nodes: [...nodes, newNode],
+          edges: newEdges,
           selectedNodeId: newNode.id,
           selectedEdgeId: null
         }
@@ -129,17 +152,23 @@ export const createPatternSearchSlice: StateCreator<PatternSearchSlice, [], [], 
 
   addNodeFromEntity: (entityType, entityName, position) =>
     set(state => {
+      const { nodes, edges } = state.patternSearch;
+      const tailNodeId = getChainTailNodeId(nodes, edges);
       const newNode: PatternNode = {
         id: `node-${Date.now()}`,
-        label: getNextNodeLabel(state.patternSearch.nodes),
+        label: getNextNodeLabel(nodes),
         type: entityType,
         filters: [{ attribute: 'labelNormalized', patterns: [entityName] }],
-        position: position ?? getNextNodePosition(state.patternSearch.nodes)
+        position: position ?? getNextNodePosition(nodes)
       };
+      const newEdges = tailNodeId
+        ? [...edges, { id: `edge-${Date.now()}-auto`, sourceNodeId: tailNodeId, targetNodeId: newNode.id, predicates: [] }]
+        : edges;
       return {
         patternSearch: {
           ...state.patternSearch,
-          nodes: [...state.patternSearch.nodes, newNode],
+          nodes: [...nodes, newNode],
+          edges: newEdges,
           selectedNodeId: newNode.id,
           selectedEdgeId: null
         }
