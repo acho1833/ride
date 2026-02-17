@@ -8,30 +8,24 @@ const API_SPREADLINE_PREFIX = '/spreadlines';
 const tags = ['Spreadline'];
 
 const topologyEntrySchema = z.object({
-  source: z.string(),
-  target: z.string(),
+  sourceId: z.string(),
+  targetId: z.string(),
   time: z.string(),
   weight: z.number()
 });
 
-const lineColorEntrySchema = z.object({
-  entity: z.string(),
-  color: z.string()
-});
-
-const nodeContextEntrySchema = z.object({
-  entity: z.string(),
-  time: z.string(),
-  context: z.number()
+const entityInfoSchema = z.object({
+  name: z.string(),
+  category: z.enum(['internal', 'external']),
+  citations: z.record(z.string(), z.number())
 });
 
 const spreadlineRawDataResponseSchema = z.object({
-  ego: z.string(),
+  egoId: z.string(),
   dataset: z.string(),
+  entities: z.record(z.string(), entityInfoSchema),
   topology: topologyEntrySchema.array(),
-  lineColor: lineColorEntrySchema.array(),
   groups: z.record(z.string(), z.array(z.array(z.string()))),
-  nodeContext: nodeContextEntrySchema.array(),
   config: z.object({
     timeDelta: z.string(),
     timeFormat: z.string(),

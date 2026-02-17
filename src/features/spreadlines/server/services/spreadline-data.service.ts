@@ -9,53 +9,51 @@ import { ORPCError } from '@orpc/server';
 
 interface RelationRow {
   year: string;
-  source: string;
-  target: string;
+  sourceId: string;
+  targetId: string;
   id: string;
   count?: number;
   citationcount?: number;
 }
 
 interface EntityRow {
+  id: string;
   year: string;
   name: string;
+  citationcount: number;
   affiliation: string;
 }
 
 interface CitationRow {
   paperID: string;
   year: number;
-  name: string;
+  entityId: string;
   citationcount: number;
 }
 
 // ── Public response types ───────────────────────────────────────────
 
+export type LineCategoryValue = 'internal' | 'external';
+
 export interface TopologyEntry {
-  source: string;
-  target: string;
+  sourceId: string;
+  targetId: string;
   time: string;
   weight: number;
 }
 
-export interface LineColorEntry {
-  entity: string;
-  color: string;
-}
-
-export interface NodeContextEntry {
-  entity: string;
-  time: string;
-  context: number;
+export interface EntityInfo {
+  name: string;
+  category: LineCategoryValue;
+  citations: Record<string, number>;
 }
 
 export interface SpreadlineRawDataResponse {
-  ego: string;
+  egoId: string;
   dataset: string;
+  entities: Record<string, EntityInfo>;
   topology: TopologyEntry[];
-  lineColor: LineColorEntry[];
   groups: Record<string, string[][]>;
-  nodeContext: NodeContextEntry[];
   config: {
     timeDelta: string;
     timeFormat: string;
@@ -66,11 +64,12 @@ export interface SpreadlineRawDataResponse {
 
 // ── Constants ───────────────────────────────────────────────────────
 
-const INTERNAL_COLOR = '#FA9902';
-const EXTERNAL_COLOR = '#166b6b';
+const INTERNAL: LineCategoryValue = 'internal';
+const EXTERNAL: LineCategoryValue = 'external';
 const HOP_LIMIT = 2;
 const DEFAULT_EGO = 'Jeffrey Heer';
-const DATA_DIR = 'data/spreadline/vis-author';
+const DATASET_NAME = 'vis-author2';
+const DATA_DIR = `data/spreadline/${DATASET_NAME}`;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -106,7 +105,7 @@ function remapJHAffiliation(affiliation: string | null | undefined): string {
 /**
  * Construct ego-centric network via 2-hop BFS per time slice.
  */
-function constructEgoNetworks(data: RelationRow[], ego: string): RelationRow[] {
+function constructEgoNetworks(data: RelationRow[], egoId: string): RelationRow[] {
   const indices = new Set<number>();
 
   // Group by time
@@ -118,17 +117,17 @@ function constructEgoNetworks(data: RelationRow[], ego: string): RelationRow[] {
   });
 
   for (const entries of Object.values(byTime)) {
-    let waitlist = new Set<string>([ego]);
+    let waitlist = new Set<string>([egoId]);
     let hop = 1;
 
     while (waitlist.size > 0 && hop <= HOP_LIMIT) {
       const nextWaitlist: string[] = [];
 
       for (const each of waitlist) {
-        const sources = entries.filter(e => e.row.target === each);
-        const targets = entries.filter(e => e.row.source === each);
+        const sources = entries.filter(e => e.row.targetId === each);
+        const targets = entries.filter(e => e.row.sourceId === each);
 
-        const candidates: string[] = [...sources.map(e => e.row.source), ...targets.map(e => e.row.target)];
+        const candidates: string[] = [...sources.map(e => e.row.sourceId), ...targets.map(e => e.row.targetId)];
 
         sources.forEach(e => indices.add(e.idx));
         targets.forEach(e => indices.add(e.idx));
@@ -147,19 +146,24 @@ function constructEgoNetworks(data: RelationRow[], ego: string): RelationRow[] {
 }
 
 /**
- * Build author network with line colors and group assignments.
+ * Build author network with category assignments and group assignments.
  */
 function constructAuthorNetwork(
-  ego: string,
+  egoId: string,
   relations: RelationRow[],
   allEntities: EntityRow[]
-): { topology: TopologyEntry[]; lineColor: LineColorEntry[]; groups: Record<string, string[][]>; network: RelationRow[] } {
+): {
+  topology: TopologyEntry[];
+  categoryMap: Record<string, LineCategoryValue>;
+  groups: Record<string, string[][]>;
+  network: RelationRow[];
+} {
   // Ensure year strings
   relations = relations.map(r => ({ ...r, year: String(r.year) }));
   allEntities = allEntities.map(e => ({ ...e, year: String(e.year) }));
 
   // Ego affiliations by year
-  const egoEntries = allEntities.filter(e => e.name === ego);
+  const egoEntries = allEntities.filter(e => e.id === egoId);
   const egoStatus: Record<string, string> = {};
   for (const entry of egoEntries) {
     const remapped = remapJHAffiliation(entry.affiliation);
@@ -173,7 +177,7 @@ function constructAuthorNetwork(
   relations = relations.filter(r => years.includes(r.year));
 
   // 2-hop ego network
-  let network = constructEgoNetworks(relations, ego);
+  let network = constructEgoNetworks(relations, egoId);
 
   // Keep only papers involving ego
   const byPaper: Record<string, RelationRow[]> = {};
@@ -186,41 +190,41 @@ function constructAuthorNetwork(
   for (const group of Object.values(byPaper)) {
     const nodes = new Set<string>();
     group.forEach(row => {
-      nodes.add(row.source);
-      nodes.add(row.target);
+      nodes.add(row.sourceId);
+      nodes.add(row.targetId);
     });
-    if (nodes.has(ego)) {
+    if (nodes.has(egoId)) {
       validRows.push(...group);
     }
   }
   network = validRows;
 
-  // Helper: affiliations for author in a year
-  const getAffiliations = (author: string, year: string): string[] => {
-    const entries = allEntities.filter(e => e.name === author && e.year === year);
+  // Helper: affiliations for entity in a year
+  const getAffiliations = (entityId: string, year: string): string[] => {
+    const entries = allEntities.filter(e => e.id === entityId && e.year === year);
     return [...new Set(entries.map(e => remapJHAffiliation(e.affiliation)))];
   };
 
-  const colorAssign: Record<string, Record<string, string>> = {};
+  const colorAssign: Record<string, Record<string, LineCategoryValue>> = {};
   const groupAssign: Record<string, Set<string>[]> = {};
 
   for (const row of network) {
-    const firstAuthor = row.source;
-    const author = row.target;
+    const firstAuthor = row.sourceId;
+    const author = row.targetId;
     const year = row.year;
-    const egoAffiliations = getAffiliations(ego, year);
+    const egoAffiliations = getAffiliations(egoId, year);
 
     if (!groupAssign[year]) {
-      groupAssign[year] = [new Set(), new Set(), new Set([ego]), new Set(), new Set()];
+      groupAssign[year] = [new Set(), new Set(), new Set([egoId]), new Set(), new Set()];
     }
     if (!colorAssign[year]) {
       colorAssign[year] = {};
     }
 
-    if (author === ego) {
+    if (author === egoId) {
       const affiliations = getAffiliations(firstAuthor, year);
       const intersection = affiliations.filter(a => egoAffiliations.includes(a));
-      const color = intersection.length > 0 ? INTERNAL_COLOR : EXTERNAL_COLOR;
+      const category = intersection.length > 0 ? INTERNAL : EXTERNAL;
 
       if (intersection.length > 0) {
         groupAssign[year][3].add(firstAuthor);
@@ -229,27 +233,27 @@ function constructAuthorNetwork(
       }
 
       if (!colorAssign[year][firstAuthor]) {
-        colorAssign[year][firstAuthor] = color;
+        colorAssign[year][firstAuthor] = category;
       }
     } else {
       const affiliations = getAffiliations(author, year);
       const intersection = affiliations.filter(a => egoAffiliations.includes(a));
-      const color = intersection.length > 0 ? INTERNAL_COLOR : EXTERNAL_COLOR;
+      const category = intersection.length > 0 ? INTERNAL : EXTERNAL;
 
-      if (color === INTERNAL_COLOR) {
+      if (category === INTERNAL) {
         groupAssign[year][4].add(author);
       } else {
         groupAssign[year][0].add(author);
       }
 
       if (!colorAssign[year][author]) {
-        colorAssign[year][author] = color;
+        colorAssign[year][author] = category;
       }
     }
 
     // Count collaborations
     const collab = network.filter(
-      r => r.source === (author === ego ? firstAuthor : author) || r.target === (author === ego ? firstAuthor : author)
+      r => r.sourceId === (author === egoId ? firstAuthor : author) || r.targetId === (author === egoId ? firstAuthor : author)
     );
     const uniquePapers = new Set(collab.map(r => r.id));
     row.count = uniquePapers.size;
@@ -294,8 +298,8 @@ function constructAuthorNetwork(
       const toBeReverse = idx >= 2;
 
       groupArray.sort((a, b) => {
-        const aCount = new Set(network.filter(r => r.source === a || r.target === a).map(r => r.id)).size;
-        const bCount = new Set(network.filter(r => r.source === b || r.target === b).map(r => r.id)).size;
+        const aCount = new Set(network.filter(r => r.sourceId === a || r.targetId === a).map(r => r.id)).size;
+        const bCount = new Set(network.filter(r => r.sourceId === b || r.targetId === b).map(r => r.id)).size;
 
         if (aCount !== bCount) {
           return toBeReverse ? bCount - aCount : aCount - bCount;
@@ -309,19 +313,19 @@ function constructAuthorNetwork(
     finalGroups[year] = newGroups;
   }
 
-  // Build line color array
-  const entities = new Set<string>();
+  // Build category map (entity ID -> category)
+  const categoryMap: Record<string, LineCategoryValue> = {};
+  const entityIds = new Set<string>();
   network.forEach(row => {
-    entities.add(row.source);
-    entities.add(row.target);
+    entityIds.add(row.sourceId);
+    entityIds.add(row.targetId);
   });
 
-  const lineColorEntries: LineColorEntry[] = [];
-  for (const entity of entities) {
+  for (const eid of entityIds) {
     for (const year of years) {
-      const color = colorAssign[year]?.[entity];
-      if (color) {
-        lineColorEntries.push({ entity, color });
+      const category = colorAssign[year]?.[eid];
+      if (category) {
+        categoryMap[eid] = category;
         break;
       }
     }
@@ -329,19 +333,19 @@ function constructAuthorNetwork(
 
   // Convert to topology format
   const topology: TopologyEntry[] = network.map(row => ({
-    source: row.source,
-    target: row.target,
+    sourceId: row.sourceId,
+    targetId: row.targetId,
     time: row.year,
     weight: row.count || 1
   }));
 
-  return { topology, lineColor: lineColorEntries, groups: finalGroups, network };
+  return { topology, categoryMap, groups: finalGroups, network };
 }
 
 // ── Public API ──────────────────────────────────────────────────────
 
 export async function getSpreadlineRawData(ego?: string): Promise<SpreadlineRawDataResponse> {
-  const resolvedEgo = ego || DEFAULT_EGO;
+  const resolvedEgoName = ego || DEFAULT_EGO;
   const basePath = path.join(process.cwd(), DATA_DIR);
 
   let relations: RelationRow[];
@@ -360,42 +364,61 @@ export async function getSpreadlineRawData(ego?: string): Promise<SpreadlineRawD
     });
   }
 
-  const { topology, lineColor, groups, network } = constructAuthorNetwork(resolvedEgo, relations, allEntities);
+  // Build name -> ID and ID -> name lookups
+  const nameToId: Record<string, string> = {};
+  const idToName: Record<string, string> = {};
+  for (const e of allEntities) {
+    if (!nameToId[e.name]) {
+      nameToId[e.name] = e.id;
+      idToName[e.id] = e.name;
+    }
+  }
 
-  // Build node context from citations
+  const egoId = nameToId[resolvedEgoName];
+  if (!egoId) {
+    throw new ORPCError('BAD_REQUEST', {
+      message: `Ego entity "${resolvedEgoName}" not found`
+    });
+  }
+
+  const { topology, categoryMap, groups, network } = constructAuthorNetwork(egoId, relations, allEntities);
+
+  // Build citations per entity
   const papers = [...new Set(network.map(r => r.id))];
-  const frames: NodeContextEntry[] = [];
-
+  const citationsByEntity: Record<string, Record<string, number>> = {};
   for (const paper of papers) {
     const group = citations.filter(c => c.paperID === paper);
     for (const row of group) {
-      frames.push({
-        entity: row.name,
-        time: String(row.year),
-        context: row.citationcount
-      });
+      const eid = row.entityId;
+      const time = String(row.year);
+      if (!citationsByEntity[eid]) citationsByEntity[eid] = {};
+      citationsByEntity[eid][time] = (citationsByEntity[eid][time] || 0) + row.citationcount;
     }
   }
 
-  // Aggregate by entity+time
-  const aggregated: Record<string, NodeContextEntry> = {};
-  for (const frame of frames) {
-    const key = `${frame.entity},${frame.time}`;
-    if (!aggregated[key]) {
-      aggregated[key] = { ...frame };
-    } else {
-      aggregated[key].context += frame.context;
-    }
+  // Build entities map (ego excluded — ego has no category)
+  const entityIds = new Set<string>();
+  network.forEach(row => {
+    entityIds.add(row.sourceId);
+    entityIds.add(row.targetId);
+  });
+
+  const entities: Record<string, EntityInfo> = {};
+  for (const eid of entityIds) {
+    if (eid === egoId) continue;
+    entities[eid] = {
+      name: idToName[eid] || eid,
+      category: categoryMap[eid] || EXTERNAL,
+      citations: citationsByEntity[eid] || {}
+    };
   }
-  const nodeContext = Object.values(aggregated);
 
   return {
-    ego: resolvedEgo,
-    dataset: 'vis-author',
+    egoId,
+    dataset: DATASET_NAME,
+    entities,
     topology,
-    lineColor,
     groups,
-    nodeContext,
     config: {
       timeDelta: 'year',
       timeFormat: '%Y',

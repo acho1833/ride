@@ -15,7 +15,14 @@ import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-chart';
 import { SpreadLine } from '@/lib/spreadline';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
-import { SPREADLINE_DEFAULT_EGO, SPREADLINE_MIN_WIDTH_PER_TIMESTAMP, SPREADLINE_CHART_HEIGHT } from '@/features/spreadlines/const';
+import {
+  SPREADLINE_DEFAULT_EGO,
+  SPREADLINE_MIN_WIDTH_PER_TIMESTAMP,
+  SPREADLINE_CHART_HEIGHT,
+  SPREADLINE_CATEGORY_COLORS,
+  SPREADLINE_CHAR_WIDTH_PX,
+  SPREADLINE_LABEL_PADDING_PX
+} from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -60,27 +67,50 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
         const startTime = performance.now();
 
         const spreadline = new SpreadLine();
-        spreadline.load(rawData.topology, { source: 'source', target: 'target', time: 'time', weight: 'weight' }, 'topology');
-        spreadline.load(rawData.lineColor, { entity: 'entity', color: 'color' }, 'line');
 
-        if (rawData.nodeContext && rawData.nodeContext.length > 0) {
-          spreadline.load(rawData.nodeContext, { time: 'time', entity: 'entity', context: 'context' }, 'node');
+        // Convert topology to library format (source/target keys)
+        const topoData = rawData.topology.map(t => ({
+          source: t.sourceId,
+          target: t.targetId,
+          time: t.time,
+          weight: t.weight
+        }));
+        spreadline.load(topoData, { source: 'source', target: 'target', time: 'time', weight: 'weight' }, 'topology');
+
+        // Convert entities map to line color array
+        const lineColorData = Object.entries(rawData.entities).map(([id, entity]) => ({
+          entity: id,
+          color: SPREADLINE_CATEGORY_COLORS[entity.category] ?? SPREADLINE_CATEGORY_COLORS.external
+        }));
+        spreadline.load(lineColorData, { entity: 'entity', color: 'color' }, 'line');
+
+        // Convert entities citations to node context array
+        const nodeContextData: { entity: string; time: string; context: number }[] = [];
+        for (const [id, entity] of Object.entries(rawData.entities)) {
+          for (const [time, count] of Object.entries(entity.citations)) {
+            nodeContextData.push({ entity: id, time, context: count });
+          }
+        }
+        if (nodeContextData.length > 0) {
+          spreadline.load(nodeContextData, { time: 'time', entity: 'entity', context: 'context' }, 'node');
         }
 
-        spreadline.center(rawData.ego, undefined, rawData.config.timeDelta, rawData.config.timeFormat, rawData.groups);
+        spreadline.center(rawData.egoId, undefined, rawData.config.timeDelta, rawData.config.timeFormat, rawData.groups);
         spreadline.configure({
           squeezeSameCategory: rawData.config.squeezeSameCategory,
           minimize: rawData.config.minimize as 'space' | 'line' | 'wiggles'
         });
 
-        // Calculate dynamic width based on data
+        // Calculate dynamic width based on entity names
         const allNames = new Set<string>();
         rawData.topology.forEach(t => {
-          allNames.add(t.source);
-          allNames.add(t.target);
+          const srcName = rawData.entities[t.sourceId]?.name ?? t.sourceId;
+          const tgtName = rawData.entities[t.targetId]?.name ?? t.targetId;
+          allNames.add(srcName);
+          allNames.add(tgtName);
         });
         const longestName = Math.max(...Array.from(allNames).map(n => n.length));
-        const labelWidth = longestName * 8 + 80;
+        const labelWidth = longestName * SPREADLINE_CHAR_WIDTH_PX + SPREADLINE_LABEL_PADDING_PX;
         const numTimestamps = new Set(rawData.topology.map(t => t.time)).size;
         const minWidthPerTimestamp = Math.max(SPREADLINE_MIN_WIDTH_PER_TIMESTAMP, labelWidth);
         const dynamicWidth = numTimestamps * minWidthPerTimestamp;
@@ -185,7 +215,7 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
         />
 
         {/* Floating zoom controls */}
-        <div className="bg-background/80 border-border absolute bottom-2 right-2 flex items-center gap-0.5 rounded-lg border px-1 py-0.5">
+        <div className="bg-background/80 border-border absolute right-2 bottom-2 flex items-center gap-0.5 rounded-lg border px-1 py-0.5">
           <Button variant="ghost" size="icon-xs" onClick={() => chartRef.current?.zoomOut()}>
             <Minus />
           </Button>

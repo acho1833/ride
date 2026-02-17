@@ -98,17 +98,7 @@ const ZOOM_STEP = 1.3;
 const ZOOM_TRANSITION_MS = 300;
 
 const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(function SpreadLineChart(
-  {
-    data,
-    config,
-    onBlockExpand,
-    onFilterChange,
-    className = '',
-    resetKey = 0,
-    yearsFilter = 1,
-    crossingOnly = false,
-    onZoomChange
-  },
+  { data, config, onBlockExpand, onFilterChange, className = '', resetKey = 0, yearsFilter = 1, crossingOnly = false, onZoomChange },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -140,7 +130,10 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         const svg = svgRef.current;
         const zoom = zoomBehaviorRef.current;
         if (!svg || !zoom) return;
-        d3.select(svg).transition().duration(ZOOM_TRANSITION_MS).call(zoom.scaleBy, 1 / ZOOM_STEP);
+        d3.select(svg)
+          .transition()
+          .duration(ZOOM_TRANSITION_MS)
+          .call(zoom.scaleBy, 1 / ZOOM_STEP);
       },
       zoomToFit: () => {
         const svg = svgRef.current;
@@ -210,9 +203,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     const svgSelection = d3.select(svg);
     const zoomLayer = svgSelection.append('g').attr('class', 'zoom-layer');
     // Move all children except the zoom-layer itself into it
-    const children = Array.from(svg.childNodes).filter(
-      node => node !== zoomLayer.node()
-    );
+    const children = Array.from(svg.childNodes).filter(node => node !== zoomLayer.node());
     children.forEach(child => zoomLayer.node()!.appendChild(child));
 
     // Set up d3-zoom on the SVG
@@ -239,11 +230,15 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     svgSelection.call(zoom);
     // Prevent Ctrl+wheel from also scrolling/zooming the page
     // Use a separate namespace so we don't overwrite d3-zoom's own wheel.zoom handler
-    svgSelection.on('wheel.preventCtrl', function (event: WheelEvent) {
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-      }
-    }, { passive: false } as any);
+    svgSelection.on(
+      'wheel.preventCtrl',
+      function (event: WheelEvent) {
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+        }
+      },
+      { passive: false } as any
+    );
 
     zoomBehaviorRef.current = zoom;
 
