@@ -15,7 +15,11 @@ import { getSpreadlineRawData } from './spreadline-data.service';
 describe('spreadline-data.service', () => {
   describe('getSpreadlineRawData', () => {
     it('returns expected top-level fields', async () => {
-      const result = await getSpreadlineRawData('Jeffrey Heer');
+      const result = await getSpreadlineRawData({
+        egoId: 'p1199',
+        relationTypes: ['Co-co-author'],
+        yearRange: [2002, 2022]
+      });
 
       expect(typeof result.egoId).toBe('string');
       expect(result.egoId).toMatch(/^p\d{4}$/);
@@ -32,7 +36,11 @@ describe('spreadline-data.service', () => {
     });
 
     it('returns entities map with name, category, and citations', async () => {
-      const result = await getSpreadlineRawData('Jeffrey Heer');
+      const result = await getSpreadlineRawData({
+        egoId: 'p1199',
+        relationTypes: ['Co-co-author'],
+        yearRange: [2002, 2022]
+      });
 
       expect(Object.keys(result.entities).length).toBeGreaterThan(0);
 
@@ -46,13 +54,21 @@ describe('spreadline-data.service', () => {
     });
 
     it('does not include ego entity in entities map', async () => {
-      const result = await getSpreadlineRawData('Jeffrey Heer');
+      const result = await getSpreadlineRawData({
+        egoId: 'p1199',
+        relationTypes: ['Co-co-author'],
+        yearRange: [2002, 2022]
+      });
 
       expect(result.entities[result.egoId]).toBeUndefined();
     });
 
     it('topology entries reference valid entity IDs', async () => {
-      const result = await getSpreadlineRawData('Jeffrey Heer');
+      const result = await getSpreadlineRawData({
+        egoId: 'p1199',
+        relationTypes: ['Co-co-author'],
+        yearRange: [2002, 2022]
+      });
       const allIds = new Set([...Object.keys(result.entities), result.egoId]);
 
       expect(result.topology.length).toBeGreaterThan(0);
@@ -65,7 +81,11 @@ describe('spreadline-data.service', () => {
     });
 
     it('groups contain valid entity IDs', async () => {
-      const result = await getSpreadlineRawData('Jeffrey Heer');
+      const result = await getSpreadlineRawData({
+        egoId: 'p1199',
+        relationTypes: ['Co-co-author'],
+        yearRange: [2002, 2022]
+      });
       const allIds = new Set([...Object.keys(result.entities), result.egoId]);
 
       for (const [year, layers] of Object.entries(result.groups)) {
@@ -80,7 +100,11 @@ describe('spreadline-data.service', () => {
     });
 
     it('citation keys in entities are valid year strings', async () => {
-      const result = await getSpreadlineRawData('Jeffrey Heer');
+      const result = await getSpreadlineRawData({
+        egoId: 'p1199',
+        relationTypes: ['Co-co-author'],
+        yearRange: [2002, 2022]
+      });
 
       for (const entity of Object.values(result.entities)) {
         for (const [time, count] of Object.entries(entity.citations)) {

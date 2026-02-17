@@ -2,8 +2,14 @@
  * Spreadline Feature Constants
  */
 
-/** Default ego entity for the vis-author dataset */
-export const SPREADLINE_DEFAULT_EGO = 'Jeffrey Heer';
+/** Default ego entity ID for the vis-author dataset (Jeffrey Heer) */
+export const SPREADLINE_DEFAULT_EGO_ID = 'p1199';
+
+/** Default relation types to include */
+export const SPREADLINE_DEFAULT_RELATION_TYPES = ['Co-co-author'];
+
+/** Default year range [start, end] */
+export const SPREADLINE_DEFAULT_YEAR_RANGE: [number, number] = [2002, 2022];
 
 /** Minimum width per timestamp column (px) */
 export const SPREADLINE_MIN_WIDTH_PER_TIMESTAMP = 200;

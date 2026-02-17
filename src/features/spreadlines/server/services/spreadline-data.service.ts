@@ -12,6 +12,7 @@ interface RelationRow {
   sourceId: string;
   targetId: string;
   id: string;
+  type: string;
   count?: number;
   citationcount?: number;
 }
@@ -67,7 +68,6 @@ export interface SpreadlineRawDataResponse {
 const INTERNAL: LineCategoryValue = 'internal';
 const EXTERNAL: LineCategoryValue = 'external';
 const HOP_LIMIT = 2;
-const DEFAULT_EGO = 'Jeffrey Heer';
 const DATASET_NAME = 'vis-author2';
 const DATA_DIR = `data/spreadline/${DATASET_NAME}`;
 
@@ -344,8 +344,12 @@ function constructAuthorNetwork(
 
 // ── Public API ──────────────────────────────────────────────────────
 
-export async function getSpreadlineRawData(ego?: string): Promise<SpreadlineRawDataResponse> {
-  const resolvedEgoName = ego || DEFAULT_EGO;
+export async function getSpreadlineRawData(params: {
+  egoId: string;
+  relationTypes: string[];
+  yearRange: [number, number];
+}): Promise<SpreadlineRawDataResponse> {
+  const { egoId, relationTypes, yearRange } = params;
   const basePath = path.join(process.cwd(), DATA_DIR);
 
   let relations: RelationRow[];
@@ -364,20 +368,23 @@ export async function getSpreadlineRawData(ego?: string): Promise<SpreadlineRawD
     });
   }
 
-  // Build name -> ID and ID -> name lookups
-  const nameToId: Record<string, string> = {};
+  // Filter relations by type and year range
+  relations = relations.filter(r => {
+    const year = Number(r.year);
+    return relationTypes.includes(r.type) && year >= yearRange[0] && year <= yearRange[1];
+  });
+
+  // Build ID -> name lookup
   const idToName: Record<string, string> = {};
   for (const e of allEntities) {
-    if (!nameToId[e.name]) {
-      nameToId[e.name] = e.id;
+    if (!idToName[e.id]) {
       idToName[e.id] = e.name;
     }
   }
 
-  const egoId = nameToId[resolvedEgoName];
-  if (!egoId) {
+  if (!idToName[egoId]) {
     throw new ORPCError('BAD_REQUEST', {
-      message: `Ego entity "${resolvedEgoName}" not found`
+      message: `Ego entity "${egoId}" not found`
     });
   }
 

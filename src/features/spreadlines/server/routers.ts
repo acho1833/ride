@@ -42,9 +42,15 @@ export const spreadlineRouter = appProcedure.router({
       summary: 'Get SpreadLine raw data for ego network visualization',
       tags
     })
-    .input(z.object({ ego: z.string().optional() }))
+    .input(
+      z.object({
+        egoId: z.string(),
+        relationTypes: z.array(z.string()),
+        yearRange: z.tuple([z.number(), z.number()])
+      })
+    )
     .output(spreadlineRawDataResponseSchema)
     .handler(async ({ input }) => {
-      return spreadlineDataService.getSpreadlineRawData(input.ego);
+      return spreadlineDataService.getSpreadlineRawData(input);
     })
 });

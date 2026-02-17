@@ -16,7 +16,9 @@ import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-char
 import { SpreadLine } from '@/lib/spreadline';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import {
-  SPREADLINE_DEFAULT_EGO,
+  SPREADLINE_DEFAULT_EGO_ID,
+  SPREADLINE_DEFAULT_RELATION_TYPES,
+  SPREADLINE_DEFAULT_YEAR_RANGE,
   SPREADLINE_MIN_WIDTH_PER_TIMESTAMP,
   SPREADLINE_CHART_HEIGHT,
   SPREADLINE_CATEGORY_COLORS,
@@ -31,7 +33,16 @@ interface Props {
 }
 
 const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
-  const { data: rawData, isPending, isError, error } = useSpreadlineRawDataQuery(SPREADLINE_DEFAULT_EGO);
+  const {
+    data: rawData,
+    isPending,
+    isError,
+    error
+  } = useSpreadlineRawDataQuery({
+    egoId: SPREADLINE_DEFAULT_EGO_ID,
+    relationTypes: SPREADLINE_DEFAULT_RELATION_TYPES,
+    yearRange: SPREADLINE_DEFAULT_YEAR_RANGE
+  });
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
   const [computing, setComputing] = useState(false);
   const [computeError, setComputeError] = useState<string | null>(null);
