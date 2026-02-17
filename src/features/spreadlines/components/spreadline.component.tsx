@@ -23,7 +23,11 @@ import {
   SPREADLINE_CHART_HEIGHT,
   SPREADLINE_CATEGORY_COLORS,
   SPREADLINE_CHAR_WIDTH_PX,
-  SPREADLINE_LABEL_PADDING_PX
+  SPREADLINE_LABEL_PADDING_PX,
+  SPREADLINE_TIME_DELTA,
+  SPREADLINE_TIME_FORMAT,
+  SPREADLINE_SQUEEZE_SAME_CATEGORY,
+  SPREADLINE_MINIMIZE
 } from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
 
@@ -117,10 +121,10 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
           namedGroups[time] = groups.map(group => group.map(id => nameOf(id)));
         }
 
-        spreadline.center(nameOf(rawData.egoId), undefined, rawData.config.timeDelta, rawData.config.timeFormat, namedGroups);
+        spreadline.center(nameOf(rawData.egoId), undefined, SPREADLINE_TIME_DELTA, SPREADLINE_TIME_FORMAT, namedGroups);
         spreadline.configure({
-          squeezeSameCategory: rawData.config.squeezeSameCategory,
-          minimize: rawData.config.minimize as 'space' | 'line' | 'wiggles'
+          squeezeSameCategory: SPREADLINE_SQUEEZE_SAME_CATEGORY,
+          minimize: SPREADLINE_MINIMIZE
         });
 
         // Calculate dynamic width based on entity names

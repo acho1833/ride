@@ -32,6 +32,18 @@ export const SPREADLINE_CHAR_WIDTH_PX = 8;
 /** Extra padding around labels (px) */
 export const SPREADLINE_LABEL_PADDING_PX = 80;
 
+/** Time granularity for x-axis grouping */
+export const SPREADLINE_TIME_DELTA = 'year';
+
+/** Date format string for parsing/displaying time */
+export const SPREADLINE_TIME_FORMAT = '%Y';
+
+/** Compact same-category lines closer together */
+export const SPREADLINE_SQUEEZE_SAME_CATEGORY = true;
+
+/** Layout optimization strategy: 'space' | 'line' | 'wiggles' */
+export const SPREADLINE_MINIMIZE: 'space' | 'line' | 'wiggles' = 'wiggles';
+
 /** Map category string to hex color */
 export const SPREADLINE_CATEGORY_COLORS: Record<string, string> = {
   internal: SPREADLINE_INTERNAL_COLOR,

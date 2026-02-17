@@ -26,13 +26,7 @@ const spreadlineRawDataResponseSchema = z.object({
   dataset: z.string(),
   entities: z.record(z.string(), entityInfoSchema),
   topology: topologyEntrySchema.array(),
-  groups: z.record(z.string(), z.array(z.array(z.string()))),
-  config: z.object({
-    timeDelta: z.string(),
-    timeFormat: z.string(),
-    squeezeSameCategory: z.boolean(),
-    minimize: z.string()
-  })
+  groups: z.record(z.string(), z.array(z.array(z.string())))
 });
 
 export const spreadlineRouter = appProcedure.router({

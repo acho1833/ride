@@ -56,12 +56,6 @@ export interface SpreadlineRawDataResponse {
   entities: Record<string, EntityInfo>;
   topology: TopologyEntry[];
   groups: Record<string, string[][]>;
-  config: {
-    timeDelta: string;
-    timeFormat: string;
-    squeezeSameCategory: boolean;
-    minimize: string;
-  };
 }
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -427,12 +421,6 @@ export async function getSpreadlineRawData(params: {
     dataset: DATASET_NAME,
     entities,
     topology,
-    groups,
-    config: {
-      timeDelta: 'year',
-      timeFormat: '%Y',
-      squeezeSameCategory: true,
-      minimize: 'wiggles'
-    }
+    groups
   };
 }

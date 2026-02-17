@@ -27,12 +27,6 @@ describe('spreadline-data.service', () => {
       expect(Array.isArray(result.topology)).toBe(true);
       expect(typeof result.entities).toBe('object');
       expect(typeof result.groups).toBe('object');
-      expect(result.config).toEqual({
-        timeDelta: 'year',
-        timeFormat: '%Y',
-        squeezeSameCategory: true,
-        minimize: 'wiggles'
-      });
     });
 
     it('returns entities map with name, category, and citations', async () => {
