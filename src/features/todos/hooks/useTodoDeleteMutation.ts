@@ -24,7 +24,7 @@ export const useTodosDeleteMutation = () => {
       // On success: refresh todo list and show success toast
       onSuccess: async (_data, _variables, context) => {
         await queryClient.invalidateQueries({
-          queryKey: orpc.todo.getAll.key()
+          queryKey: orpc.todo.getAll.queryKey()
         });
 
         toast.success('Todo deleted', { id: context?.toastId });

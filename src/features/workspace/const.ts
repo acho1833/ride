@@ -140,6 +140,9 @@ export const DOT_GRID_CONFIG = {
   patternExtent: 10000
 } as const;
 
+/** Delay before reopening context menu after closing (ms) */
+export const CONTEXT_MENU_REOPEN_DELAY_MS = 150;
+
 export const PREVIEW_CONFIG = {
   /** Maximum entities to show as individual nodes before grouping */
   threshold: 50,

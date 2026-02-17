@@ -13,6 +13,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getSelection, $isRangeSelection, FORMAT_TEXT_COMMAND, SELECTION_CHANGE_COMMAND, COMMAND_PRIORITY_LOW } from 'lexical';
 import { Bold, Italic, Underline } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
+import { TOOLBAR_POSITION_UPDATE_DELAY_MS } from '@/features/text/const';
 
 const ToolbarPlugin = () => {
   const [editor] = useLexicalComposerContext();
@@ -82,7 +83,7 @@ const ToolbarPlugin = () => {
 
   useEffect(() => {
     const handleMouseUp = () => {
-      setTimeout(updatePosition, 10);
+      setTimeout(updatePosition, TOOLBAR_POSITION_UPDATE_DELAY_MS);
     };
     document.addEventListener('mouseup', handleMouseUp);
     return () => document.removeEventListener('mouseup', handleMouseUp);

@@ -17,7 +17,7 @@ export const useProjectViewSettingsMutation = () => {
         setCurrentProject(data);
         // Invalidate queries for consistency
         await queryClient.invalidateQueries({
-          queryKey: orpc.project.getAll.key()
+          queryKey: orpc.project.getAll.queryKey()
         });
       }
     })

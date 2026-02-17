@@ -25,12 +25,12 @@ export const useTodosUpdateMutation = () => {
       onSuccess: async (_data, variables, context) => {
         // Invalidate the todo list
         await queryClient.invalidateQueries({
-          queryKey: orpc.todo.getAll.key()
+          queryKey: orpc.todo.getAll.queryKey()
         });
 
         // Invalidate the specific todo's cache
         await queryClient.invalidateQueries({
-          queryKey: orpc.todo.getById.key({
+          queryKey: orpc.todo.getById.queryKey({
             input: {
               id: variables.id
             }

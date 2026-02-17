@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entityResponseSchema } from './entity-response.model';
+import { entityResponseSchema, type EntityResponse } from './entity-response.model';
 
 /**
  * Relationship from external API.
@@ -25,7 +25,7 @@ export const relationshipResponseSchema = z.object({
 export interface WorkspaceResponse {
   id: string;
   name: string;
-  entityList: z.infer<typeof entityResponseSchema>[];
+  entityList: EntityResponse[];
   relationshipList: RelationshipResponse[];
 }
 

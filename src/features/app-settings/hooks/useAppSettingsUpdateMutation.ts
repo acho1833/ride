@@ -10,7 +10,7 @@ export const useAppSettingsUpdateMutation = () => {
   return useMutation(
     orpc.appSettings.update.mutationOptions({
       onSuccess: async data => {
-        await queryClient.invalidateQueries({ queryKey: orpc.appSettings.get.key() });
+        await queryClient.invalidateQueries({ queryKey: orpc.appSettings.get.queryKey() });
         setAppSettings(data);
       },
       onError: () => {

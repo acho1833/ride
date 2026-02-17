@@ -14,7 +14,7 @@ export const useProjectUpdateMutation = () => {
       },
       onSuccess: async (_data, _variables, context) => {
         await queryClient.invalidateQueries({
-          queryKey: orpc.project.getAll.key()
+          queryKey: orpc.project.getAll.queryKey()
         });
         toast.success('Project updated', { id: context?.toastId });
       },

@@ -53,6 +53,7 @@ const Page = async ({ params }: { params: Promise<{ todoId: string }> }) => {
 - Pages contain NO business logic, NO hooks, NO data fetching
 - Layouts only add structural elements (headers, wrappers)
 - All logic lives in feature view components
+- **Exempt:** `src/app/docs/**` and `src/app/spreadline-frontend1/**` are internal documentation/test pages and are exempt from CLAUDE.md conventions
 
 ### Feature-Based Organization
 
@@ -266,7 +267,7 @@ export const useTodosCreateMutation = () => {
 Key rules:
 - Use `orpc.[feature].[method].queryOptions()` for queries
 - Use `orpc.[feature].[method].mutationOptions()` for mutations
-- **CRITICAL**: Use `orpc.[feature].[method].queryKey()` (not `.key()`) for `getQueryData`, `setQueryData`, and `invalidateQueries`. The `.queryKey()` method includes `type: "query"` which is required to match the cache key format used by `useQuery`.
+- **CRITICAL**: Use `orpc.[feature].[method].queryKey()` (not `.key()`) for `getQueryData`, `setQueryData`, and `invalidateQueries`. The `.queryKey()` method includes `type: "query"` which is required to match the cache key format used by `useQuery`. **Exception:** Use `.key()` when the procedure requires input and you want to invalidate all cached queries for that procedure regardless of input (broad invalidation).
 - Show toast notifications for loading/success/error states
 
 ### View/Component Pattern

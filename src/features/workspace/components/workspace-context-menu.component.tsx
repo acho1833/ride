@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/context-menu';
 import { Copy, ClipboardPaste, Trash2, BarChart3, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { CONTEXT_MENU_REOPEN_DELAY_MS } from '@/features/workspace/const';
 
 interface Props {
   /** Position to show menu at, null when closed */
@@ -54,7 +55,7 @@ const WorkspaceContextMenuComponent = ({ position, onClose, selectedEntityCount,
       // If menu is already open, close it first then reopen
       if (openRef.current) {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        setTimeout(openMenu, 150);
+        setTimeout(openMenu, CONTEXT_MENU_REOPEN_DELAY_MS);
       } else {
         openMenu();
       }

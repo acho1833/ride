@@ -25,3 +25,6 @@ export const EDITOR_THEME = {
  * Placeholder text shown when editor is empty.
  */
 export const PLACEHOLDER_TEXT = 'Start typing...';
+
+/** Delay for toolbar position update after mouse selection (ms) */
+export const TOOLBAR_POSITION_UPDATE_DELAY_MS = 10;
