@@ -22,6 +22,7 @@ const entityInfoSchema = z.object({
 
 const spreadlineRawDataResponseSchema = z.object({
   egoId: z.string(),
+  egoName: z.string(),
   dataset: z.string(),
   entities: z.record(z.string(), entityInfoSchema),
   topology: topologyEntrySchema.array(),

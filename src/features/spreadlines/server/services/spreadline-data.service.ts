@@ -51,6 +51,7 @@ export interface EntityInfo {
 
 export interface SpreadlineRawDataResponse {
   egoId: string;
+  egoName: string;
   dataset: string;
   entities: Record<string, EntityInfo>;
   topology: TopologyEntry[];
@@ -422,6 +423,7 @@ export async function getSpreadlineRawData(params: {
 
   return {
     egoId,
+    egoName: idToName[egoId],
     dataset: DATASET_NAME,
     entities,
     topology,

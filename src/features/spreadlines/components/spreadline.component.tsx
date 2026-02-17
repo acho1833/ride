@@ -79,10 +79,15 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
 
         const spreadline = new SpreadLine();
 
-        // Convert topology to library format (source/target keys)
+        // Build ID-to-name mapping from entities + ego
+        const idToName: Record<string, string> = { [rawData.egoId]: rawData.egoName };
+        for (const [id, entity] of Object.entries(rawData.entities)) {
+          idToName[id] = entity.name;
+        }
+        const nameOf = (id: string) => idToName[id] ?? id;
         const topoData = rawData.topology.map(t => ({
-          source: t.sourceId,
-          target: t.targetId,
+          source: nameOf(t.sourceId),
+          target: nameOf(t.targetId),
           time: t.time,
           weight: t.weight
         }));
@@ -90,7 +95,7 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
 
         // Convert entities map to line color array
         const lineColorData = Object.entries(rawData.entities).map(([id, entity]) => ({
-          entity: id,
+          entity: nameOf(id),
           color: SPREADLINE_CATEGORY_COLORS[entity.category] ?? SPREADLINE_CATEGORY_COLORS.external
         }));
         spreadline.load(lineColorData, { entity: 'entity', color: 'color' }, 'line');
@@ -99,14 +104,20 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
         const nodeContextData: { entity: string; time: string; context: number }[] = [];
         for (const [id, entity] of Object.entries(rawData.entities)) {
           for (const [time, count] of Object.entries(entity.citations)) {
-            nodeContextData.push({ entity: id, time, context: count });
+            nodeContextData.push({ entity: nameOf(id), time, context: count });
           }
         }
         if (nodeContextData.length > 0) {
           spreadline.load(nodeContextData, { time: 'time', entity: 'entity', context: 'context' }, 'node');
         }
 
-        spreadline.center(rawData.egoId, undefined, rawData.config.timeDelta, rawData.config.timeFormat, rawData.groups);
+        // Convert group IDs to names
+        const namedGroups: Record<string, string[][]> = {};
+        for (const [time, groups] of Object.entries(rawData.groups)) {
+          namedGroups[time] = groups.map(group => group.map(id => nameOf(id)));
+        }
+
+        spreadline.center(nameOf(rawData.egoId), undefined, rawData.config.timeDelta, rawData.config.timeFormat, namedGroups);
         spreadline.configure({
           squeezeSameCategory: rawData.config.squeezeSameCategory,
           minimize: rawData.config.minimize as 'space' | 'line' | 'wiggles'
