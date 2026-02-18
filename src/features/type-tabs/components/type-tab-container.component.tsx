@@ -31,16 +31,10 @@ const TypeTabContainer = ({ pos }: Props) => {
         {/* Tab content */}
         <div className="min-h-0 flex-1 overflow-hidden">
           {activeTab ? (
-            activeTab.type === 'SPREADLINE' ? (
-              <div className="h-full">
-                <TypeTabContent tab={activeTab} />
-              </div>
-            ) : (
-              <ScrollArea className="h-full" type="hover">
-                <TypeTabContent tab={activeTab} />
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            )
+            <ScrollArea className="h-full" type="hover">
+              <TypeTabContent tab={activeTab} />
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           ) : (
             <div className="bg-background flex h-full items-center justify-center">
               <div className="text-center">

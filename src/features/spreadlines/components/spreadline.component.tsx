@@ -32,11 +32,11 @@ import {
 import { Button } from '@/components/ui/button';
 
 interface Props {
-  workspaceId: string;
-  workspaceName: string;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
-const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
+const SpreadlineComponent = ({}: Props) => {
   const {
     data: rawData,
     isPending,

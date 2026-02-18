@@ -5,8 +5,7 @@
  */
 
 import React from 'react';
-import { DashboardData, SpreadlineData, Tab } from '@/stores/type-tabs/type-tabs.store';
-import SpreadlineComponent from '@/features/spreadlines/components/spreadline.component';
+import { DashboardData, Tab } from '@/stores/type-tabs/type-tabs.store';
 import DashboardComponent from '@/features/dashboard/components/dashboard.component';
 
 interface Props {
@@ -20,11 +19,6 @@ interface Props {
 const TypeTabContent = ({ tab }: Props) => {
   // Route to appropriate component based on type
   switch (tab.type) {
-    case 'SPREADLINE': {
-      const spreadlineData = tab.data as SpreadlineData;
-      return <SpreadlineComponent workspaceId={spreadlineData.workspaceId} workspaceName={spreadlineData.workspaceName} />;
-    }
-
     case 'DASHBOARD': {
       const data = tab.data as DashboardData;
       return <DashboardComponent workspaceId={data.workspaceId} workspaceName={data.workspaceName} />;

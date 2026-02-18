@@ -23,7 +23,8 @@ import {
 } from '@/stores/workspace-graph/workspace-graph.selector';
 import { useIsEditorGroupFocused, useUiActions } from '@/stores/ui/ui.selector';
 import { useTypeTabActions } from '@/stores/type-tabs/type-tabs.selector';
-import type { DashboardData, SpreadlineData } from '@/stores/type-tabs/type-tabs.store';
+import type { DashboardData } from '@/stores/type-tabs/type-tabs.store';
+import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
 import { useHighlightedEntityIds, usePatternSearchActions } from '@/stores/pattern-search/pattern-search.selector';
 import { toast } from 'sonner';
 import WorkspaceGraphComponent from './workspace-graph.component';
@@ -71,6 +72,7 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   const isEditorGroupFocused = useIsEditorGroupFocused(groupId);
   const { setFocusedPanel, toggleToolbar } = useUiActions();
   const { openChartTab } = useTypeTabActions();
+  const { openNewFile } = useOpenFilesActions();
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -344,15 +346,11 @@ const WorkspaceComponent = ({ workspaceId, groupId }: Props) => {
   }, [workspaceId, workspace?.name, openChartTab, toggleToolbar]);
 
   const handleSpreadline = useCallback(() => {
-    const tab = {
+    openNewFile({
       id: `spreadline-${workspaceId}`,
-      name: `Spreadline: ${workspace?.name ?? 'Workspace'}`,
-      type: 'SPREADLINE' as const,
-      data: { workspaceId, workspaceName: workspace?.name ?? 'Workspace' } satisfies SpreadlineData
-    };
-    openChartTab(tab);
-    toggleToolbar('bottom', 'CHARTS', true);
-  }, [workspaceId, workspace?.name, openChartTab, toggleToolbar]);
+      name: `Spreadline: ${workspace?.name ?? 'Workspace'}.sl`
+    });
+  }, [workspaceId, workspace?.name, openNewFile]);
 
   const handleContextMenuClose = useCallback(() => {
     setContextMenuPosition(null);
