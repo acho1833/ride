@@ -6,7 +6,7 @@
 
 import TextComponent from '@/features/text/components/text.component';
 import WorkspaceComponent from '@/features/workspace/components/workspace.component';
-import CollaborationGraphComponent from '@/features/collaboration-graph/components/collaboration-graph.component';
+import NetworkTimelineComponent from '@/features/network-timeline/components/network-timeline.component';
 
 interface Props {
   fileId: string;
@@ -44,8 +44,8 @@ const EditorContentComponent = ({ fileId, fileName, metadata, groupId }: Props) 
       return <WorkspaceComponent workspaceId={workspaceId} groupId={groupId} />;
     }
 
-    case 'gx':
-      return <CollaborationGraphComponent fileId={fileId} fileName={fileName} />;
+    case 'nt':
+      return <NetworkTimelineComponent fileId={fileId} fileName={fileName} />;
 
     case 'txt':
       return <TextComponent fileId={fileId} fileName={fileName} />;

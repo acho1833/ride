@@ -1,7 +1,7 @@
 /**
- * Collaboration Graph Constants
+ * Network Timeline Constants
  *
- * Configuration for the .gx visualization.
+ * Configuration for the .nt visualization.
  */
 
 import type { ColorTier } from './types';

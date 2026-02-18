@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Collaboration Timeline Component
+ * Network Timeline Chart Component
  *
  * Displays collaboration timelines for selected nodes.
  * Shows years on x-axis, one row per selected collaborator.
@@ -19,7 +19,7 @@ interface Props {
   yearRange: [number, number];
 }
 
-const CollaborationTimelineComponent = ({ selectedIds, collaborators, yearRange }: Props) => {
+const NetworkTimelineChartComponent = ({ selectedIds, collaborators, yearRange }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -148,4 +148,4 @@ const CollaborationTimelineComponent = ({ selectedIds, collaborators, yearRange 
   );
 };
 
-export default CollaborationTimelineComponent;
+export default NetworkTimelineChartComponent;

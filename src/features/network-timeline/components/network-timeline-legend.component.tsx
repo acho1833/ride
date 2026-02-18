@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * Collaboration Legend Component
+ * Network Timeline Legend Component
  *
  * Displays the 5-tier color legend for collaboration frequency.
  */
 
 import { COLOR_TIERS } from '../const';
 
-const CollaborationLegendComponent = () => {
+const NetworkTimelineLegendComponent = () => {
   return (
     <div className="flex items-center gap-4 px-4 py-2">
       <span className="text-muted-foreground text-sm font-medium">Collaborations:</span>
@@ -24,4 +24,4 @@ const CollaborationLegendComponent = () => {
   );
 };
 
-export default CollaborationLegendComponent;
+export default NetworkTimelineLegendComponent;

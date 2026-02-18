@@ -1,7 +1,7 @@
 /**
- * Collaboration Graph Types
+ * Network Timeline Types
  *
- * Type definitions for the .gx collaboration network visualization.
+ * Type definitions for the .nt network timeline visualization.
  */
 
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
@@ -39,7 +39,7 @@ export interface Connection {
 }
 
 /**
- * Complete .gx file data structure.
+ * Complete .nt file data structure.
  */
 export interface CollaborationData {
   target: Target;

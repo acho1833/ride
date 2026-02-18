@@ -1,5 +1,5 @@
 /**
- * Collaboration Graph Utilities
+ * Network Timeline Utilities
  *
  * Helper functions and demo data generation.
  */

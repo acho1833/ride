@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Collaboration Graph Component
+ * Network Timeline Component
  *
- * D3.js force-directed graph for .gx files.
+ * D3.js force-directed graph for .nt files.
  * Shows collaboration network with timeline panel.
  */
 
@@ -14,8 +14,8 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { GRAPH_CONFIG, TARGET_COLOR, SELECTION_COLOR, SELECTION_RING_WIDTH } from '../const';
 import { generateDemoData, transformToGraph, getTierColor, getYearRange } from '../utils';
-import CollaborationLegendComponent from './collaboration-legend.component';
-import CollaborationTimelineComponent from './collaboration-timeline.component';
+import NetworkTimelineLegendComponent from './network-timeline-legend.component';
+import NetworkTimelineChartComponent from './network-timeline-chart.component';
 import type { CollaborationNode, CollaborationLink, CollaborationData } from '../types';
 
 interface Props {
@@ -23,7 +23,7 @@ interface Props {
   fileName: string;
 }
 
-const CollaborationGraphComponent = ({ fileId }: Props) => {
+const NetworkTimelineComponent = ({ fileId }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -328,7 +328,7 @@ const CollaborationGraphComponent = ({ fileId }: Props) => {
     <div ref={containerRef} className="flex h-full w-full flex-col overflow-hidden">
       {/* Legend */}
       <div className="shrink-0 border-b">
-        <CollaborationLegendComponent />
+        <NetworkTimelineLegendComponent />
       </div>
 
       {/* Resizable Graph and Timeline */}
@@ -358,7 +358,7 @@ const CollaborationGraphComponent = ({ fileId }: Props) => {
         {/* Timeline Panel */}
         <ResizablePanel defaultSize={30} minSize={15}>
           <div className="h-full w-full overflow-hidden">
-            <CollaborationTimelineComponent selectedIds={selectedIds} collaborators={data.collaborators} yearRange={yearRange} />
+            <NetworkTimelineChartComponent selectedIds={selectedIds} collaborators={data.collaborators} yearRange={yearRange} />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -366,4 +366,4 @@ const CollaborationGraphComponent = ({ fileId }: Props) => {
   );
 };
 
-export default CollaborationGraphComponent;
+export default NetworkTimelineComponent;

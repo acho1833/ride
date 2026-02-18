@@ -19,7 +19,7 @@ export const IS_DEV = process.env.NODE_ENV === 'development';
  */
 export const FILE_APPLICATIONS = [
   { id: 'workspace', label: 'Workspace', extension: '.ws', iconName: 'Share2' },
-  { id: 'collaboration', label: 'Collaboration Graph', extension: '.gx', iconName: 'Users' },
+  { id: 'networkTimeline', label: 'Network Timeline', extension: '.nt', iconName: 'Users' },
   { id: 'text', label: 'Text Editor', extension: '.txt', iconName: 'File' }
 ] as const;
 
