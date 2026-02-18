@@ -19,12 +19,16 @@ import { transformSpreadlineToGraph } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
 
 /** Ego node uses the selected color to visually distinguish it */
+/** Ego node uses the selected color to visually distinguish it */
 const EGO_NODE_COLOR = GRAPH_CONFIG.nodeColorSelected;
+/** Ego node is 50% larger than regular nodes */
+const EGO_SCALE = 1.5;
 
 const SpreadlineGraphComponent = () => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const nodesRef = useRef<SpreadlineGraphNode[]>([]);
+  const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // Fetch data (same query as SpreadlineComponent — React Query deduplicates)
@@ -70,8 +74,25 @@ const SpreadlineGraphComponent = () => {
 
     svg.selectAll('*').remove();
 
-    // Dot grid background pattern (matching .ws style)
+    // SVG defs: dot grid pattern + ego glow filter
     const defs = svg.append('defs');
+
+    // Glow filter for ego node
+    const glow = defs
+      .append('filter')
+      .attr('id', 'sl-ego-glow')
+      .attr('x', '-50%')
+      .attr('y', '-50%')
+      .attr('width', '200%')
+      .attr('height', '200%');
+    glow
+      .append('feDropShadow')
+      .attr('dx', 0)
+      .attr('dy', 0)
+      .attr('stdDeviation', 6)
+      .attr('flood-color', EGO_NODE_COLOR)
+      .attr('flood-opacity', 0.6);
+
     defs
       .append('pattern')
       .attr('id', 'sl-dot-grid-pattern')
@@ -96,8 +117,12 @@ const SpreadlineGraphComponent = () => {
       .attr('fill', 'url(#sl-dot-grid-pattern)')
       .attr('pointer-events', 'none');
 
-    // Deep copy data
-    const nodes: SpreadlineGraphNode[] = graphData.nodes.map(n => ({ ...n }));
+    // Deep copy data — restore positions from previous render (survives resize)
+    const prevNodesMap = new Map(nodesRef.current.map(n => [n.id, n]));
+    const nodes: SpreadlineGraphNode[] = graphData.nodes.map(n => {
+      const prev = prevNodesMap.get(n.id);
+      return { ...n, x: prev?.x ?? n.x, y: prev?.y ?? n.y };
+    });
     const links: SpreadlineGraphLink[] = graphData.links.map(l => ({ ...l }));
 
     // Setup zoom (Ctrl key required)
@@ -114,6 +139,7 @@ const SpreadlineGraphComponent = () => {
       })
       .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
         g.attr('transform', event.transform.toString());
+        transformRef.current = event.transform;
       });
 
     svg.call(zoom);
@@ -150,36 +176,39 @@ const SpreadlineGraphComponent = () => {
       .join('g')
       .attr('cursor', 'pointer');
 
-    // Rounded rectangle (matching .ws style)
+    // Rounded rectangle — ego node is larger with a glow
     node
       .append('rect')
-      .attr('x', -GRAPH_CONFIG.nodeRadius)
-      .attr('y', -GRAPH_CONFIG.nodeRadius)
-      .attr('width', GRAPH_CONFIG.nodeRadius * 2)
-      .attr('height', GRAPH_CONFIG.nodeRadius * 2)
+      .attr('x', d => -(d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius))
+      .attr('y', d => -(d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius))
+      .attr('width', d => (d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius) * 2)
+      .attr('height', d => (d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius) * 2)
       .attr('rx', GRAPH_CONFIG.nodeRectRadius)
       .attr('ry', GRAPH_CONFIG.nodeRectRadius)
       .attr('fill', d => (d.isEgo ? EGO_NODE_COLOR : GRAPH_CONFIG.nodeColor))
       .attr('stroke', GRAPH_CONFIG.linkStroke)
-      .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth);
+      .attr('stroke-width', d => (d.isEgo ? 3 : GRAPH_CONFIG.linkStrokeWidth))
+      .attr('filter', d => (d.isEgo ? 'url(#sl-ego-glow)' : null));
 
     // Person icon inside node (uses global EntityIconProvider symbols)
     node
       .append('use')
       .attr('href', '#entity-icon-Person')
-      .attr('x', -GRAPH_CONFIG.iconSize / 2)
-      .attr('y', -GRAPH_CONFIG.iconSize / 2)
-      .attr('width', GRAPH_CONFIG.iconSize)
-      .attr('height', GRAPH_CONFIG.iconSize)
+      .attr('x', d => -(d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize) / 2)
+      .attr('y', d => -(d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize) / 2)
+      .attr('width', d => (d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize))
+      .attr('height', d => (d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize))
       .attr('fill', 'white');
 
-    // Name label below node (white text, 12px, matching .ws style)
+    // Name label below node — ego gets bold + slightly larger font
+    const r = GRAPH_CONFIG.nodeRadius;
     node
       .append('text')
       .attr('text-anchor', 'middle')
-      .attr('dy', GRAPH_CONFIG.nodeRadius + GRAPH_CONFIG.labelOffsetY)
+      .attr('dy', d => (d.isEgo ? r * EGO_SCALE : r) + GRAPH_CONFIG.labelOffsetY)
       .attr('fill', 'white')
-      .attr('font-size', '12px')
+      .attr('font-size', d => (d.isEgo ? '14px' : '12px'))
+      .attr('font-weight', d => (d.isEgo ? '600' : 'normal'))
       .attr('pointer-events', 'none')
       .text(d => d.name);
 
@@ -195,25 +224,38 @@ const SpreadlineGraphComponent = () => {
       )
       .force('charge', d3.forceManyBody().strength(GRAPH_CONFIG.chargeStrength))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(GRAPH_CONFIG.nodeRadius + GRAPH_CONFIG.collisionPadding));
+      .force(
+        'collision',
+        d3
+          .forceCollide<SpreadlineGraphNode>()
+          .radius(d => (d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius) + GRAPH_CONFIG.collisionPadding)
+      );
 
-    // Run simulation synchronously
+    // Run simulation only on first layout (not on resize rebuilds)
     simulation.stop();
-    for (let i = 0; i < GRAPH_CONFIG.initialLayoutTicks; i++) {
-      simulation.tick();
+    const hasExistingPositions = prevNodesMap.size > 0;
+    if (!hasExistingPositions) {
+      for (let i = 0; i < GRAPH_CONFIG.initialLayoutTicks; i++) {
+        simulation.tick();
+      }
     }
 
     nodesRef.current = nodes;
 
-    // Center the graph
-    const xExtent = d3.extent(nodes, d => d.x) as [number, number];
-    const yExtent = d3.extent(nodes, d => d.y) as [number, number];
-    const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
-    const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
-    const translateX = width / 2 - graphCenterX;
-    const translateY = height / 2 - graphCenterY;
+    // Apply transform: prefer in-memory transform (survives resize) over fresh centering
+    const hasInMemoryTransform = transformRef.current !== d3.zoomIdentity;
+    const initialTransform = hasInMemoryTransform
+      ? transformRef.current
+      : (() => {
+          const xExt = d3.extent(nodes, d => d.x) as [number, number];
+          const yExt = d3.extent(nodes, d => d.y) as [number, number];
+          const cx = (xExt[0] + xExt[1]) / 2;
+          const cy = (yExt[0] + yExt[1]) / 2;
+          return d3.zoomIdentity.translate(width / 2 - cx, height / 2 - cy).scale(1);
+        })();
 
-    svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(1));
+    transformRef.current = initialTransform;
+    svg.call(zoom.transform, initialTransform);
 
     // Set positions
     link
