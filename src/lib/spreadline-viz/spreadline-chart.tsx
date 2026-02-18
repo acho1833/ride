@@ -195,7 +195,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     if (w && h) {
       svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
       svg.setAttribute('width', '100%');
-      svg.removeAttribute('height');
+      svg.setAttribute('height', '100%');
       svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     }
 
@@ -288,10 +288,10 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   }, []);
 
   return (
-    <div ref={containerRef} className={`spreadline-chart relative ${className}`} style={{ position: 'relative' }}>
+    <div ref={containerRef} className={`spreadline-chart relative h-full w-full ${className}`}>
       <svg
         ref={svgRef}
-        className="spreadline-svg"
+        className="spreadline-svg h-full w-full"
         style={{
           overflow: 'hidden',
           fontFamily: 'system-ui, -apple-system, sans-serif'

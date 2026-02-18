@@ -30,19 +30,25 @@ const TypeTabContainer = ({ pos }: Props) => {
 
         {/* Tab content */}
         <div className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full" type="hover">
-            {activeTab ? (
-              <TypeTabContent tab={activeTab} />
-            ) : (
-              <div className="bg-background flex h-full items-center justify-center">
-                <div className="text-center">
-                  <h2 className="text-muted-foreground text-lg font-medium">No Chart Open</h2>
-                  <p className="text-muted-foreground mt-2 text-sm">Open a chart tab to get started</p>
-                </div>
+          {activeTab ? (
+            activeTab.type === 'SPREADLINE' ? (
+              <div className="h-full">
+                <TypeTabContent tab={activeTab} />
               </div>
-            )}
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+            ) : (
+              <ScrollArea className="h-full" type="hover">
+                <TypeTabContent tab={activeTab} />
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            )
+          ) : (
+            <div className="bg-background flex h-full items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-muted-foreground text-lg font-medium">No Chart Open</h2>
+                <p className="text-muted-foreground mt-2 text-sm">Open a chart tab to get started</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </MainPanelsComponent>

@@ -50,7 +50,6 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
   const [computing, setComputing] = useState(false);
   const [computeError, setComputeError] = useState<string | null>(null);
-  const [computeTime, setComputeTime] = useState<number | null>(null);
 
   // Filter state
   const [yearsFilter, setYearsFilter] = useState(1);
@@ -64,13 +63,6 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
     setZoomLevel(level);
   }, []);
 
-  const handleRefresh = useCallback(() => {
-    setResetKey(k => k + 1);
-    setYearsFilter(1);
-    setCrossingOnly(false);
-    setZoomLevel(100);
-  }, []);
-
   // Compute SpreadLine layout when raw data arrives
   useEffect(() => {
     if (!rawData) return;
@@ -79,8 +71,6 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
       if (!rawData) return;
       try {
         setComputing(true);
-        const startTime = performance.now();
-
         const spreadline = new SpreadLine();
 
         // Build ID-to-name mapping from entities + ego
@@ -142,7 +132,6 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
         const dynamicWidth = numTimestamps * minWidthPerTimestamp;
 
         const result = spreadline.fit(dynamicWidth, SPREADLINE_CHART_HEIGHT);
-        setComputeTime(performance.now() - startTime);
         setComputedData({ ...result, mode: 'author', reference: [] } as SpreadLineData);
       } catch (err) {
         console.error('SpreadLine layout error:', err);
@@ -204,7 +193,6 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
       <div className="bg-background border-border flex shrink-0 items-center gap-4 border-b px-3 py-1.5 text-xs">
         <span className="text-muted-foreground">
           {computedData.storylines.length} entities | {computedData.blocks.length} blocks | Ego: {computedData.ego}
-          {computeTime && <span className="text-primary ml-1">({computeTime.toFixed(0)}ms)</span>}
         </span>
         <div className="flex items-center gap-2">
           <input
@@ -222,9 +210,6 @@ const SpreadlineComponent = ({ workspaceId, workspaceName }: Props) => {
           <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
           <label className="text-muted-foreground">Crossing only</label>
         </div>
-        <button onClick={handleRefresh} className="text-muted-foreground hover:text-foreground ml-auto">
-          Refresh
-        </button>
       </div>
 
       {/* Chart with d3-zoom */}
