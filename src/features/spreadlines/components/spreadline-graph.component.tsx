@@ -108,6 +108,10 @@ const SpreadlineGraphComponent = () => {
         if (!event) return true;
         return (event as KeyboardEvent).ctrlKey || (event as MouseEvent).ctrlKey;
       })
+      .wheelDelta((event: WheelEvent) => {
+        const direction = event.deltaY > 0 ? -1 : 1;
+        return direction * Math.log(GRAPH_CONFIG.zoomStep);
+      })
       .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
         g.attr('transform', event.transform.toString());
       });
