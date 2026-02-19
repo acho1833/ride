@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Minus, Plus, Maximize } from 'lucide-react';
+import { Minus, Plus, Maximize, X } from 'lucide-react';
 import type { SpreadLineData } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-chart';
@@ -35,12 +35,13 @@ interface Props {
   workspaceId?: string;
   workspaceName?: string;
   highlightTimes?: string[];
+  pinnedEntityNames?: string[];
   onTimeClick?: (timeLabel: string) => void;
   onHighlightRangeChange?: (startLabel: string, endLabel: string) => void;
   onEntityPin?: (names: string[]) => void;
 }
 
-const SpreadlineComponent = ({ highlightTimes, onTimeClick, onHighlightRangeChange, onEntityPin }: Props) => {
+const SpreadlineComponent = ({ highlightTimes, pinnedEntityNames = [], onTimeClick, onHighlightRangeChange, onEntityPin }: Props) => {
   const {
     data: rawData,
     isPending,
@@ -214,6 +215,16 @@ const SpreadlineComponent = ({ highlightTimes, onTimeClick, onHighlightRangeChan
           <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
           <label className="text-muted-foreground">Crossing only</label>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto h-6 gap-1 px-2 text-xs"
+          disabled={pinnedEntityNames.length === 0}
+          onClick={() => chartRef.current?.clearPins()}
+        >
+          <X className="h-3 w-3" />
+          Clear
+        </Button>
       </div>
 
       {/* Chart with d3-zoom */}

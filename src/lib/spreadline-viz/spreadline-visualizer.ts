@@ -1467,6 +1467,23 @@ export class SpreadLinesVisualizer {
     }
   };
 
+  /** Clear all pinned entities and reset their visual styles */
+  clearPins(): void {
+    for (const name of [...this.members.pinned]) {
+      const storyline = this.storylines.find(s => s.name === name);
+      if (!storyline) continue;
+      // Reset visual styles
+      d3.selectAll(`.line-${storyline.id}.path-movable`).style('stroke', null).style('stroke-width', null);
+      d3.selectAll(`.line-${storyline.id}.marks`).style('fill', null);
+      const labelEl = d3.select(document.getElementById(`label-${name}`));
+      labelEl.attr('pin', '0');
+      labelEl.selectAll('text.labels').style('fill', null);
+      labelEl.select('.mark-links').style('stroke', null);
+    }
+    this.members.pinned = [];
+    this.onEntityPin?.([]);
+  }
+
   // ============================================
   // Brush
   // ============================================

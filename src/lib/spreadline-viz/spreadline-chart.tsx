@@ -51,6 +51,7 @@ export interface SpreadLineChartHandle {
   zoomOut: () => void;
   zoomToFit: () => void;
   getZoomLevel: () => number;
+  clearPins: () => void;
 }
 
 interface SpreadLineChartProps {
@@ -186,7 +187,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         if (!svg || !zoom) return;
         d3.select(svg).transition().duration(ZOOM_TRANSITION_MS).call(zoom.transform, d3.zoomIdentity);
       },
-      getZoomLevel: () => Math.round(zoomTransformRef.current.k * 100)
+      getZoomLevel: () => Math.round(zoomTransformRef.current.k * 100),
+      clearPins: () => visualizerRef.current?.clearPins()
     }),
     []
   );

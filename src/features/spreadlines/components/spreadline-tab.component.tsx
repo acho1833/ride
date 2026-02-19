@@ -88,6 +88,7 @@ const SpreadlineTabComponent = (_props: Props) => {
           <div className="h-full w-full overflow-hidden">
             <SpreadlineComponent
               highlightTimes={selectedTimes}
+              pinnedEntityNames={pinnedEntityNames}
               onTimeClick={handleTimeClick}
               onHighlightRangeChange={handleHighlightRangeChange}
               onEntityPin={setPinnedEntityNames}
