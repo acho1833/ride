@@ -152,6 +152,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
   const simulationRef = useRef<d3.Simulation<SpreadlineGraphNode, SpreadlineGraphLink> | null>(null);
   const nodeLinkMapRef = useRef<Map<string, SVGLineElement[]>>(new Map());
   const nodeRegistryRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const settledNodeIdsRef = useRef<Set<string>>(new Set());
 
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
@@ -313,12 +314,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
       return { ...n };
     });
 
-    const enteringIds = new Set<string>();
-    for (const n of nodes) {
-      if (!prevNodesMap.has(n.id) && !registry.has(n.id)) {
-        enteringIds.add(n.id);
-      }
-    }
+    const settled = settledNodeIdsRef.current;
 
     const links: SpreadlineGraphLink[] = graphData.links.map(l => ({ ...l }));
 
@@ -507,16 +503,16 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
 
     // Run simulation
     simulation.stop();
-    if (isFirstRender) {
-      // Pin ego to center
-      for (const n of nodes) {
-        if (n.isEgo) {
-          n.fx = width / 2;
-          n.fy = height / 2;
-          break;
-        }
+    // Pin ego to center on all renders
+    for (const n of nodes) {
+      if (n.isEgo) {
+        n.fx = width / 2;
+        n.fy = height / 2;
+        break;
       }
+    }
 
+    if (isFirstRender) {
       // First render: synchronous layout
       for (let i = 0; i < GRAPH_CONFIG.initialLayoutTicks; i++) {
         simulation.tick();
@@ -529,6 +525,11 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
         .attr('x2', d => (d.target as SpreadlineGraphNode).x ?? 0)
         .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
       nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+
+      // Mark all initial nodes as settled
+      for (const n of nodes) {
+        settled.add(n.id);
+      }
 
       // Auto-center on first render
       if (transformRef.current === d3.zoomIdentity) {
@@ -543,22 +544,15 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
         }
       }
     } else {
-      // Pin ego to center, fix persisting/returning in place, position new nodes near ego
+      // Unsettled nodes (new or interrupted mid-animation) spawn near ego
       for (const n of nodes) {
-        if (n.isEgo) {
-          n.fx = width / 2;
-          n.fy = height / 2;
-        } else if (enteringIds.has(n.id)) {
+        if (!n.isEgo && !settled.has(n.id)) {
           n.x = spawnX + (Math.random() - 0.5) * 40;
           n.y = spawnY + (Math.random() - 0.5) * 40;
-        } else {
-          // Persisting or returning — hold position, collision only
-          n.fx = n.x;
-          n.fy = n.y;
         }
       }
 
-      // Animated simulation — only entering nodes get full forces
+      // Animated simulation — settled nodes keep positions, unsettled get full forces
       simulation
         .alpha(0.5)
         .alphaDecay(0.05)
@@ -571,15 +565,9 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
           nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
         })
         .on('end', () => {
-          // Release fx/fy on non-ego nodes so future collision nudges work
+          // Mark all current nodes as settled and update registry
           for (const n of nodes) {
-            if (!n.isEgo) {
-              n.fx = null;
-              n.fy = null;
-            }
-          }
-          // Update registry with final settled positions
-          for (const n of nodes) {
+            settled.add(n.id);
             if (n.x != null && n.y != null) {
               registry.set(n.id, { x: n.x, y: n.y });
             }
