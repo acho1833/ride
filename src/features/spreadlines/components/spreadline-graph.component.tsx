@@ -348,7 +348,9 @@ const SpreadlineGraphComponent = ({ selectedTimes = [] }: Props) => {
 
     nodeEnter.transition().duration(GRAPH_TIME_TRANSITION_MS).style('opacity', 1);
 
-    // Update existing nodes — update fill color for category changes
+    // Update existing nodes — ensure fully visible (interrupt any in-progress enter fade)
+    // and update fill color for category changes
+    nodeJoin.interrupt().style('opacity', 1);
     nodeJoin.select('rect').transition().duration(GRAPH_TIME_TRANSITION_MS).attr('fill', getNodeFill);
 
     // Merge
