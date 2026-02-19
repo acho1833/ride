@@ -316,6 +316,9 @@ class Renderer {
       bandStart[idx] = bandStart[idx - 1] + step + additional;
     }
 
+    // Reverse positions so newest time appears on the left (descending order)
+    bandStart.reverse();
+
     const bands: [number, number][] = bandStart.map(s => [s, s + bandwidth]);
 
     let blockWeight = 0.6;

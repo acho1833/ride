@@ -358,8 +358,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     const heightExtent = data.heightExtents[1] - data.heightExtents[0];
     const barY = data.heightExtents[0] - 20;
     const barHeight = heightExtent + 40;
-    const barX = firstLabel.posX - bandWidth / 2;
-    const barWidth = lastLabel.posX - firstLabel.posX + bandWidth;
+    const barX = Math.min(firstLabel.posX, lastLabel.posX) - bandWidth / 2;
+    const barWidth = Math.abs(lastLabel.posX - firstLabel.posX) + bandWidth;
 
     // Track current label indices during drag
     let currentStartIdx = data.timeLabels.findIndex(t => t.label === highlightTimes[0]);
@@ -383,8 +383,10 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
 
     // Update bar and handle positions from current indices
     const updateVisuals = () => {
-      const startX = data.timeLabels[currentStartIdx].posX - bandWidth / 2;
-      const endX = data.timeLabels[currentEndIdx].posX + bandWidth / 2;
+      const posX1 = data.timeLabels[currentStartIdx].posX;
+      const posX2 = data.timeLabels[currentEndIdx].posX;
+      const startX = Math.min(posX1, posX2) - bandWidth / 2;
+      const endX = Math.max(posX1, posX2) + bandWidth / 2;
       const width = endX - startX;
       storylineContainer.select('.time-highlight-bar').attr('x', startX).attr('width', width);
       storylineContainer.select('.time-highlight-handle-left').attr('x', startX - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2);

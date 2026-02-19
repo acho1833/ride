@@ -86,11 +86,11 @@ export function transformSpreadlineToGraph(rawData: {
 }
 
 /**
- * Extract sorted unique time blocks from topology data.
+ * Extract unique time blocks from topology data, sorted descending (newest first).
  */
 export function getTimeBlocks(rawData: { topology: { time: string }[] }): string[] {
   const times = [...new Set(rawData.topology.map(t => t.time))];
-  return times.sort((a, b) => a.localeCompare(b));
+  return times.sort((a, b) => b.localeCompare(a));
 }
 
 /**
