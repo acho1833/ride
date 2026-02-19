@@ -151,6 +151,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
   const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const simulationRef = useRef<d3.Simulation<SpreadlineGraphNode, SpreadlineGraphLink> | null>(null);
   const nodeLinkMapRef = useRef<Map<string, SVGLineElement[]>>(new Map());
+  const nodeRegistryRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
@@ -301,12 +302,24 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     const graphData =
       selectedTimes.length === 0 ? transformSpreadlineToGraph(rawData) : transformSpreadlineToGraphByTimes(rawData, selectedTimes);
 
-    // Preserve positions from existing nodes
+    // Preserve positions from existing nodes or registry
     const prevNodesMap = new Map(nodesRef.current.map(n => [n.id, n]));
+    const registry = nodeRegistryRef.current;
     const nodes: SpreadlineGraphNode[] = graphData.nodes.map(n => {
       const prev = prevNodesMap.get(n.id);
-      return { ...n, x: prev?.x ?? n.x, y: prev?.y ?? n.y };
+      if (prev) return { ...n, x: prev.x, y: prev.y };
+      const reg = registry.get(n.id);
+      if (reg) return { ...n, x: reg.x, y: reg.y };
+      return { ...n };
     });
+
+    const enteringIds = new Set<string>();
+    for (const n of nodes) {
+      if (!prevNodesMap.has(n.id) && !registry.has(n.id)) {
+        enteringIds.add(n.id);
+      }
+    }
+
     const links: SpreadlineGraphLink[] = graphData.links.map(l => ({ ...l }));
 
     const isFirstRender = prevNodesMap.size === 0;
@@ -321,8 +334,18 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
         return [srcId, tgtId].sort().join('::');
       });
 
-    // Exit links
-    linkJoin.exit().transition().duration(GRAPH_TIME_TRANSITION_MS).attr('stroke-opacity', 0).remove();
+    // Exit links — hide in place instead of removing
+    linkJoin
+      .exit()
+      .filter(function (this: SVGLineElement) {
+        return this.style.display !== 'none';
+      })
+      .transition()
+      .duration(GRAPH_TIME_TRANSITION_MS)
+      .attr('stroke-opacity', 0)
+      .on('end', function () {
+        d3.select(this).style('display', 'none');
+      });
 
     // Enter links
     const linkEnter = linkJoin
@@ -337,23 +360,35 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     // Merge
     const linkMerged = linkEnter.merge(linkJoin);
 
+    // Returning links — unhide and fade in
+    linkJoin
+      .filter(function (this: SVGLineElement) {
+        return this.style.display === 'none';
+      })
+      .style('display', '')
+      .attr('stroke-opacity', 0)
+      .transition()
+      .duration(GRAPH_TIME_TRANSITION_MS)
+      .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
+
     // ─── D3 Data Join: Nodes ─────────────────────────────────────────
     const nodeJoin = g
       .select<SVGGElement>('.nodes')
       .selectAll<SVGGElement, SpreadlineGraphNode>('g')
       .data(nodes, (d: SpreadlineGraphNode) => d.id);
 
-    // Exit nodes
+    // Exit nodes — hide in place instead of removing
     nodeJoin
       .exit()
+      .filter(function (this: SVGGElement) {
+        return this.style.display !== 'none';
+      })
       .transition()
       .duration(GRAPH_TIME_TRANSITION_MS)
       .style('opacity', 0)
-      .attr('transform', d => {
-        const nd = d as SpreadlineGraphNode;
-        return `translate(${nd.x ?? 0},${nd.y ?? 0}) scale(0.3)`;
-      })
-      .remove();
+      .on('end', function () {
+        d3.select(this).style('display', 'none');
+      });
 
     // Enter nodes — start transparent, positioned near ego or center
     const egoNode = prevNodesMap.get(rawData.egoId);
@@ -375,10 +410,24 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
 
     nodeEnter.transition().duration(GRAPH_TIME_TRANSITION_MS).style('opacity', 1);
 
-    // Update existing nodes — ensure fully visible (interrupt any in-progress enter fade)
-    // and update fill color for category changes
+    // Persisting nodes — ensure visible, update fill.
+    // IMPORTANT: Must run BEFORE returning nodes. The interrupt() touches all update nodes,
+    // but returning nodes still have display:none here so the opacity:1 is invisible.
+    // If this ran AFTER returning, the interrupt would cancel their fade-in transition.
     nodeJoin.interrupt().style('opacity', 1);
     nodeJoin.select('rect').transition().duration(GRAPH_TIME_TRANSITION_MS).attr('fill', getNodeFill);
+
+    // Returning nodes — unhide and fade in at last known position
+    nodeJoin
+      .filter(function (this: SVGGElement) {
+        return this.style.display === 'none';
+      })
+      .style('display', '')
+      .style('opacity', 0)
+      .attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`)
+      .transition()
+      .duration(GRAPH_TIME_TRANSITION_MS)
+      .style('opacity', 1);
 
     // Merge
     const nodeMerged = nodeEnter.merge(nodeJoin);
@@ -419,8 +468,12 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
           }
         }
       })
-      .on('end', function () {
+      .on('end', function (_event, d) {
         this.setAttribute('cursor', 'pointer');
+        // Update registry so returning nodes remember drag position
+        if (d.x != null && d.y != null) {
+          nodeRegistryRef.current.set(d.id, { x: d.x, y: d.y });
+        }
       });
 
     nodeMerged.call(drag);
@@ -455,6 +508,15 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     // Run simulation
     simulation.stop();
     if (isFirstRender) {
+      // Pin ego to center
+      for (const n of nodes) {
+        if (n.isEgo) {
+          n.fx = width / 2;
+          n.fy = height / 2;
+          break;
+        }
+      }
+
       // First render: synchronous layout
       for (let i = 0; i < GRAPH_CONFIG.initialLayoutTicks; i++) {
         simulation.tick();
@@ -481,15 +543,22 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
         }
       }
     } else {
-      // Position new nodes near ego (existing nodes keep inherited positions)
+      // Pin ego to center, fix persisting/returning in place, position new nodes near ego
       for (const n of nodes) {
-        if (!prevNodesMap.has(n.id)) {
+        if (n.isEgo) {
+          n.fx = width / 2;
+          n.fy = height / 2;
+        } else if (enteringIds.has(n.id)) {
           n.x = spawnX + (Math.random() - 0.5) * 40;
           n.y = spawnY + (Math.random() - 0.5) * 40;
+        } else {
+          // Persisting or returning — hold position, collision only
+          n.fx = n.x;
+          n.fy = n.y;
         }
       }
 
-      // Animated simulation — all nodes free to move so hop forces take effect
+      // Animated simulation — only entering nodes get full forces
       simulation
         .alpha(0.5)
         .alphaDecay(0.05)
@@ -501,10 +570,34 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
             .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
           nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
         })
+        .on('end', () => {
+          // Release fx/fy on non-ego nodes so future collision nudges work
+          for (const n of nodes) {
+            if (!n.isEgo) {
+              n.fx = null;
+              n.fy = null;
+            }
+          }
+          // Update registry with final settled positions
+          for (const n of nodes) {
+            if (n.x != null && n.y != null) {
+              registry.set(n.id, { x: n.x, y: n.y });
+            }
+          }
+        })
         .restart();
     }
 
     nodesRef.current = nodes;
+
+    // Seed registry with current positions (covers first-render synchronous layout;
+    // animated path overwrites with final positions in simulation.on('end'))
+    for (const n of nodes) {
+      if (n.x != null && n.y != null) {
+        registry.set(n.id, { x: n.x, y: n.y });
+      }
+    }
+
     simulationRef.current = simulation;
   }, [selectedTimes, rawData, dimensions]);
 
@@ -517,10 +610,19 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     const nodes = nodesRef.current;
     const egoId = rawData.egoId;
 
+    // Filters to skip nodes/links hidden by time-range exit transitions
+    const visibleNodeFilter = function (this: SVGGElement) {
+      return this.style.display !== 'none';
+    };
+    const visibleLinkFilter = function (this: SVGLineElement) {
+      return this.style.display !== 'none';
+    };
+
     // Reset all nodes and links to default style
-    g.select('.nodes').selectAll<SVGGElement, SpreadlineGraphNode>('g').style('opacity', null);
+    g.select('.nodes').selectAll<SVGGElement, SpreadlineGraphNode>('g').filter(visibleNodeFilter).style('opacity', null);
     g.select('.nodes')
       .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .filter(visibleNodeFilter)
       .each(function (d) {
         const node = d3.select(this);
         const radius = d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius;
@@ -548,6 +650,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
       });
     g.select('.links')
       .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
+      .filter(visibleLinkFilter)
       .style('stroke', null)
       .attr('stroke', GRAPH_CONFIG.linkStroke)
       .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth)
@@ -559,6 +662,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     const currentLinks: SpreadlineGraphLink[] = [];
     g.select('.links')
       .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
+      .filter(visibleLinkFilter)
       .each(function (d) {
         currentLinks.push(d);
       });
@@ -607,6 +711,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     // Highlight path links, dim non-path links
     g.select('.links')
       .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
+      .filter(visibleLinkFilter)
       .each(function (d) {
         const s = typeof d.source === 'string' ? d.source : d.source.id;
         const t = typeof d.target === 'string' ? d.target : d.target.id;
@@ -624,12 +729,14 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     // Dim non-path nodes
     g.select('.nodes')
       .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .filter(visibleNodeFilter)
       .filter(d => !allPathNodeIds.has(d.id))
       .style('opacity', 0.25);
 
     // Style intermediate path nodes — blue fill only, keep original size
     g.select('.nodes')
       .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .filter(visibleNodeFilter)
       .filter(d => intermediateIds.has(d.id))
       .each(function () {
         d3.select(this).select('rect').transition().duration(GRAPH_TIME_TRANSITION_MS).attr('fill', EGO_NODE_COLOR);
@@ -640,6 +747,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     const egoIconSize = GRAPH_CONFIG.iconSize * EGO_SCALE;
     g.select('.nodes')
       .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .filter(visibleNodeFilter)
       .filter(d => targetNodeIds.has(d.id))
       .each(function () {
         const node = d3.select(this);
