@@ -37,9 +37,10 @@ interface Props {
   highlightTimes?: string[];
   onTimeClick?: (timeLabel: string) => void;
   onHighlightRangeChange?: (startLabel: string, endLabel: string) => void;
+  onEntityPin?: (names: string[]) => void;
 }
 
-const SpreadlineComponent = ({ highlightTimes, onTimeClick, onHighlightRangeChange }: Props) => {
+const SpreadlineComponent = ({ highlightTimes, onTimeClick, onHighlightRangeChange, onEntityPin }: Props) => {
   const {
     data: rawData,
     isPending,
@@ -229,6 +230,7 @@ const SpreadlineComponent = ({ highlightTimes, onTimeClick, onHighlightRangeChan
           highlightTimes={highlightTimes && highlightTimes.length > 0 ? highlightTimes : undefined}
           onTimeClick={onTimeClick}
           onHighlightRangeChange={onHighlightRangeChange}
+          onEntityPin={onEntityPin}
         />
 
         {/* Floating zoom controls */}

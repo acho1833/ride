@@ -26,6 +26,7 @@ interface Props {
 const SpreadlineTabComponent = (_props: Props) => {
   // Default to first year ([0,0]). Before timeBlocks load, selectedTimes will be [] = ALL mode.
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>([0, 0]);
+  const [pinnedEntityNames, setPinnedEntityNames] = useState<string[]>([]);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
@@ -77,7 +78,7 @@ const SpreadlineTabComponent = (_props: Props) => {
       <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
         {/* Graph Panel */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <SpreadlineGraphComponent selectedTimes={selectedTimes} />
+          <SpreadlineGraphComponent selectedTimes={selectedTimes} pinnedEntityNames={pinnedEntityNames} />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -89,6 +90,7 @@ const SpreadlineTabComponent = (_props: Props) => {
               highlightTimes={selectedTimes}
               onTimeClick={handleTimeClick}
               onHighlightRangeChange={handleHighlightRangeChange}
+              onEntityPin={setPinnedEntityNames}
             />
           </div>
         </ResizablePanel>

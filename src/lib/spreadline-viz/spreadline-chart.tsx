@@ -115,6 +115,9 @@ interface SpreadLineChartProps {
    * Fires on drag end with the new start and end time labels.
    */
   onHighlightRangeChange?: (startLabel: string, endLabel: string) => void;
+
+  /** Callback when pinned entities change in the chart */
+  onEntityPin?: (names: string[]) => void;
 }
 
 const ZOOM_SCALE_EXTENT: [number, number] = [0.1, 10];
@@ -134,7 +137,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     onZoomChange,
     highlightTimes,
     onTimeClick,
-    onHighlightRangeChange
+    onHighlightRangeChange,
+    onEntityPin
   },
   ref
 ) {
@@ -151,6 +155,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   const onZoomChangeRef = useCallbackRef(onZoomChange);
   const onTimeClickRef = useCallbackRef(onTimeClick);
   const onHighlightRangeChangeRef = useCallbackRef(onHighlightRangeChange);
+  const onEntityPinRef = useCallbackRef(onEntityPin);
 
   // Refs for filter values - allows D3 to access current values without triggering React re-init
   const yearsFilterRef = useValueRef(yearsFilter);
@@ -224,6 +229,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     // Set callbacks using refs so they always use the latest version
     visualizer.onBlockExpand = (blockId, expanded) => onBlockExpandRef.current?.(blockId, expanded);
     visualizer.onFilterChange = names => onFilterChangeRef.current?.(names);
+    visualizer.onEntityPin = name => onEntityPinRef.current?.(name);
 
     // Render visualization into SVG
     visualizer.visualize(svgRef.current);

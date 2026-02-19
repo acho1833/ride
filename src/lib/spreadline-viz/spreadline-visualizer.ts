@@ -77,6 +77,7 @@ export class SpreadLinesVisualizer {
   // Callbacks for React integration
   onFilterChange?: (filteredNames: string[]) => void;
   onBlockExpand?: (blockId: number, expanded: boolean) => void;
+  onEntityPin?: (names: string[]) => void;
 
   constructor(json: SpreadLineData, config?: Partial<SpreadLineConfig>) {
     this.theme = getThemeColors();
@@ -1454,6 +1455,7 @@ export class SpreadLinesVisualizer {
         labelEl.selectAll('text.labels').style('fill', null);
         labelEl.select('.mark-links').style('stroke', null);
       }
+      this.onEntityPin?.([...this.members.pinned]);
     } else {
       // Pinning — apply primary blue
       d3.selectAll(`.line-${d.id}.path-movable`).style('stroke', 'var(--primary)').style('stroke-width', '8px');
@@ -1461,6 +1463,7 @@ export class SpreadLinesVisualizer {
       const labelEl = d3.select(document.getElementById(`label-${d.name}`));
       labelEl.selectAll('text.labels').style('fill', 'var(--primary)');
       labelEl.select('.mark-links').style('stroke', 'var(--primary)');
+      this.onEntityPin?.([...this.members.pinned]);
     }
   };
 

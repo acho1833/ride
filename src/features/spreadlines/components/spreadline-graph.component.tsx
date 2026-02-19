@@ -108,11 +108,38 @@ const getRadialRadius = (d: SpreadlineGraphNode): number => {
   return GRAPH_HOP2_RADIAL_RADIUS;
 };
 
+/** BFS: compute distances from a start node to all reachable nodes */
+const bfsDistances = (startId: string, links: SpreadlineGraphLink[]): Map<string, number> => {
+  const adj = new Map<string, string[]>();
+  for (const link of links) {
+    const s = typeof link.source === 'string' ? link.source : link.source.id;
+    const t = typeof link.target === 'string' ? link.target : link.target.id;
+    if (!adj.has(s)) adj.set(s, []);
+    if (!adj.has(t)) adj.set(t, []);
+    adj.get(s)!.push(t);
+    adj.get(t)!.push(s);
+  }
+  const dist = new Map<string, number>([[startId, 0]]);
+  const queue = [startId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const d = dist.get(current)!;
+    for (const neighbor of adj.get(current) ?? []) {
+      if (!dist.has(neighbor)) {
+        dist.set(neighbor, d + 1);
+        queue.push(neighbor);
+      }
+    }
+  }
+  return dist;
+};
+
 interface Props {
   selectedTimes?: string[];
+  pinnedEntityNames?: string[];
 }
 
-const SpreadlineGraphComponent = ({ selectedTimes = [] }: Props) => {
+const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -480,6 +507,170 @@ const SpreadlineGraphComponent = ({ selectedTimes = [] }: Props) => {
     nodesRef.current = nodes;
     simulationRef.current = simulation;
   }, [selectedTimes, rawData, dimensions]);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Pin Highlight Effect — styles path from ego to pinned entity
+  // ═══════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (!gRef.current || !rawData) return;
+    const g = gRef.current;
+    const nodes = nodesRef.current;
+    const egoId = rawData.egoId;
+
+    // Reset all nodes and links to default style
+    g.select('.nodes').selectAll<SVGGElement, SpreadlineGraphNode>('g').style('opacity', null);
+    g.select('.nodes')
+      .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .each(function (d) {
+        const node = d3.select(this);
+        const radius = d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius;
+        const iconSize = d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize;
+        node
+          .select('rect')
+          .attr('x', -radius)
+          .attr('y', -radius)
+          .attr('width', radius * 2)
+          .attr('height', radius * 2)
+          .attr('fill', getNodeFill(d))
+          .attr('stroke-width', d.isEgo ? 3 : GRAPH_CONFIG.linkStrokeWidth)
+          .attr('filter', d.isEgo ? 'url(#sl-ego-glow)' : null);
+        node
+          .select('use')
+          .attr('x', -iconSize / 2)
+          .attr('y', -iconSize / 2)
+          .attr('width', iconSize)
+          .attr('height', iconSize);
+        node
+          .select('text')
+          .attr('dy', radius + GRAPH_CONFIG.labelOffsetY)
+          .attr('font-size', d.isEgo ? '14px' : '12px')
+          .attr('font-weight', d.isEgo ? '600' : 'normal');
+      });
+    g.select('.links')
+      .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
+      .style('stroke', null)
+      .attr('stroke', GRAPH_CONFIG.linkStroke)
+      .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth)
+      .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
+
+    if (pinnedEntityNames.length === 0) return;
+
+    // Collect current links from DOM
+    const currentLinks: SpreadlineGraphLink[] = [];
+    g.select('.links')
+      .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
+      .each(function (d) {
+        currentLinks.push(d);
+      });
+
+    // BFS distances from ego (computed once, shared across all targets)
+    const egoDistances = bfsDistances(egoId, currentLinks);
+
+    // For each target, include all nodes on any path (within 1 hop of shortest)
+    const allPathNodeIds = new Set<string>();
+    const allPathLinkKeys = new Set<string>();
+    const targetNodeIds = new Set<string>();
+    const intermediateIds = new Set<string>();
+
+    for (const name of pinnedEntityNames) {
+      const targetNode = nodes.find(n => n.name === name);
+      if (!targetNode) continue;
+      const shortestDist = egoDistances.get(targetNode.id);
+      if (shortestDist === undefined) continue;
+
+      targetNodeIds.add(targetNode.id);
+      const targetDistances = bfsDistances(targetNode.id, currentLinks);
+
+      // A node is on "a path" if distFromEgo + distFromTarget <= shortest + 1
+      for (const [nodeId, distFromEgo] of egoDistances) {
+        const distFromTarget = targetDistances.get(nodeId);
+        if (distFromTarget !== undefined && distFromEgo + distFromTarget <= shortestDist + 1) {
+          allPathNodeIds.add(nodeId);
+          if (nodeId !== egoId && !targetNodeIds.has(nodeId)) {
+            intermediateIds.add(nodeId);
+          }
+        }
+      }
+    }
+
+    if (allPathNodeIds.size === 0) return;
+
+    // Include links where both endpoints are path nodes
+    for (const link of currentLinks) {
+      const s = typeof link.source === 'string' ? link.source : link.source.id;
+      const t = typeof link.target === 'string' ? link.target : link.target.id;
+      if (allPathNodeIds.has(s) && allPathNodeIds.has(t)) {
+        allPathLinkKeys.add([s, t].sort().join('::'));
+      }
+    }
+
+    // Highlight path links, dim non-path links
+    g.select('.links')
+      .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
+      .each(function (d) {
+        const s = typeof d.source === 'string' ? d.source : d.source.id;
+        const t = typeof d.target === 'string' ? d.target : d.target.id;
+        const key = [s, t].sort().join('::');
+        if (allPathLinkKeys.has(key)) {
+          d3.select(this)
+            .style('stroke', 'var(--primary)')
+            .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth * 2)
+            .attr('stroke-opacity', 1);
+        } else {
+          d3.select(this).attr('stroke-opacity', 0.15);
+        }
+      });
+
+    // Dim non-path nodes
+    g.select('.nodes')
+      .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .filter(d => !allPathNodeIds.has(d.id))
+      .style('opacity', 0.25);
+
+    // Style intermediate path nodes — blue fill only, keep original size
+    g.select('.nodes')
+      .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .filter(d => intermediateIds.has(d.id))
+      .each(function () {
+        d3.select(this).select('rect').transition().duration(GRAPH_TIME_TRANSITION_MS).attr('fill', EGO_NODE_COLOR);
+      });
+
+    // Style target nodes like ego — full size + glow
+    const egoRadius = GRAPH_CONFIG.nodeRadius * EGO_SCALE;
+    const egoIconSize = GRAPH_CONFIG.iconSize * EGO_SCALE;
+    g.select('.nodes')
+      .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+      .filter(d => targetNodeIds.has(d.id))
+      .each(function () {
+        const node = d3.select(this);
+        node
+          .select('rect')
+          .transition()
+          .duration(GRAPH_TIME_TRANSITION_MS)
+          .attr('x', -egoRadius)
+          .attr('y', -egoRadius)
+          .attr('width', egoRadius * 2)
+          .attr('height', egoRadius * 2)
+          .attr('fill', EGO_NODE_COLOR)
+          .attr('stroke-width', 3)
+          .attr('filter', 'url(#sl-ego-glow)');
+        node
+          .select('use')
+          .transition()
+          .duration(GRAPH_TIME_TRANSITION_MS)
+          .attr('x', -egoIconSize / 2)
+          .attr('y', -egoIconSize / 2)
+          .attr('width', egoIconSize)
+          .attr('height', egoIconSize);
+        node
+          .select('text')
+          .transition()
+          .duration(GRAPH_TIME_TRANSITION_MS)
+          .attr('dy', egoRadius + GRAPH_CONFIG.labelOffsetY)
+          .attr('font-size', '14px')
+          .attr('font-weight', '600');
+      });
+  }, [pinnedEntityNames, rawData, selectedTimes]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // Zoom Controls
