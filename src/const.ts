@@ -21,7 +21,8 @@ export const FILE_APPLICATIONS = [
   { id: 'workspace', label: 'Workspace', extension: '.ws', iconName: 'Share2' },
   { id: 'networkTimeline', label: 'Network Timeline', extension: '.nt', iconName: 'Users' },
   { id: 'text', label: 'Text Editor', extension: '.txt', iconName: 'File' },
-  { id: 'spreadline', label: 'Spreadline', extension: '.sl', iconName: 'TrendingUp' }
+  { id: 'spreadline', label: 'Spreadline', extension: '.sl', iconName: 'TrendingUp' },
+  { id: 'spreadline2', label: 'Spreadline 2', extension: '.sl2', iconName: 'TrendingUp' }
 ] as const;
 
 export type FileApplicationId = (typeof FILE_APPLICATIONS)[number]['id'];
