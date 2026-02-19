@@ -3,19 +3,20 @@
 /**
  * Spreadline Tab Component
  *
- * Editor tab for .sl files. Shows D3 force graph on top (with time scrubber)
+ * Editor tab for .sl files. Shows D3 force graph on top
  * and SpreadLine chart on bottom in a resizable split layout.
- * Manages selectedTime state shared between graph, scrubber, and chart.
+ * Manages selectedRange state shared between graph and chart.
+ *
+ * Range state: [startIndex, endIndex] into timeBlocks, or null = ALL mode.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import { SPREADLINE_DEFAULT_EGO_ID, SPREADLINE_DEFAULT_RELATION_TYPES, SPREADLINE_DEFAULT_YEAR_RANGE } from '@/features/spreadlines/const';
 import { getTimeBlocks } from '@/features/spreadlines/utils';
 import SpreadlineGraphComponent from './spreadline-graph.component';
 import SpreadlineComponent from './spreadline.component';
-import SpreadlineScrubberComponent from './spreadline-scrubber.component';
 
 interface Props {
   fileId: string;
@@ -23,7 +24,8 @@ interface Props {
 }
 
 const SpreadlineTabComponent = (_props: Props) => {
-  const [selectedTime, setSelectedTime] = useState<string | 'ALL'>('ALL');
+  // Default to first year ([0,0]). Before timeBlocks load, selectedTimes will be [] = ALL mode.
+  const [selectedRange, setSelectedRange] = useState<[number, number] | null>([0, 0]);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
@@ -33,17 +35,49 @@ const SpreadlineTabComponent = (_props: Props) => {
 
   const timeBlocks = useMemo(() => (rawData ? getTimeBlocks(rawData) : []), [rawData]);
 
+  // Derive selected time strings from range indices
+  const selectedTimes = useMemo(
+    () => (selectedRange ? timeBlocks.slice(selectedRange[0], selectedRange[1] + 1) : []),
+    [selectedRange, timeBlocks]
+  );
+
+  // Update range when highlight bar handles are dragged on spreadline chart
+  const handleHighlightRangeChange = useCallback(
+    (startLabel: string, endLabel: string) => {
+      const startIdx = timeBlocks.indexOf(startLabel);
+      const endIdx = timeBlocks.indexOf(endLabel);
+      if (startIdx !== -1 && endIdx !== -1) {
+        setSelectedRange([Math.min(startIdx, endIdx), Math.max(startIdx, endIdx)]);
+      }
+    },
+    [timeBlocks]
+  );
+
+  // Expand range to include clicked time column on spreadline
+  const handleTimeClick = useCallback(
+    (timeLabel: string) => {
+      const idx = timeBlocks.indexOf(timeLabel);
+      if (idx === -1) return;
+
+      if (!selectedRange) {
+        // No range — select clicked column
+        setSelectedRange([idx, idx]);
+      } else {
+        // Expand range to include clicked column
+        const newStart = Math.min(selectedRange[0], idx);
+        const newEnd = Math.max(selectedRange[1], idx);
+        setSelectedRange([newStart, newEnd]);
+      }
+    },
+    [timeBlocks, selectedRange]
+  );
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
-        {/* Graph Panel (with scrubber at bottom) */}
+        {/* Graph Panel */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <div className="flex h-full w-full flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <SpreadlineGraphComponent selectedTime={selectedTime} />
-            </div>
-            <SpreadlineScrubberComponent timeBlocks={timeBlocks} selectedTime={selectedTime} onTimeChange={setSelectedTime} />
-          </div>
+          <SpreadlineGraphComponent selectedTimes={selectedTimes} />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -51,7 +85,11 @@ const SpreadlineTabComponent = (_props: Props) => {
         {/* Spreadline Chart Panel */}
         <ResizablePanel defaultSize={50} minSize={20}>
           <div className="h-full w-full overflow-hidden">
-            <SpreadlineComponent selectedTime={selectedTime} />
+            <SpreadlineComponent
+              highlightTimes={selectedTimes}
+              onTimeClick={handleTimeClick}
+              onHighlightRangeChange={handleHighlightRangeChange}
+            />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

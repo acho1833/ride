@@ -12,7 +12,7 @@
  *  - Hop-aware force layout: shorter links for hop-1, longer for hop-2, radial nudge, collision prevention
  */
 
-import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
@@ -31,7 +31,7 @@ import {
   GRAPH_RADIAL_STRENGTH,
   GRAPH_TIME_TRANSITION_MS
 } from '@/features/spreadlines/const';
-import { transformSpreadlineToGraph, transformSpreadlineToGraphByTime } from '@/features/spreadlines/utils';
+import { transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
 
 /** Ego node uses the selected color to visually distinguish it */
@@ -109,10 +109,10 @@ const getRadialRadius = (d: SpreadlineGraphNode): number => {
 };
 
 interface Props {
-  selectedTime?: string | 'ALL';
+  selectedTimes?: string[];
 }
 
-const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
+const SpreadlineGraphComponent = ({ selectedTimes = [] }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -124,12 +124,6 @@ const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
   const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const simulationRef = useRef<d3.Simulation<SpreadlineGraphNode, SpreadlineGraphLink> | null>(null);
   const nodeLinkMapRef = useRef<Map<string, SVGLineElement[]>>(new Map());
-
-  // Ref to track selectedTime for D3 callbacks without triggering re-renders
-  const selectedTimeRef = useRef(selectedTime);
-  useLayoutEffect(() => {
-    selectedTimeRef.current = selectedTime;
-  }, [selectedTime]);
 
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
@@ -260,7 +254,7 @@ const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
   }, [rawData, dimensions]);
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Time-Change Effect — D3 data joins (runs on selectedTime change)
+  // Time-Change Effect — D3 data joins (runs on selectedTimes change)
   // Performs enter/update/exit transitions without re-initializing the graph.
   // Also runs on initial mount after main effect sets up the SVG.
   // ═══════════════════════════════════════════════════════════════════════
@@ -276,9 +270,9 @@ const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
       simulationRef.current = null;
     }
 
-    // Compute graph data for the selected time
+    // Compute graph data: empty selectedTimes = ALL mode
     const graphData =
-      selectedTime === 'ALL' ? transformSpreadlineToGraph(rawData) : transformSpreadlineToGraphByTime(rawData, selectedTime);
+      selectedTimes.length === 0 ? transformSpreadlineToGraph(rawData) : transformSpreadlineToGraphByTimes(rawData, selectedTimes);
 
     // Preserve positions from existing nodes
     const prevNodesMap = new Map(nodesRef.current.map(n => [n.id, n]));
@@ -403,7 +397,7 @@ const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
     nodeMerged.call(drag);
 
     // ─── Force Simulation ──────────────────────────────────────────────
-    const useHopLayout = selectedTime !== 'ALL';
+    const useHopLayout = selectedTimes.length > 0;
 
     const simulation = d3
       .forceSimulation<SpreadlineGraphNode>(nodes)
@@ -458,15 +452,7 @@ const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
         }
       }
     } else {
-      // Time change: pin existing nodes, let new nodes find positions via animated simulation
-      for (const n of nodes) {
-        if (prevNodesMap.has(n.id) && n.x !== undefined) {
-          n.fx = n.x;
-          n.fy = n.y;
-        }
-      }
-
-      // Position new nodes near ego
+      // Position new nodes near ego (existing nodes keep inherited positions)
       for (const n of nodes) {
         if (!prevNodesMap.has(n.id)) {
           n.x = spawnX + (Math.random() - 0.5) * 40;
@@ -474,6 +460,7 @@ const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
         }
       }
 
+      // Animated simulation — all nodes free to move so hop forces take effect
       simulation
         .alpha(0.5)
         .alphaDecay(0.05)
@@ -485,19 +472,12 @@ const SpreadlineGraphComponent = ({ selectedTime = 'ALL' }: Props) => {
             .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
           nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
         })
-        .on('end', () => {
-          // Unpin all nodes after simulation settles
-          for (const n of nodes) {
-            n.fx = null;
-            n.fy = null;
-          }
-        })
         .restart();
     }
 
     nodesRef.current = nodes;
     simulationRef.current = simulation;
-  }, [selectedTime, rawData, dimensions]);
+  }, [selectedTimes, rawData, dimensions]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // Zoom Controls

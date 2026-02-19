@@ -15,7 +15,13 @@ import { useEffect, useRef, useCallback, useLayoutEffect, forwardRef, useImperat
 import * as d3 from 'd3';
 import { SpreadLinesVisualizer } from './spreadline-visualizer';
 import { SpreadLineData, SpreadLineConfig, createDefaultConfig } from './spreadline-types';
-import { SPREADLINE_HIGHLIGHT_FILL, SPREADLINE_HIGHLIGHT_STROKE } from '@/features/spreadlines/const';
+import {
+  SPREADLINE_HIGHLIGHT_FILL,
+  SPREADLINE_HIGHLIGHT_STROKE,
+  SPREADLINE_HIGHLIGHT_HANDLE_WIDTH,
+  SPREADLINE_HIGHLIGHT_HANDLE_COLOR,
+  SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR
+} from '@/features/spreadlines/const';
 
 /**
  * Keep callback in ref to prevent re-renders when callback identity changes.
@@ -94,9 +100,21 @@ interface SpreadLineChartProps {
   onZoomChange?: (level: number) => void;
 
   /**
-   * Time label to highlight on the chart (e.g., "2005"). Undefined = no highlight.
+   * Time labels to highlight on the chart. Single string = one column, array = range.
+   * Undefined = no highlight.
    */
-  highlightTime?: string;
+  highlightTimes?: string[];
+
+  /**
+   * Callback when a time column is clicked on the chart.
+   */
+  onTimeClick?: (timeLabel: string) => void;
+
+  /**
+   * Callback when the highlight bar is resized by dragging its edge handles.
+   * Fires on drag end with the new start and end time labels.
+   */
+  onHighlightRangeChange?: (startLabel: string, endLabel: string) => void;
 }
 
 const ZOOM_SCALE_EXTENT: [number, number] = [0.1, 10];
@@ -114,7 +132,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     yearsFilter = 1,
     crossingOnly = false,
     onZoomChange,
-    highlightTime
+    highlightTimes,
+    onTimeClick,
+    onHighlightRangeChange
   },
   ref
 ) {
@@ -123,11 +143,14 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   const visualizerRef = useRef<SpreadLinesVisualizer | null>(null);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const zoomTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+  const isDraggingHighlightRef = useRef(false);
 
   // Refs for callbacks - prevents re-init when callback identity changes
   const onBlockExpandRef = useCallbackRef(onBlockExpand);
   const onFilterChangeRef = useCallbackRef(onFilterChange);
   const onZoomChangeRef = useCallbackRef(onZoomChange);
+  const onTimeClickRef = useCallbackRef(onTimeClick);
+  const onHighlightRangeChangeRef = useCallbackRef(onHighlightRangeChange);
 
   // Refs for filter values - allows D3 to access current values without triggering React re-init
   const yearsFilterRef = useValueRef(yearsFilter);
@@ -293,43 +316,261 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
 
   /**
    * Handle highlight time changes via D3 (not React re-render).
-   * Renders a semi-transparent vertical bar at the matching time column.
+   * Renders a semi-transparent vertical bar spanning the highlighted time range,
+   * with draggable left/right handles for resizing the range.
+   *
+   * During drag: D3 visuals update directly (no React state change).
+   * On drag end: fires onHighlightRangeChange callback to sync React state.
    */
   useEffect(() => {
+    // Skip re-init while user is dragging — D3 manages visuals directly during drag
+    if (isDraggingHighlightRef.current) return;
+
     if (!svgRef.current) return;
 
     const svg = d3.select(svgRef.current);
     const zoomLayer = svg.select('.zoom-layer');
     if (zoomLayer.empty()) return;
 
-    // Remove existing highlight
+    // Remove existing highlight elements
     zoomLayer.selectAll('.time-highlight-bar').remove();
+    zoomLayer.selectAll('.time-highlight-handle').remove();
 
-    if (!highlightTime || !data) return;
+    if (!highlightTimes || highlightTimes.length === 0 || !data) return;
 
-    // Find matching time label
-    const timeLabel = data.timeLabels.find(t => t.label === highlightTime);
-    if (!timeLabel) return;
+    const storylineContainer = zoomLayer.select('#storyline-container');
+    if (storylineContainer.empty()) return;
+
+    // Find matching time labels for first and last in range
+    const firstLabel = data.timeLabels.find(t => t.label === highlightTimes[0]);
+    const lastLabel = data.timeLabels.find(t => t.label === highlightTimes[highlightTimes.length - 1]);
+    if (!firstLabel || !lastLabel) return;
+
+    const bandWidth = data.bandWidth;
+    const heightExtent = data.heightExtents[1] - data.heightExtents[0];
+    const barY = data.heightExtents[0] - 20;
+    const barHeight = heightExtent + 40;
+    const barX = firstLabel.posX - bandWidth / 2;
+    const barWidth = lastLabel.posX - firstLabel.posX + bandWidth;
+
+    // Track current label indices during drag
+    let currentStartIdx = data.timeLabels.findIndex(t => t.label === highlightTimes[0]);
+    let currentEndIdx = data.timeLabels.findIndex(t => t.label === highlightTimes[highlightTimes.length - 1]);
+    if (currentStartIdx === -1) currentStartIdx = 0;
+    if (currentEndIdx === -1) currentEndIdx = data.timeLabels.length - 1;
+
+    // Helper: find nearest time label index by x position
+    const findNearestLabelIdx = (x: number): number => {
+      let nearest = 0;
+      let minDist = Infinity;
+      for (let i = 0; i < data.timeLabels.length; i++) {
+        const dist = Math.abs(data.timeLabels[i].posX - x);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = i;
+        }
+      }
+      return nearest;
+    };
+
+    // Update bar and handle positions from current indices
+    const updateVisuals = () => {
+      const startX = data.timeLabels[currentStartIdx].posX - bandWidth / 2;
+      const endX = data.timeLabels[currentEndIdx].posX + bandWidth / 2;
+      const width = endX - startX;
+      storylineContainer.select('.time-highlight-bar').attr('x', startX).attr('width', width);
+      storylineContainer.select('.time-highlight-handle-left').attr('x', startX - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2);
+      storylineContainer.select('.time-highlight-handle-right').attr('x', endX - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2);
+    };
+
+    // Create highlight bar (on top of content for reliable drag; semi-transparent so content shows through)
+    const bar = storylineContainer
+      .append('rect')
+      .attr('class', 'time-highlight-bar')
+      .attr('x', barX)
+      .attr('y', barY)
+      .attr('width', barWidth)
+      .attr('height', barHeight)
+      .attr('fill', SPREADLINE_HIGHLIGHT_FILL)
+      .attr('stroke', SPREADLINE_HIGHLIGHT_STROKE)
+      .attr('stroke-width', 1)
+      .attr('cursor', 'grab')
+      .attr('opacity', 0);
+
+    bar.transition().duration(300).attr('opacity', 1);
+
+    // Helper: fire range change callback with current indices
+    const fireRangeChange = () => {
+      onHighlightRangeChangeRef.current?.(data.timeLabels[currentStartIdx].label, data.timeLabels[currentEndIdx].label);
+    };
+
+    // D3 drag for left handle
+    const leftDrag = d3
+      .drag<SVGRectElement, unknown>()
+      .container(function () {
+        return storylineContainer.node() as SVGGElement;
+      })
+      .on('start', event => {
+        event.sourceEvent.stopPropagation();
+        event.sourceEvent.preventDefault();
+        isDraggingHighlightRef.current = true;
+        document.body.style.cursor = 'ew-resize';
+      })
+      .on('drag', event => {
+        const idx = findNearestLabelIdx(event.x);
+        if (idx <= currentEndIdx) {
+          currentStartIdx = idx;
+          updateVisuals();
+          fireRangeChange();
+        }
+      })
+      .on('end', () => {
+        isDraggingHighlightRef.current = false;
+        document.body.style.cursor = '';
+        fireRangeChange();
+      });
+
+    // D3 drag for right handle
+    const rightDrag = d3
+      .drag<SVGRectElement, unknown>()
+      .container(function () {
+        return storylineContainer.node() as SVGGElement;
+      })
+      .on('start', event => {
+        event.sourceEvent.stopPropagation();
+        event.sourceEvent.preventDefault();
+        isDraggingHighlightRef.current = true;
+        document.body.style.cursor = 'ew-resize';
+      })
+      .on('drag', event => {
+        const idx = findNearestLabelIdx(event.x);
+        if (idx >= currentStartIdx) {
+          currentEndIdx = idx;
+          updateVisuals();
+          fireRangeChange();
+        }
+      })
+      .on('end', () => {
+        isDraggingHighlightRef.current = false;
+        document.body.style.cursor = '';
+        fireRangeChange();
+      });
+
+    // D3 drag for panning the highlight bar (shifts entire range left/right)
+    let panStartIdx = 0;
+    let panOrigStart = 0;
+    let panOrigEnd = 0;
+    const panDrag = d3
+      .drag<SVGRectElement, unknown>()
+      .container(function () {
+        return storylineContainer.node() as SVGGElement;
+      })
+      .on('start', event => {
+        event.sourceEvent.stopPropagation();
+        event.sourceEvent.preventDefault();
+        isDraggingHighlightRef.current = true;
+        document.body.style.cursor = 'grabbing';
+        bar.attr('cursor', 'grabbing');
+        panStartIdx = findNearestLabelIdx(event.x);
+        panOrigStart = currentStartIdx;
+        panOrigEnd = currentEndIdx;
+      })
+      .on('drag', event => {
+        const idx = findNearestLabelIdx(event.x);
+        const delta = idx - panStartIdx;
+        const rangeSize = panOrigEnd - panOrigStart;
+        let newStart = panOrigStart + delta;
+        let newEnd = panOrigEnd + delta;
+        if (newStart < 0) {
+          newStart = 0;
+          newEnd = rangeSize;
+        }
+        if (newEnd >= data.timeLabels.length) {
+          newEnd = data.timeLabels.length - 1;
+          newStart = newEnd - rangeSize;
+        }
+        currentStartIdx = newStart;
+        currentEndIdx = newEnd;
+        updateVisuals();
+        fireRangeChange();
+      })
+      .on('end', () => {
+        isDraggingHighlightRef.current = false;
+        document.body.style.cursor = '';
+        bar.attr('cursor', 'grab');
+        fireRangeChange();
+      });
+
+    bar.call(panDrag);
+
+    // Left handle (on top of content for interaction)
+    storylineContainer
+      .append('rect')
+      .attr('class', 'time-highlight-handle time-highlight-handle-left')
+      .attr('x', barX - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2)
+      .attr('y', barY)
+      .attr('width', SPREADLINE_HIGHLIGHT_HANDLE_WIDTH)
+      .attr('height', barHeight)
+      .attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_COLOR)
+      .attr('cursor', 'ew-resize')
+      .attr('rx', 2)
+      .on('mouseenter', function () {
+        d3.select(this).attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_COLOR);
+      })
+      .call(leftDrag);
+
+    // Right handle (on top of content for interaction)
+    storylineContainer
+      .append('rect')
+      .attr('class', 'time-highlight-handle time-highlight-handle-right')
+      .attr('x', barX + barWidth - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2)
+      .attr('y', barY)
+      .attr('width', SPREADLINE_HIGHLIGHT_HANDLE_WIDTH)
+      .attr('height', barHeight)
+      .attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_COLOR)
+      .attr('cursor', 'ew-resize')
+      .attr('rx', 2)
+      .on('mouseenter', function () {
+        d3.select(this).attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_COLOR);
+      })
+      .call(rightDrag);
+  }, [highlightTimes, data]);
+
+  /**
+   * Set up click targets on time columns for range expansion.
+   * Invisible rects behind content — only receive clicks on empty areas.
+   */
+  useEffect(() => {
+    if (!svgRef.current || !data || data.timeLabels.length === 0) return;
+
+    const svg = d3.select(svgRef.current);
+    const storylineContainer = svg.select('.zoom-layer #storyline-container');
+    if (storylineContainer.empty()) return;
+
+    storylineContainer.selectAll('.time-click-receptor').remove();
 
     const bandWidth = data.bandWidth;
     const heightExtent = data.heightExtents[1] - data.heightExtents[0];
 
-    zoomLayer
-      .append('rect')
-      .attr('class', 'time-highlight-bar')
-      .attr('x', timeLabel.posX - bandWidth / 2)
-      .attr('y', data.heightExtents[0] - 20)
-      .attr('width', bandWidth)
-      .attr('height', heightExtent + 40)
-      .attr('fill', SPREADLINE_HIGHLIGHT_FILL)
-      .attr('stroke', SPREADLINE_HIGHLIGHT_STROKE)
-      .attr('stroke-width', 1)
-      .attr('pointer-events', 'none')
-      .attr('opacity', 0)
-      .transition()
-      .duration(300)
-      .attr('opacity', 1);
-  }, [highlightTime, data]);
+    data.timeLabels.forEach(tl => {
+      storylineContainer
+        .insert('rect', ':first-child')
+        .attr('class', 'time-click-receptor')
+        .attr('x', tl.posX - bandWidth / 2)
+        .attr('y', data.heightExtents[0] - 20)
+        .attr('width', bandWidth)
+        .attr('height', heightExtent + 40)
+        .attr('fill', 'transparent')
+        .attr('cursor', 'pointer')
+        .on('click', () => onTimeClickRef.current?.(tl.label));
+    });
+  }, [data]);
 
   /**
    * Handle window resize
@@ -351,7 +592,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         className="spreadline-svg h-full w-full"
         style={{
           overflow: 'hidden',
-          fontFamily: 'system-ui, -apple-system, sans-serif'
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          userSelect: 'none',
+          WebkitUserSelect: 'none'
         }}
       />
     </div>

@@ -89,3 +89,12 @@ export const SPREADLINE_HIGHLIGHT_FILL = 'rgba(59, 130, 246, 0.15)';
 
 /** Border color for the time highlight bar */
 export const SPREADLINE_HIGHLIGHT_STROKE = 'rgba(59, 130, 246, 0.5)';
+
+/** Width of draggable handles on the highlight bar (px) */
+export const SPREADLINE_HIGHLIGHT_HANDLE_WIDTH = 8;
+
+/** Fill color for highlight bar drag handles */
+export const SPREADLINE_HIGHLIGHT_HANDLE_COLOR = 'rgba(59, 130, 246, 0.4)';
+
+/** Fill color for highlight bar drag handles on hover */
+export const SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR = 'rgba(59, 130, 246, 0.7)';

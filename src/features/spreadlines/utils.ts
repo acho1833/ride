@@ -173,3 +173,95 @@ export function transformSpreadlineToGraphByTime(
 
   return { nodes, links };
 }
+
+/**
+ * Transform spreadline raw data into graph for MULTIPLE time blocks (range).
+ *
+ * Unions entities and links across all given times.
+ * Hop distance = closest (minimum) hop across the time range.
+ */
+export function transformSpreadlineToGraphByTimes(
+  rawData: {
+    egoId: string;
+    egoName: string;
+    entities: Record<string, { name: string; category: string }>;
+    topology: { sourceId: string; targetId: string; time: string; weight: number }[];
+    groups: Record<string, string[][]>;
+  },
+  times: string[]
+): { nodes: SpreadlineGraphNode[]; links: SpreadlineGraphLink[] } {
+  if (times.length === 1) return transformSpreadlineToGraphByTime(rawData, times[0]);
+
+  const timesSet = new Set(times);
+
+  // 1. Filter topology to times in range
+  const rangeTopology = rawData.topology.filter(t => timesSet.has(t.time));
+
+  // 2. Collect active entity IDs
+  const activeIds = new Set<string>();
+  activeIds.add(rawData.egoId);
+  for (const entry of rangeTopology) {
+    activeIds.add(entry.sourceId);
+    activeIds.add(entry.targetId);
+  }
+
+  // 3. Build hop map — use closest (minimum) hop across all times
+  const hopMap = new Map<string, { hop: 0 | 1 | 2; category: 'internal' | 'external' | 'ego' }>();
+  hopMap.set(rawData.egoId, { hop: 0, category: 'ego' });
+
+  for (const time of times) {
+    const groups = rawData.groups[time] ?? [[], [], [], [], []];
+    const timeHops: [string, 0 | 1 | 2, 'internal' | 'external'][] = [
+      ...(groups[1] ?? []).map(id => [id, 1 as const, 'external' as const] as [string, 1, 'external']),
+      ...(groups[3] ?? []).map(id => [id, 1 as const, 'internal' as const] as [string, 1, 'internal']),
+      ...(groups[0] ?? []).map(id => [id, 2 as const, 'external' as const] as [string, 2, 'external']),
+      ...(groups[4] ?? []).map(id => [id, 2 as const, 'internal' as const] as [string, 2, 'internal'])
+    ];
+    for (const [id, hop, category] of timeHops) {
+      const existing = hopMap.get(id);
+      if (!existing || hop < existing.hop) {
+        hopMap.set(id, { hop, category });
+      }
+    }
+  }
+
+  // 4. Build nodes
+  const nodes: SpreadlineGraphNode[] = [];
+  nodes.push({
+    id: rawData.egoId,
+    name: rawData.egoName,
+    isEgo: true,
+    collaborationCount: 0,
+    hopDistance: 0,
+    category: 'ego'
+  });
+
+  for (const id of activeIds) {
+    if (id === rawData.egoId) continue;
+    const entity = rawData.entities[id];
+    if (!entity) continue;
+    const info = hopMap.get(id) ?? { hop: 2, category: 'external' as const };
+    nodes.push({
+      id,
+      name: entity.name,
+      isEgo: false,
+      collaborationCount: rangeTopology.filter(t => t.sourceId === id || t.targetId === id).length,
+      hopDistance: info.hop,
+      category: info.category
+    });
+  }
+
+  // 5. Build links (deduplicated across all times in range)
+  const linkSet = new Set<string>();
+  const links: SpreadlineGraphLink[] = [];
+  const nodeIds = new Set(nodes.map(n => n.id));
+  for (const entry of rangeTopology) {
+    const key = [entry.sourceId, entry.targetId].sort().join('::');
+    if (!linkSet.has(key) && nodeIds.has(entry.sourceId) && nodeIds.has(entry.targetId)) {
+      linkSet.add(key);
+      links.push({ source: entry.sourceId, target: entry.targetId });
+    }
+  }
+
+  return { nodes, links };
+}

@@ -4,7 +4,11 @@
  * Spreadline Time Scrubber Component
  *
  * Horizontal control bar for navigating time blocks in the spreadline visualization.
- * Features: play/pause animation, speed control, clickable time dots, ALL mode toggle.
+ * Features: play/pause animation, speed control, clickable time dots,
+ * resizable/pannable range selector, ALL mode toggle.
+ *
+ * Range: [startIndex, endIndex] into timeBlocks, or null for ALL mode.
+ * Drag left/right handles to resize. Drag middle to pan. Click dot for single selection.
  */
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
@@ -15,36 +19,113 @@ import { SCRUBBER_SPEED_OPTIONS, SCRUBBER_DEFAULT_SPEED_MS } from '@/features/sp
 
 interface Props {
   timeBlocks: string[];
-  selectedTime: string | 'ALL';
-  onTimeChange: (time: string | 'ALL') => void;
+  selectedRange: [number, number] | null;
+  onRangeChange: (range: [number, number] | null) => void;
 }
 
-const SpreadlineScrubberComponent = ({ timeBlocks, selectedTime, onTimeChange }: Props) => {
+interface DragState {
+  mode: 'left' | 'right' | 'pan';
+  startIdx: number;
+  origRange: [number, number];
+}
+
+const SpreadlineScrubberComponent = ({ timeBlocks, selectedRange, onRangeChange }: Props) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMs, setSpeedMs] = useState(SCRUBBER_DEFAULT_SPEED_MS);
-  const selectedTimeRef = useRef(selectedTime);
-  useLayoutEffect(() => {
-    selectedTimeRef.current = selectedTime;
-  }, [selectedTime]);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragState | null>(null);
 
-  // Auto-advance animation loop
+  // Keep values in refs for window-level drag handlers
+  const selectedRangeRef = useRef(selectedRange);
+  useLayoutEffect(() => {
+    selectedRangeRef.current = selectedRange;
+  }, [selectedRange]);
+
+  const onRangeChangeRef = useRef(onRangeChange);
+  useLayoutEffect(() => {
+    onRangeChangeRef.current = onRangeChange;
+  }, [onRangeChange]);
+
+  const maxIdx = timeBlocks.length - 1;
+  const maxIdxRef = useRef(maxIdx);
+  useLayoutEffect(() => {
+    maxIdxRef.current = maxIdx;
+  }, [maxIdx]);
+
+  // Convert client X position to nearest dot index
+  const xToIndex = useCallback((clientX: number): number => {
+    if (!trackRef.current || maxIdxRef.current <= 0) return 0;
+    const rect = trackRef.current.getBoundingClientRect();
+    const fraction = (clientX - rect.left) / rect.width;
+    const clamped = Math.max(0, Math.min(1, fraction));
+    return Math.round(clamped * maxIdxRef.current);
+  }, []);
+
+  // Window-level drag listeners (stable via refs)
+  useEffect(() => {
+    const handleMove = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+
+      const idx = xToIndex(e.clientX);
+      const max = maxIdxRef.current;
+      const [origStart, origEnd] = drag.origRange;
+
+      if (drag.mode === 'left') {
+        onRangeChangeRef.current([Math.min(idx, origEnd), origEnd]);
+      } else if (drag.mode === 'right') {
+        onRangeChangeRef.current([origStart, Math.max(idx, origStart)]);
+      } else if (drag.mode === 'pan') {
+        const delta = idx - drag.startIdx;
+        const rangeSize = origEnd - origStart;
+        let newStart = origStart + delta;
+        let newEnd = origEnd + delta;
+        if (newStart < 0) {
+          newStart = 0;
+          newEnd = rangeSize;
+        }
+        if (newEnd > max) {
+          newEnd = max;
+          newStart = max - rangeSize;
+        }
+        onRangeChangeRef.current([newStart, newEnd]);
+      }
+    };
+
+    const handleUp = () => {
+      dragRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+  }, [xToIndex]);
+
+  // Auto-advance animation loop — slides range forward each tick
   useEffect(() => {
     if (!isPlaying || timeBlocks.length === 0) return;
 
     const interval = setInterval(() => {
-      const current = selectedTimeRef.current;
-      if (current === 'ALL') {
-        // Start from first time block
-        onTimeChange(timeBlocks[0]);
+      const current = selectedRangeRef.current;
+      const max = maxIdxRef.current;
+      if (!current) {
+        onRangeChangeRef.current([0, 0]);
       } else {
-        const idx = timeBlocks.indexOf(current);
-        const nextIdx = (idx + 1) % timeBlocks.length;
-        onTimeChange(timeBlocks[nextIdx]);
+        const rangeSize = current[1] - current[0];
+        const nextStart = current[0] + 1;
+        if (nextStart + rangeSize > max) {
+          onRangeChangeRef.current([0, rangeSize]);
+        } else {
+          onRangeChangeRef.current([nextStart, nextStart + rangeSize]);
+        }
       }
     }, speedMs);
 
     return () => clearInterval(interval);
-  }, [isPlaying, speedMs, timeBlocks, onTimeChange]);
+  }, [isPlaying, speedMs, timeBlocks.length]);
 
   const handlePlayPause = useCallback(() => {
     setIsPlaying(prev => !prev);
@@ -52,27 +133,50 @@ const SpreadlineScrubberComponent = ({ timeBlocks, selectedTime, onTimeChange }:
 
   const handleAllClick = useCallback(() => {
     setIsPlaying(false);
-    onTimeChange('ALL');
-  }, [onTimeChange]);
+    onRangeChange(null);
+  }, [onRangeChange]);
 
   const handleDotClick = useCallback(
-    (time: string) => {
+    (index: number) => {
       setIsPlaying(false);
-      onTimeChange(time);
+      onRangeChange([index, index]);
     },
-    [onTimeChange]
+    [onRangeChange]
   );
 
   const handleSpeedChange = useCallback((value: string) => {
     setSpeedMs(Number(value));
   }, []);
 
+  const startDrag = useCallback(
+    (e: React.PointerEvent, mode: DragState['mode']) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = {
+        mode,
+        startIdx: xToIndex(e.clientX),
+        origRange: selectedRange ? [...selectedRange] : [0, 0]
+      };
+    },
+    [selectedRange, xToIndex]
+  );
+
   if (timeBlocks.length === 0) return null;
+
+  const isAllMode = selectedRange === null;
+  const rangeLeftPct = selectedRange && maxIdx > 0 ? (selectedRange[0] / maxIdx) * 100 : 0;
+  const rangeRightPct = selectedRange && maxIdx > 0 ? ((maxIdx - selectedRange[1]) / maxIdx) * 100 : 0;
+
+  const rangeLabel = isAllMode
+    ? 'ALL'
+    : selectedRange[0] === selectedRange[1]
+      ? timeBlocks[selectedRange[0]]
+      : `${timeBlocks[selectedRange[0]]}\u2013${timeBlocks[selectedRange[1]]}`;
 
   return (
     <div className="border-border bg-background/80 flex h-10 shrink-0 items-center gap-2 border-t px-3">
       {/* ALL toggle */}
-      <Button variant={selectedTime === 'ALL' ? 'default' : 'outline'} size="sm" className="h-7 px-2 text-xs" onClick={handleAllClick}>
+      <Button variant={isAllMode ? 'default' : 'outline'} size="sm" className="h-7 px-2 text-xs" onClick={handleAllClick}>
         ALL
       </Button>
 
@@ -95,26 +199,54 @@ const SpreadlineScrubberComponent = ({ timeBlocks, selectedTime, onTimeChange }:
         </SelectContent>
       </Select>
 
-      {/* Time track with dots */}
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-0">
-        {timeBlocks.map((time, i) => (
-          <div key={time} className="flex items-center">
+      {/* Time track with dots and range overlay */}
+      <div ref={trackRef} className="relative flex min-w-0 flex-1 items-center" style={{ height: 24 }}>
+        {/* Connector line */}
+        <div className="bg-muted-foreground/30 absolute top-1/2 right-0 left-0 h-px" />
+
+        {/* Range overlay */}
+        {selectedRange && (
+          <div
+            className="bg-primary/15 border-primary/40 absolute top-0 bottom-0 border-y"
+            style={{ left: `${rangeLeftPct}%`, right: `${rangeRightPct}%`, minWidth: 4 }}
+          >
+            {/* Left handle */}
+            <div
+              className="bg-primary/60 hover:bg-primary absolute top-0 bottom-0 -left-1.5 w-3 cursor-ew-resize rounded-l"
+              onPointerDown={e => startDrag(e, 'left')}
+            />
+            {/* Pan area (middle) */}
+            <div className="absolute inset-0 cursor-grab active:cursor-grabbing" onPointerDown={e => startDrag(e, 'pan')} />
+            {/* Right handle */}
+            <div
+              className="bg-primary/60 hover:bg-primary absolute top-0 -right-1.5 bottom-0 w-3 cursor-ew-resize rounded-r"
+              onPointerDown={e => startDrag(e, 'right')}
+            />
+          </div>
+        )}
+
+        {/* Dots */}
+        {timeBlocks.map((time, i) => {
+          const leftPct = maxIdx === 0 ? 50 : (i / maxIdx) * 100;
+          const inRange = selectedRange !== null && i >= selectedRange[0] && i <= selectedRange[1];
+          return (
             <button
-              className={`h-3 w-3 rounded-full border-2 transition-all ${
-                selectedTime === time
-                  ? 'bg-primary border-primary scale-125'
-                  : 'border-muted-foreground/50 hover:border-primary/70 bg-transparent hover:scale-110'
+              key={time}
+              className={`absolute z-10 h-5 w-3 -translate-x-1/2 rounded-full border-2 transition-all ${
+                inRange
+                  ? 'bg-primary border-primary scale-110'
+                  : 'border-muted-foreground/50 hover:border-primary/70 bg-transparent hover:scale-105'
               }`}
-              onClick={() => handleDotClick(time)}
+              style={{ left: `${leftPct}%` }}
+              onClick={() => handleDotClick(i)}
               title={time}
             />
-            {i < timeBlocks.length - 1 && <div className="bg-muted-foreground/30 h-px w-3" />}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Current time label */}
-      <span className="text-muted-foreground w-10 text-right text-xs font-medium">{selectedTime === 'ALL' ? 'ALL' : selectedTime}</span>
+      {/* Range label */}
+      <span className="text-muted-foreground min-w-10 text-right text-xs font-medium whitespace-nowrap">{rangeLabel}</span>
     </div>
   );
 };
