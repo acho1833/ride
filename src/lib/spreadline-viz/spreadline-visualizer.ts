@@ -775,7 +775,7 @@ export class SpreadLinesVisualizer {
           .attr('id', d => `label-${d.name}`)
           .attr('point-id', d => d.id)
           .attr('pin', 0)
-          .style('cursor', 'default');
+          .style('cursor', d => (d.name === this._EGO ? 'default' : 'pointer'));
 
         // Main label
         const labelText = container
@@ -790,6 +790,7 @@ export class SpreadLinesVisualizer {
           .style('text-anchor', d => d.label.textAlign)
           .style('visibility', d => d.label.visibility)
           .on('mouseover', (event, d) => this._lineHover(event, d))
+          .on('click', (_, d) => this._linePin(d as Storyline))
           .on('mouseout', (event, d) => this._lineHoverOut(event, d));
 
         // Add title element for tooltip (shows full name on hover if truncated)
@@ -1443,7 +1444,23 @@ export class SpreadLinesVisualizer {
     }
 
     if (pinned) {
+      // Unpinning — revert to original colors
       this.LINE_SELECTION(d.id).classed('storyline-hover', false);
+      const storyline = this.storylines.find(s => s.name === d.name);
+      if (storyline) {
+        d3.selectAll(`.line-${d.id}.path-movable`).style('stroke', null).style('stroke-width', null);
+        d3.selectAll(`.line-${d.id}.marks`).style('fill', null);
+        const labelEl = d3.select(document.getElementById(`label-${d.name}`));
+        labelEl.selectAll('text.labels').style('fill', null);
+        labelEl.select('.mark-links').style('stroke', null);
+      }
+    } else {
+      // Pinning — apply primary blue
+      d3.selectAll(`.line-${d.id}.path-movable`).style('stroke', 'var(--primary)').style('stroke-width', '8px');
+      d3.selectAll(`.line-${d.id}.marks`).style('fill', 'var(--primary)');
+      const labelEl = d3.select(document.getElementById(`label-${d.name}`));
+      labelEl.selectAll('text.labels').style('fill', 'var(--primary)');
+      labelEl.select('.mark-links').style('stroke', 'var(--primary)');
     }
   };
 

@@ -270,8 +270,8 @@ export function createStyleElementFromCSS(): SVGStyleElement {
   style.textContent = `
     /* Storyline styles - matching original SpreadLine */
     .storyline-ego { stroke-width: 5.5px; }
-    .storyline-alter { stroke-width: 2px; }
-    .storyline-hover, .storyline-pin { stroke-width: 4px; }
+    .storyline-alter { stroke-width: 4px; }
+    .storyline-hover, .storyline-pin { stroke-width: 8px; }
     .storyline-dehighlight, .storyline-unpin { opacity: 0.1; }
     .storyline-arc-dehighlight { opacity: 0.1; }
     .storyline-label-dehighlight { opacity: 0; }
