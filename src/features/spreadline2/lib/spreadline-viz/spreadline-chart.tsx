@@ -361,11 +361,14 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     const barX = Math.min(firstLabel.posX, lastLabel.posX) - bandWidth / 2;
     const barWidth = Math.abs(lastLabel.posX - firstLabel.posX) + bandWidth;
 
-    // Track current label indices during drag
+    // Track current label indices during drag (ensure ascending order for drag constraints)
     let currentStartIdx = data.timeLabels.findIndex(t => t.label === highlightTimes[0]);
     let currentEndIdx = data.timeLabels.findIndex(t => t.label === highlightTimes[highlightTimes.length - 1]);
     if (currentStartIdx === -1) currentStartIdx = 0;
     if (currentEndIdx === -1) currentEndIdx = data.timeLabels.length - 1;
+    if (currentStartIdx > currentEndIdx) {
+      [currentStartIdx, currentEndIdx] = [currentEndIdx, currentStartIdx];
+    }
 
     // Helper: find nearest time label index by x position
     const findNearestLabelIdx = (x: number): number => {
@@ -414,34 +417,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       onHighlightRangeChangeRef.current?.(data.timeLabels[currentStartIdx].label, data.timeLabels[currentEndIdx].label);
     };
 
-    // D3 drag for left handle
+    // D3 drag for left handle (controls endIdx — higher index = leftmost due to reversed positions)
     const leftDrag = d3
-      .drag<SVGRectElement, unknown>()
-      .container(function () {
-        return storylineContainer.node() as SVGGElement;
-      })
-      .on('start', event => {
-        event.sourceEvent.stopPropagation();
-        event.sourceEvent.preventDefault();
-        isDraggingHighlightRef.current = true;
-        document.body.style.cursor = 'ew-resize';
-      })
-      .on('drag', event => {
-        const idx = findNearestLabelIdx(event.x);
-        if (idx <= currentEndIdx) {
-          currentStartIdx = idx;
-          updateVisuals();
-          fireRangeChange();
-        }
-      })
-      .on('end', () => {
-        isDraggingHighlightRef.current = false;
-        document.body.style.cursor = '';
-        fireRangeChange();
-      });
-
-    // D3 drag for right handle
-    const rightDrag = d3
       .drag<SVGRectElement, unknown>()
       .container(function () {
         return storylineContainer.node() as SVGGElement;
@@ -456,6 +433,32 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         const idx = findNearestLabelIdx(event.x);
         if (idx >= currentStartIdx) {
           currentEndIdx = idx;
+          updateVisuals();
+          fireRangeChange();
+        }
+      })
+      .on('end', () => {
+        isDraggingHighlightRef.current = false;
+        document.body.style.cursor = '';
+        fireRangeChange();
+      });
+
+    // D3 drag for right handle (controls startIdx — lower index = rightmost due to reversed positions)
+    const rightDrag = d3
+      .drag<SVGRectElement, unknown>()
+      .container(function () {
+        return storylineContainer.node() as SVGGElement;
+      })
+      .on('start', event => {
+        event.sourceEvent.stopPropagation();
+        event.sourceEvent.preventDefault();
+        isDraggingHighlightRef.current = true;
+        document.body.style.cursor = 'ew-resize';
+      })
+      .on('drag', event => {
+        const idx = findNearestLabelIdx(event.x);
+        if (idx <= currentEndIdx) {
+          currentStartIdx = idx;
           updateVisuals();
           fireRangeChange();
         }
