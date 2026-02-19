@@ -34,9 +34,10 @@ import { Button } from '@/components/ui/button';
 interface Props {
   workspaceId?: string;
   workspaceName?: string;
+  selectedTime?: string | 'ALL';
 }
 
-const SpreadlineComponent = ({}: Props) => {
+const SpreadlineComponent = ({ selectedTime }: Props) => {
   const {
     data: rawData,
     isPending,
@@ -223,6 +224,7 @@ const SpreadlineComponent = ({}: Props) => {
           yearsFilter={yearsFilter}
           crossingOnly={crossingOnly}
           onZoomChange={handleZoomChange}
+          highlightTime={selectedTime && selectedTime !== 'ALL' ? selectedTime : undefined}
         />
 
         {/* Floating zoom controls */}

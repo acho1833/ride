@@ -15,6 +15,7 @@ import { useEffect, useRef, useCallback, useLayoutEffect, forwardRef, useImperat
 import * as d3 from 'd3';
 import { SpreadLinesVisualizer } from './spreadline-visualizer';
 import { SpreadLineData, SpreadLineConfig, createDefaultConfig } from './spreadline-types';
+import { SPREADLINE_HIGHLIGHT_FILL, SPREADLINE_HIGHLIGHT_STROKE } from '@/features/spreadlines/const';
 
 /**
  * Keep callback in ref to prevent re-renders when callback identity changes.
@@ -91,6 +92,11 @@ interface SpreadLineChartProps {
    * Callback when zoom level changes (percentage, e.g. 100 = 100%)
    */
   onZoomChange?: (level: number) => void;
+
+  /**
+   * Time label to highlight on the chart (e.g., "2005"). Undefined = no highlight.
+   */
+  highlightTime?: string;
 }
 
 const ZOOM_SCALE_EXTENT: [number, number] = [0.1, 10];
@@ -98,7 +104,18 @@ const ZOOM_STEP = 1.3;
 const ZOOM_TRANSITION_MS = 300;
 
 const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(function SpreadLineChart(
-  { data, config, onBlockExpand, onFilterChange, className = '', resetKey = 0, yearsFilter = 1, crossingOnly = false, onZoomChange },
+  {
+    data,
+    config,
+    onBlockExpand,
+    onFilterChange,
+    className = '',
+    resetKey = 0,
+    yearsFilter = 1,
+    crossingOnly = false,
+    onZoomChange,
+    highlightTime
+  },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -273,6 +290,46 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       visualizerRef.current.applyFilter(yearsFilter, crossingOnly);
     }
   }, [yearsFilter, crossingOnly]);
+
+  /**
+   * Handle highlight time changes via D3 (not React re-render).
+   * Renders a semi-transparent vertical bar at the matching time column.
+   */
+  useEffect(() => {
+    if (!svgRef.current) return;
+
+    const svg = d3.select(svgRef.current);
+    const zoomLayer = svg.select('.zoom-layer');
+    if (zoomLayer.empty()) return;
+
+    // Remove existing highlight
+    zoomLayer.selectAll('.time-highlight-bar').remove();
+
+    if (!highlightTime || !data) return;
+
+    // Find matching time label
+    const timeLabel = data.timeLabels.find(t => t.label === highlightTime);
+    if (!timeLabel) return;
+
+    const bandWidth = data.bandWidth;
+    const heightExtent = data.heightExtents[1] - data.heightExtents[0];
+
+    zoomLayer
+      .append('rect')
+      .attr('class', 'time-highlight-bar')
+      .attr('x', timeLabel.posX - bandWidth / 2)
+      .attr('y', data.heightExtents[0] - 20)
+      .attr('width', bandWidth)
+      .attr('height', heightExtent + 40)
+      .attr('fill', SPREADLINE_HIGHLIGHT_FILL)
+      .attr('stroke', SPREADLINE_HIGHLIGHT_STROKE)
+      .attr('stroke-width', 1)
+      .attr('pointer-events', 'none')
+      .attr('opacity', 0)
+      .transition()
+      .duration(300)
+      .attr('opacity', 1);
+  }, [highlightTime, data]);
 
   /**
    * Handle window resize
