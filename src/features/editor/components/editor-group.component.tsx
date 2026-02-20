@@ -48,11 +48,7 @@ const EditorGroupComponent = ({ groupId }: Props) => {
 
   // Check if file needs full height (no scroll wrapper)
   // Graph-based editors (.ws, .nt) need full height for proper D3 rendering
-  const isFullHeight =
-    activeFile?.name.endsWith('.ws') ||
-    activeFile?.name.endsWith('.nt') ||
-    activeFile?.name.endsWith('.sl') ||
-    activeFile?.name.endsWith('.sl2');
+  const isFullHeight = activeFile?.name.endsWith('.ws') || activeFile?.name.endsWith('.nt') || activeFile?.name.endsWith('.sl');
 
   // Track which group user last interacted with.
   // Used by openFile() to determine default target when no group specified.
