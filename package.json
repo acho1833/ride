@@ -16,7 +16,8 @@
     "test:watch": "jest --watch",
     "mongo-gui": "mongo-gui -p 3091 -u \"mongodb://root:password@localhost:27017/?authMechanism=DEFAULT\"",
     "db:reset": "tsx scripts/db-reset.ts",
-    "test:generate-data": "tsx scripts/generate-dummy-data.ts"
+    "test:generate-data": "tsx scripts/generate-dummy-data.ts",
+    "generate:spreadline-monthly": "tsx scripts/generate-monthly-data.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
