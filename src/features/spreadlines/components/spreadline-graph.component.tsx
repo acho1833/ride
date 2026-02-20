@@ -17,10 +17,7 @@ import * as d3 from 'd3';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
 import { GRAPH_CONFIG, DOT_GRID_CONFIG } from '@/features/workspace/const';
-import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import {
-  SPREADLINE_DEFAULT_EGO_ID,
-  SPREADLINE_DEFAULT_YEAR_RANGE,
   SPREADLINE_INTERNAL_COLOR,
   SPREADLINE_EXTERNAL_COLOR,
   GRAPH_HOP1_LINK_DISTANCE,
@@ -30,7 +27,6 @@ import {
   GRAPH_RADIAL_STRENGTH,
   GRAPH_TIME_TRANSITION_MS
 } from '@/features/spreadlines/const';
-import type { SpreadlineGranularity } from '@/features/spreadlines/const';
 import { transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
 
@@ -135,13 +131,18 @@ const bfsDistances = (startId: string, links: SpreadlineGraphLink[]): Map<string
 };
 
 interface Props {
+  rawData: {
+    egoId: string;
+    egoName: string;
+    entities: Record<string, { name: string; category: string }>;
+    topology: { sourceId: string; targetId: string; time: string; weight: number }[];
+    groups: Record<string, string[][]>;
+  } | null;
   selectedTimes?: string[];
   pinnedEntityNames?: string[];
-  relationTypes: string[];
-  granularity: SpreadlineGranularity;
 }
 
-const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [], relationTypes, granularity }: Props) => {
+const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNames = [] }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -158,19 +159,6 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [], 
 
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
-
-  // Fetch data (same query as SpreadlineComponent — React Query deduplicates)
-  const {
-    data: rawData,
-    isPending,
-    isError,
-    error
-  } = useSpreadlineRawDataQuery({
-    egoId: SPREADLINE_DEFAULT_EGO_ID,
-    relationTypes,
-    yearRange: SPREADLINE_DEFAULT_YEAR_RANGE,
-    granularity
-  });
 
   // Observe container size
   useEffect(() => {
@@ -815,16 +803,12 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [], 
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
-      {isPending ? (
+      {!rawData ? (
         <div className="flex h-full items-center justify-center">
           <div className="text-center">
             <div className="border-primary mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-t-transparent" />
             <div className="text-muted-foreground text-sm">Loading graph data...</div>
           </div>
-        </div>
-      ) : isError ? (
-        <div className="flex h-full items-center justify-center">
-          <div className="text-destructive text-sm">{error?.message ?? 'Failed to load graph data'}</div>
         </div>
       ) : (
         <>

@@ -7,6 +7,8 @@ export const useSpreadlineRawDataQuery = (params: {
   relationTypes: string[];
   yearRange: [number, number];
   granularity?: SpreadlineGranularity;
+  pageIndex?: number;
+  pageSize?: number;
 }) => {
   return useQuery(orpc.spreadline.getRawData.queryOptions({ input: params }));
 };

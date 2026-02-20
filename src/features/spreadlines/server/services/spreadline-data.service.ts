@@ -56,6 +56,8 @@ export interface SpreadlineRawDataResponse {
   entities: Record<string, EntityInfo>;
   topology: TopologyEntry[];
   groups: Record<string, string[][]>;
+  totalPages: number;
+  timeBlocks: string[];
 }
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -347,8 +349,10 @@ export async function getSpreadlineRawData(params: {
   relationTypes: string[];
   yearRange: [number, number];
   granularity?: 'yearly' | 'monthly';
+  pageIndex?: number;
+  pageSize?: number;
 }): Promise<SpreadlineRawDataResponse> {
-  const { egoId, relationTypes, yearRange, granularity = 'yearly' } = params;
+  const { egoId, relationTypes, yearRange, granularity = 'yearly', pageIndex = 0, pageSize = 20 } = params;
   const dataDir = DATASET_DIRS[granularity] ?? DATASET_DIRS.yearly;
   const basePath = path.join(process.cwd(), dataDir);
 
@@ -421,12 +425,82 @@ export async function getSpreadlineRawData(params: {
     };
   }
 
+  // Extract unique time blocks sorted descending (newest first)
+  const allTimeBlocks = [...new Set(topology.map(t => t.time))].sort((a, b) => b.localeCompare(a));
+  const totalPages = Math.max(1, Math.ceil(allTimeBlocks.length / pageSize));
+  const clampedPage = Math.max(0, Math.min(pageIndex, totalPages - 1));
+  const start = clampedPage * pageSize;
+  const end = Math.min(start + pageSize, allTimeBlocks.length);
+  const pageTimeBlocks = allTimeBlocks.slice(start, end);
+
+  // Pad to pageSize so every page lays out the same number of columns.
+  // Generate earlier time labels beyond the last real block.
+  if (pageTimeBlocks.length < pageSize && pageTimeBlocks.length > 0) {
+    const lastLabel = pageTimeBlocks[pageTimeBlocks.length - 1];
+    const existing = new Set(pageTimeBlocks);
+    if (granularity === 'monthly') {
+      // Format: "YYYY-MM"
+      let [y, m] = lastLabel.split('-').map(Number);
+      while (pageTimeBlocks.length < pageSize) {
+        m -= 1;
+        if (m < 1) {
+          m = 12;
+          y -= 1;
+        }
+        const label = `${y}-${String(m).padStart(2, '0')}`;
+        if (!existing.has(label)) {
+          pageTimeBlocks.push(label);
+          existing.add(label);
+        }
+      }
+    } else {
+      // Format: "YYYY"
+      let y = Number(lastLabel);
+      while (pageTimeBlocks.length < pageSize) {
+        y -= 1;
+        const label = String(y);
+        if (!existing.has(label)) {
+          pageTimeBlocks.push(label);
+          existing.add(label);
+        }
+      }
+    }
+  }
+
+  const pageTimeSet = new Set(pageTimeBlocks);
+
+  // Filter topology, entities, and groups to the current page's time blocks
+  const pagedTopology = topology.filter(t => pageTimeSet.has(t.time));
+
+  const activeEntityIds = new Set<string>();
+  for (const t of pagedTopology) {
+    activeEntityIds.add(t.sourceId);
+    activeEntityIds.add(t.targetId);
+  }
+
+  const pagedEntities: Record<string, EntityInfo> = {};
+  for (const [eid, info] of Object.entries(entities)) {
+    if (!activeEntityIds.has(eid)) continue;
+    const filteredCitations: Record<string, number> = {};
+    for (const [time, count] of Object.entries(info.citations)) {
+      if (pageTimeSet.has(time)) filteredCitations[time] = count;
+    }
+    pagedEntities[eid] = { ...info, citations: filteredCitations };
+  }
+
+  const pagedGroups: Record<string, string[][]> = {};
+  for (const [time, g] of Object.entries(groups)) {
+    if (pageTimeSet.has(time)) pagedGroups[time] = g;
+  }
+
   return {
     egoId,
     egoName: idToName[egoId],
     dataset: granularity === 'monthly' ? 'vis-author2-monthly' : DATASET_NAME,
-    entities,
-    topology,
-    groups
+    entities: pagedEntities,
+    topology: pagedTopology,
+    groups: pagedGroups,
+    totalPages,
+    timeBlocks: pageTimeBlocks
   };
 }

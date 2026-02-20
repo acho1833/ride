@@ -4,7 +4,7 @@
  * Spreadline Component
  *
  * Renders a SpreadLine ego-network visualization in a bottom panel tab.
- * Fetches raw data via ORPC, computes layout client-side, renders with D3.
+ * Receives pre-filtered raw data, computes layout client-side, renders with D3.
  * Pan/zoom via Ctrl+wheel / Ctrl+drag; floating controls at lower-right.
  */
 
@@ -14,16 +14,11 @@ import type { SpreadLineData } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-chart';
 import { SpreadLine } from '@/lib/spreadline';
-import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import {
-  SPREADLINE_DEFAULT_EGO_ID,
-  SPREADLINE_DEFAULT_YEAR_RANGE,
   SPREADLINE_RELATION_TYPE_OPTIONS,
   SPREADLINE_MIN_WIDTH_PER_TIMESTAMP,
   SPREADLINE_CHART_HEIGHT,
   SPREADLINE_CATEGORY_COLORS,
-  SPREADLINE_CHAR_WIDTH_PX,
-  SPREADLINE_LABEL_PADDING_PX,
   SPREADLINE_SQUEEZE_SAME_CATEGORY,
   SPREADLINE_MINIMIZE,
   SPREADLINE_GRANULARITY_OPTIONS,
@@ -33,9 +28,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+export interface SpreadlineRawData {
+  egoId: string;
+  egoName: string;
+  dataset: string;
+  entities: Record<string, { name: string; category: 'internal' | 'external'; citations: Record<string, number> }>;
+  topology: { sourceId: string; targetId: string; time: string; weight: number }[];
+  groups: Record<string, string[][]>;
+  timeBlocks: string[];
+}
+
 interface Props {
-  workspaceId?: string;
-  workspaceName?: string;
+  rawData: SpreadlineRawData | null;
   highlightTimes?: string[];
   pinnedEntityNames?: string[];
   relationTypes: string[];
@@ -51,6 +55,7 @@ interface Props {
 }
 
 const SpreadlineComponent = ({
+  rawData,
   highlightTimes,
   pinnedEntityNames = [],
   relationTypes,
@@ -64,17 +69,6 @@ const SpreadlineComponent = ({
   totalPages,
   onPageChange
 }: Props) => {
-  const {
-    data: rawData,
-    isPending,
-    isError,
-    error
-  } = useSpreadlineRawDataQuery({
-    egoId: SPREADLINE_DEFAULT_EGO_ID,
-    relationTypes,
-    yearRange: SPREADLINE_DEFAULT_YEAR_RANGE,
-    granularity
-  });
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
   const [computing, setComputing] = useState(false);
   const [computeError, setComputeError] = useState<string | null>(null);
@@ -107,12 +101,25 @@ const SpreadlineComponent = ({
           idToName[id] = entity.name;
         }
         const nameOf = (id: string) => idToName[id] ?? id;
+        const egoName = nameOf(rawData.egoId);
+
+        // Build topology, adding dummy entries for padded time blocks
+        // so the SpreadLine library creates columns for all timeBlocks.
         const topoData = rawData.topology.map(t => ({
           source: nameOf(t.sourceId),
           target: nameOf(t.targetId),
           time: t.time,
           weight: t.weight
         }));
+        const realTimes = new Set(rawData.topology.map(t => t.time));
+        const firstEntityName = Object.values(rawData.entities)[0]?.name;
+        if (firstEntityName) {
+          for (const time of rawData.timeBlocks) {
+            if (!realTimes.has(time)) {
+              topoData.push({ source: egoName, target: firstEntityName, time, weight: 0 });
+            }
+          }
+        }
         spreadline.load(topoData, { source: 'source', target: 'target', time: 'time', weight: 'weight' }, 'topology');
 
         // Convert entities map to line color array
@@ -133,32 +140,29 @@ const SpreadlineComponent = ({
           spreadline.load(nodeContextData, { time: 'time', entity: 'entity', context: 'context' }, 'node');
         }
 
-        // Convert group IDs to names
+        // Convert group IDs to names — include empty groups for padded time blocks
         const namedGroups: Record<string, string[][]> = {};
         for (const [time, groups] of Object.entries(rawData.groups)) {
           namedGroups[time] = groups.map(group => group.map(id => nameOf(id)));
         }
+        for (const time of rawData.timeBlocks) {
+          if (!namedGroups[time]) {
+            namedGroups[time] = [[], [], [egoName], [], []];
+          }
+        }
 
         const timeConfig = SPREADLINE_TIME_CONFIG[granularity];
-        spreadline.center(nameOf(rawData.egoId), undefined, timeConfig.delta, timeConfig.format, namedGroups);
+        // timeBlocks are descending; timeExtents needs [oldest, newest]
+        const timeExtents: [string, string] | undefined =
+          rawData.timeBlocks.length >= 2 ? [rawData.timeBlocks[rawData.timeBlocks.length - 1], rawData.timeBlocks[0]] : undefined;
+        spreadline.center(egoName, timeExtents, timeConfig.delta, timeConfig.format, namedGroups);
         spreadline.configure({
           squeezeSameCategory: SPREADLINE_SQUEEZE_SAME_CATEGORY,
           minimize: SPREADLINE_MINIMIZE
         });
 
-        // Calculate dynamic width based on entity names
-        const allNames = new Set<string>();
-        rawData.topology.forEach(t => {
-          const srcName = rawData.entities[t.sourceId]?.name ?? t.sourceId;
-          const tgtName = rawData.entities[t.targetId]?.name ?? t.targetId;
-          allNames.add(srcName);
-          allNames.add(tgtName);
-        });
-        const longestName = Math.max(...Array.from(allNames).map(n => n.length));
-        const labelWidth = longestName * SPREADLINE_CHAR_WIDTH_PX + SPREADLINE_LABEL_PADDING_PX;
-        const numTimestamps = new Set(rawData.topology.map(t => t.time)).size;
-        const minWidthPerTimestamp = Math.max(SPREADLINE_MIN_WIDTH_PER_TIMESTAMP, labelWidth);
-        const dynamicWidth = numTimestamps * minWidthPerTimestamp;
+        // Fixed width: consistent across all pages so viewBox stays identical
+        const dynamicWidth = rawData.timeBlocks.length * SPREADLINE_MIN_WIDTH_PER_TIMESTAMP;
 
         const result = spreadline.fit(dynamicWidth, SPREADLINE_CHART_HEIGHT);
         setComputedData({ ...result, mode: 'author', reference: [] } as SpreadLineData);
@@ -186,21 +190,21 @@ const SpreadlineComponent = ({
     []
   );
 
-  if (isPending || computing) {
+  if (!rawData || computing) {
     return (
       <div className="bg-background flex h-full items-center justify-center">
         <div className="text-center">
           <div className="border-primary mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-t-transparent" />
-          <div className="text-muted-foreground text-sm">{isPending ? 'Fetching data...' : 'Computing layout...'}</div>
+          <div className="text-muted-foreground text-sm">{!rawData ? 'Fetching data...' : 'Computing layout...'}</div>
         </div>
       </div>
     );
   }
 
-  if (isError || computeError) {
+  if (computeError) {
     return (
       <div className="bg-background flex h-full items-center justify-center">
-        <div className="text-destructive text-sm">{computeError ?? error?.message ?? 'Failed to load SpreadLine'}</div>
+        <div className="text-destructive text-sm">{computeError}</div>
       </div>
     );
   }
@@ -296,13 +300,13 @@ const SpreadlineComponent = ({
         <div className="bg-background/80 border-border absolute right-2 bottom-2 flex items-center gap-0.5 rounded-lg border px-1 py-0.5">
           {totalPages > 1 && (
             <>
-              <Button variant="ghost" size="icon-xs" disabled={pageIndex >= totalPages - 1} onClick={() => onPageChange(pageIndex + 1)}>
+              <Button variant="ghost" size="icon-xs" disabled={pageIndex <= 0} onClick={() => onPageChange(pageIndex - 1)}>
                 <ChevronLeft />
               </Button>
               <span className="text-muted-foreground w-10 text-center text-xs tabular-nums">
                 {pageIndex + 1}/{totalPages}
               </span>
-              <Button variant="ghost" size="icon-xs" disabled={pageIndex <= 0} onClick={() => onPageChange(pageIndex - 1)}>
+              <Button variant="ghost" size="icon-xs" disabled={pageIndex >= totalPages - 1} onClick={() => onPageChange(pageIndex + 1)}>
                 <ChevronRight />
               </Button>
               <div className="bg-border mx-0.5 h-4 w-px" />

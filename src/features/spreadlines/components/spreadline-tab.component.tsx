@@ -7,7 +7,8 @@
  * and SpreadLine chart on bottom in a resizable split layout.
  * Manages selectedRange, granularity, and pagination state.
  *
- * Range state: [startIndex, endIndex] into visibleTimeBlocks, or null = ALL mode.
+ * Pagination is server-side: the API returns only the current page's data.
+ * Range state: [startIndex, endIndex] into timeBlocks, or null = ALL mode.
  */
 
 import { useState, useMemo, useCallback } from 'react';
@@ -21,7 +22,6 @@ import {
   SPREADLINE_PAGE_SIZE,
   type SpreadlineGranularity
 } from '@/features/spreadlines/const';
-import { getTimeBlocks, getPagedTimeBlocks } from '@/features/spreadlines/utils';
 import SpreadlineGraphComponent from './spreadline-graph.component';
 import SpreadlineComponent from './spreadline.component';
 
@@ -41,19 +41,17 @@ const SpreadlineTabComponent = (_props: Props) => {
     egoId: SPREADLINE_DEFAULT_EGO_ID,
     relationTypes,
     yearRange: SPREADLINE_DEFAULT_YEAR_RANGE,
-    granularity
+    granularity,
+    pageIndex,
+    pageSize: SPREADLINE_PAGE_SIZE
   });
 
-  const allTimeBlocks = useMemo(() => (rawData ? getTimeBlocks(rawData) : []), [rawData]);
-
-  const { blocks: visibleTimeBlocks, totalPages } = useMemo(
-    () => getPagedTimeBlocks(allTimeBlocks, SPREADLINE_PAGE_SIZE, pageIndex),
-    [allTimeBlocks, pageIndex]
-  );
+  const timeBlocks = rawData?.timeBlocks ?? [];
+  const totalPages = rawData?.totalPages ?? 1;
 
   const selectedTimes = useMemo(
-    () => (selectedRange ? visibleTimeBlocks.slice(selectedRange[0], selectedRange[1] + 1) : []),
-    [selectedRange, visibleTimeBlocks]
+    () => (selectedRange ? timeBlocks.slice(selectedRange[0], selectedRange[1] + 1) : []),
+    [selectedRange, timeBlocks]
   );
 
   const handleGranularityChange = useCallback((newGranularity: SpreadlineGranularity) => {
@@ -69,18 +67,18 @@ const SpreadlineTabComponent = (_props: Props) => {
 
   const handleHighlightRangeChange = useCallback(
     (startLabel: string, endLabel: string) => {
-      const startIdx = visibleTimeBlocks.indexOf(startLabel);
-      const endIdx = visibleTimeBlocks.indexOf(endLabel);
+      const startIdx = timeBlocks.indexOf(startLabel);
+      const endIdx = timeBlocks.indexOf(endLabel);
       if (startIdx !== -1 && endIdx !== -1) {
         setSelectedRange([Math.min(startIdx, endIdx), Math.max(startIdx, endIdx)]);
       }
     },
-    [visibleTimeBlocks]
+    [timeBlocks]
   );
 
   const handleTimeClick = useCallback(
     (timeLabel: string) => {
-      const idx = visibleTimeBlocks.indexOf(timeLabel);
+      const idx = timeBlocks.indexOf(timeLabel);
       if (idx === -1) return;
 
       if (!selectedRange) {
@@ -91,19 +89,14 @@ const SpreadlineTabComponent = (_props: Props) => {
         setSelectedRange([newStart, newEnd]);
       }
     },
-    [visibleTimeBlocks, selectedRange]
+    [timeBlocks, selectedRange]
   );
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
         <ResizablePanel defaultSize={50} minSize={20}>
-          <SpreadlineGraphComponent
-            selectedTimes={selectedTimes}
-            pinnedEntityNames={pinnedEntityNames}
-            relationTypes={relationTypes}
-            granularity={granularity}
-          />
+          <SpreadlineGraphComponent rawData={rawData ?? null} selectedTimes={selectedTimes} pinnedEntityNames={pinnedEntityNames} />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -111,6 +104,7 @@ const SpreadlineTabComponent = (_props: Props) => {
         <ResizablePanel defaultSize={50} minSize={20}>
           <div className="h-full w-full overflow-hidden">
             <SpreadlineComponent
+              rawData={rawData ?? null}
               highlightTimes={selectedTimes}
               pinnedEntityNames={pinnedEntityNames}
               relationTypes={relationTypes}

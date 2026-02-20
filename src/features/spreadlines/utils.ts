@@ -86,14 +86,6 @@ export function transformSpreadlineToGraph(rawData: {
 }
 
 /**
- * Extract unique time blocks from topology data, sorted descending (newest first).
- */
-export function getTimeBlocks(rawData: { topology: { time: string }[] }): string[] {
-  const times = [...new Set(rawData.topology.map(t => t.time))];
-  return times.sort((a, b) => b.localeCompare(a));
-}
-
-/**
  * Transform spreadline raw data into graph nodes and links for a SINGLE time block.
  *
  * Uses `groups[time]` to determine hop distance per entity:
@@ -264,25 +256,4 @@ export function transformSpreadlineToGraphByTimes(
   }
 
   return { nodes, links };
-}
-
-/**
- * Compute a page window of time blocks.
- *
- * Time blocks are sorted descending (newest first).
- * Page 0 = most recent blocks (end of the array).
- * Returns the slice of blocks for the given page.
- */
-export function getPagedTimeBlocks(
-  allBlocks: string[],
-  pageSize: number,
-  pageIndex: number
-): { blocks: string[]; totalPages: number } {
-  const totalPages = Math.max(1, Math.ceil(allBlocks.length / pageSize));
-  const clampedPage = Math.max(0, Math.min(pageIndex, totalPages - 1));
-  // Page 0 = most recent = last slice of the array
-  const reversedPage = totalPages - 1 - clampedPage;
-  const start = reversedPage * pageSize;
-  const end = Math.min(start + pageSize, allBlocks.length);
-  return { blocks: allBlocks.slice(start, end), totalPages };
 }

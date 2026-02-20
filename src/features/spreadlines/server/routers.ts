@@ -26,7 +26,9 @@ const spreadlineRawDataResponseSchema = z.object({
   dataset: z.string(),
   entities: z.record(z.string(), entityInfoSchema),
   topology: topologyEntrySchema.array(),
-  groups: z.record(z.string(), z.array(z.array(z.string())))
+  groups: z.record(z.string(), z.array(z.array(z.string()))),
+  totalPages: z.number(),
+  timeBlocks: z.array(z.string())
 });
 
 export const spreadlineRouter = appProcedure.router({
@@ -42,7 +44,9 @@ export const spreadlineRouter = appProcedure.router({
         egoId: z.string(),
         relationTypes: z.array(z.string()),
         yearRange: z.tuple([z.number(), z.number()]),
-        granularity: z.enum(['yearly', 'monthly']).default('yearly')
+        granularity: z.enum(['yearly', 'monthly']).default('yearly'),
+        pageIndex: z.number().default(0),
+        pageSize: z.number().default(20)
       })
     )
     .output(spreadlineRawDataResponseSchema)

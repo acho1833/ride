@@ -57,10 +57,7 @@ export const SPREADLINE_DEFAULT_GRANULARITY: SpreadlineGranularity = 'yearly';
 export const SPREADLINE_PAGE_SIZE = 20;
 
 /** Time config per granularity */
-export const SPREADLINE_TIME_CONFIG: Record<
-  SpreadlineGranularity,
-  { delta: string; format: string }
-> = {
+export const SPREADLINE_TIME_CONFIG: Record<SpreadlineGranularity, { delta: string; format: string }> = {
   yearly: { delta: 'year', format: '%Y' },
   monthly: { delta: 'month', format: '%Y-%m' }
 };

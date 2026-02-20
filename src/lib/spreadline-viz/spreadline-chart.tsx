@@ -148,6 +148,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   const visualizerRef = useRef<SpreadLinesVisualizer | null>(null);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const zoomTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+  const zoomLayerRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const isDraggingHighlightRef = useRef(false);
 
   // Refs for callbacks - prevents re-init when callback identity changes
@@ -194,10 +195,63 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   );
 
   /**
-   * Initialize or reinitialize the D3 visualization.
-   *
-   * IMPORTANT: This only runs when data or config changes.
-   * Filter changes are handled separately by D3 via applyFilter().
+   * Create merged config from defaults + overrides.
+   */
+  const getMergedConfig = useCallback(() => {
+    const defaultConfig = createDefaultConfig();
+    return {
+      ...defaultConfig,
+      ...config,
+      content: {
+        ...defaultConfig.content,
+        ...config?.content
+      }
+    } as SpreadLineConfig;
+  }, [config]);
+
+  /**
+   * Render visualizer content into a temporary SVG, then move children into zoomLayer.
+   * This preserves the existing viewBox, zoom behavior, and zoom transform.
+   */
+  const updateContent = useCallback(() => {
+    const svg = svgRef.current;
+    const zoomLayer = zoomLayerRef.current;
+    if (!svg || !zoomLayer || !data) return;
+
+    // Clean up old visualizer tooltip — don't call destroy() as it removes
+    // all SVG children (including the zoom-layer we want to preserve)
+    d3.select('#point-tooltip').remove();
+    visualizerRef.current = null;
+
+    // Clear zoom-layer content
+    zoomLayer.selectAll('*').remove();
+
+    // Create new visualizer and render into SVG
+    const visualizer = new SpreadLinesVisualizer(data, getMergedConfig());
+    visualizer.onBlockExpand = (blockId, expanded) => onBlockExpandRef.current?.(blockId, expanded);
+    visualizer.onFilterChange = names => onFilterChangeRef.current?.(names);
+    visualizer.onEntityPin = name => onEntityPinRef.current?.(name);
+    visualizer.visualize(svg);
+
+    // Restore SVG sizing (visualize() sets numeric width/height)
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+
+    // Move newly rendered children (everything except zoom-layer) into zoom-layer
+    const zoomNode = zoomLayer.node()!;
+    const newChildren = Array.from(svg.childNodes).filter(node => node !== zoomNode);
+    newChildren.forEach(child => zoomNode.appendChild(child));
+
+    // Restore zoom transform on the zoom-layer
+    zoomLayer.attr('transform', zoomTransformRef.current.toString());
+
+    visualizer.applyFilter(yearsFilterRef.current, crossingOnlyRef.current);
+    visualizerRef.current = visualizer;
+  }, [data, getMergedConfig]);
+
+  /**
+   * Full initialization: create SVG structure, viewBox, zoom-layer, d3-zoom.
+   * Only runs on first render or when resetKey changes.
    */
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const initVisualization = useCallback(() => {
@@ -212,28 +266,14 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     // Clear SVG and remove old zoom behavior
     svgRef.current.innerHTML = '';
     zoomBehaviorRef.current = null;
+    zoomLayerRef.current = null;
     zoomTransformRef.current = d3.zoomIdentity;
 
-    // Create merged config - ensure content settings are properly merged
-    const defaultConfig = createDefaultConfig();
-    const mergedConfig: SpreadLineConfig = {
-      ...defaultConfig,
-      ...config,
-      content: {
-        ...defaultConfig.content,
-        ...config?.content
-      }
-    };
-
-    // Create visualizer
-    const visualizer = new SpreadLinesVisualizer(data, mergedConfig);
-
-    // Set callbacks using refs so they always use the latest version
+    // Create visualizer and render
+    const visualizer = new SpreadLinesVisualizer(data, getMergedConfig());
     visualizer.onBlockExpand = (blockId, expanded) => onBlockExpandRef.current?.(blockId, expanded);
     visualizer.onFilterChange = names => onFilterChangeRef.current?.(names);
     visualizer.onEntityPin = name => onEntityPinRef.current?.(name);
-
-    // Render visualization into SVG
     visualizer.visualize(svgRef.current);
 
     // Set viewBox so SVG scales to fit container width, height from aspect ratio
@@ -250,9 +290,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     // Wrap all existing SVG children in a zoom-layer <g>
     const svgSelection = d3.select(svg);
     const zoomLayer = svgSelection.append('g').attr('class', 'zoom-layer');
-    // Move all children except the zoom-layer itself into it
     const children = Array.from(svg.childNodes).filter(node => node !== zoomLayer.node());
     children.forEach(child => zoomLayer.node()!.appendChild(child));
+    zoomLayerRef.current = zoomLayer;
 
     // Set up d3-zoom on the SVG
     const zoom = d3
@@ -276,8 +316,6 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       });
 
     svgSelection.call(zoom);
-    // Prevent Ctrl+wheel from also scrolling/zooming the page
-    // Use a separate namespace so we don't overwrite d3-zoom's own wheel.zoom handler
     svgSelection.on(
       'wheel.preventCtrl',
       function (event: WheelEvent) {
@@ -294,22 +332,37 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     visualizer.applyFilter(yearsFilterRef.current, crossingOnlyRef.current);
 
     visualizerRef.current = visualizer;
-  }, [data, config]); // ONLY data and config - filters handled by D3
+  }, [data, getMergedConfig]);
 
   /**
-   * Initialize on mount and when resetKey changes
+   * Full init on mount and when resetKey changes.
    */
   useEffect(() => {
     initVisualization();
 
     return () => {
-      // Cleanup on unmount
       if (visualizerRef.current) {
         visualizerRef.current.destroy();
         visualizerRef.current = null;
       }
     };
-  }, [initVisualization, resetKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
+
+  /**
+   * Content-only update when data changes after initial render.
+   * If zoom-layer already exists, update content in place (preserves viewBox + zoom).
+   * Otherwise, full init (first render).
+   */
+  useEffect(() => {
+    if (!data) return;
+    if (zoomLayerRef.current) {
+      updateContent();
+    } else {
+      initVisualization();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   /**
    * Handle filter changes via D3 (not React re-render).
