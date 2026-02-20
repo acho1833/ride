@@ -41,6 +41,30 @@ export const SPREADLINE_TIME_DELTA = 'year';
 /** Date format string for parsing/displaying time */
 export const SPREADLINE_TIME_FORMAT = '%Y';
 
+/** Granularity type for time axis */
+export type SpreadlineGranularity = 'yearly' | 'monthly';
+
+/** Available granularity options for the dropdown */
+export const SPREADLINE_GRANULARITY_OPTIONS: { label: string; value: SpreadlineGranularity }[] = [
+  { label: 'Yearly', value: 'yearly' },
+  { label: 'Monthly', value: 'monthly' }
+];
+
+/** Default granularity */
+export const SPREADLINE_DEFAULT_GRANULARITY: SpreadlineGranularity = 'yearly';
+
+/** Number of blocks per page for pagination */
+export const SPREADLINE_PAGE_SIZE = 20;
+
+/** Time config per granularity */
+export const SPREADLINE_TIME_CONFIG: Record<
+  SpreadlineGranularity,
+  { delta: string; format: string }
+> = {
+  yearly: { delta: 'year', format: '%Y' },
+  monthly: { delta: 'month', format: '%Y-%m' }
+};
+
 /** Compact same-category lines closer together */
 export const SPREADLINE_SQUEEZE_SAME_CATEGORY = true;
 
