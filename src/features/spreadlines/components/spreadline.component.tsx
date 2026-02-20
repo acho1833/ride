@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Minus, Plus, Maximize, X } from 'lucide-react';
+import { Minus, Plus, Maximize, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SpreadLineData } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-chart';
@@ -24,10 +24,11 @@ import {
   SPREADLINE_CATEGORY_COLORS,
   SPREADLINE_CHAR_WIDTH_PX,
   SPREADLINE_LABEL_PADDING_PX,
-  SPREADLINE_TIME_DELTA,
-  SPREADLINE_TIME_FORMAT,
   SPREADLINE_SQUEEZE_SAME_CATEGORY,
-  SPREADLINE_MINIMIZE
+  SPREADLINE_MINIMIZE,
+  SPREADLINE_GRANULARITY_OPTIONS,
+  SPREADLINE_TIME_CONFIG,
+  type SpreadlineGranularity
 } from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -42,6 +43,11 @@ interface Props {
   onTimeClick?: (timeLabel: string) => void;
   onHighlightRangeChange?: (startLabel: string, endLabel: string) => void;
   onEntityPin?: (names: string[]) => void;
+  granularity: SpreadlineGranularity;
+  onGranularityChange: (granularity: SpreadlineGranularity) => void;
+  pageIndex: number;
+  totalPages: number;
+  onPageChange: (pageIndex: number) => void;
 }
 
 const SpreadlineComponent = ({
@@ -51,7 +57,12 @@ const SpreadlineComponent = ({
   onRelationTypesChange,
   onTimeClick,
   onHighlightRangeChange,
-  onEntityPin
+  onEntityPin,
+  granularity,
+  onGranularityChange,
+  pageIndex,
+  totalPages,
+  onPageChange
 }: Props) => {
   const {
     data: rawData,
@@ -61,7 +72,8 @@ const SpreadlineComponent = ({
   } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
     relationTypes,
-    yearRange: SPREADLINE_DEFAULT_YEAR_RANGE
+    yearRange: SPREADLINE_DEFAULT_YEAR_RANGE,
+    granularity
   });
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
   const [computing, setComputing] = useState(false);
@@ -127,7 +139,8 @@ const SpreadlineComponent = ({
           namedGroups[time] = groups.map(group => group.map(id => nameOf(id)));
         }
 
-        spreadline.center(nameOf(rawData.egoId), undefined, SPREADLINE_TIME_DELTA, SPREADLINE_TIME_FORMAT, namedGroups);
+        const timeConfig = SPREADLINE_TIME_CONFIG[granularity];
+        spreadline.center(nameOf(rawData.egoId), undefined, timeConfig.delta, timeConfig.format, namedGroups);
         spreadline.configure({
           squeezeSameCategory: SPREADLINE_SQUEEZE_SAME_CATEGORY,
           minimize: SPREADLINE_MINIMIZE
@@ -158,7 +171,7 @@ const SpreadlineComponent = ({
     }
 
     computeLayout();
-  }, [rawData]);
+  }, [rawData, granularity]);
 
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
 
@@ -238,6 +251,18 @@ const SpreadlineComponent = ({
             ))}
           </SelectContent>
         </Select>
+        <Select value={granularity} onValueChange={val => onGranularityChange(val as SpreadlineGranularity)}>
+          <SelectTrigger className="h-7 w-auto gap-1 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SPREADLINE_GRANULARITY_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           variant="ghost"
           size="sm"
@@ -269,6 +294,20 @@ const SpreadlineComponent = ({
 
         {/* Floating zoom controls */}
         <div className="bg-background/80 border-border absolute right-2 bottom-2 flex items-center gap-0.5 rounded-lg border px-1 py-0.5">
+          {totalPages > 1 && (
+            <>
+              <Button variant="ghost" size="icon-xs" disabled={pageIndex >= totalPages - 1} onClick={() => onPageChange(pageIndex + 1)}>
+                <ChevronLeft />
+              </Button>
+              <span className="text-muted-foreground w-10 text-center text-xs tabular-nums">
+                {pageIndex + 1}/{totalPages}
+              </span>
+              <Button variant="ghost" size="icon-xs" disabled={pageIndex <= 0} onClick={() => onPageChange(pageIndex - 1)}>
+                <ChevronRight />
+              </Button>
+              <div className="bg-border mx-0.5 h-4 w-px" />
+            </>
+          )}
           <Button variant="ghost" size="icon-xs" onClick={() => chartRef.current?.zoomOut()}>
             <Minus />
           </Button>

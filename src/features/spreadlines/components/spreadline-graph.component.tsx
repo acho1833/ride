@@ -30,6 +30,7 @@ import {
   GRAPH_RADIAL_STRENGTH,
   GRAPH_TIME_TRANSITION_MS
 } from '@/features/spreadlines/const';
+import type { SpreadlineGranularity } from '@/features/spreadlines/const';
 import { transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
 
@@ -137,9 +138,10 @@ interface Props {
   selectedTimes?: string[];
   pinnedEntityNames?: string[];
   relationTypes: string[];
+  granularity: SpreadlineGranularity;
 }
 
-const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [], relationTypes }: Props) => {
+const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [], relationTypes, granularity }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -166,7 +168,8 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [], 
   } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
     relationTypes,
-    yearRange: SPREADLINE_DEFAULT_YEAR_RANGE
+    yearRange: SPREADLINE_DEFAULT_YEAR_RANGE,
+    granularity
   });
 
   // Observe container size
