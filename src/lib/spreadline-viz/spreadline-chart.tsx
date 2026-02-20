@@ -199,12 +199,21 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
    */
   const getMergedConfig = useCallback(() => {
     const defaultConfig = createDefaultConfig();
+    const legendOverride = config?.legend as Partial<SpreadLineConfig['legend']> | undefined;
     return {
       ...defaultConfig,
       ...config,
       content: {
         ...defaultConfig.content,
         ...config?.content
+      },
+      legend: {
+        line: { ...defaultConfig.legend.line, ...legendOverride?.line },
+        node: { ...defaultConfig.legend.node, ...legendOverride?.node }
+      },
+      background: {
+        ...defaultConfig.background,
+        ...config?.background
       }
     } as SpreadLineConfig;
   }, [config]);

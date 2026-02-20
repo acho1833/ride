@@ -19,6 +19,7 @@ import {
   SPREADLINE_DEFAULT_RELATION_TYPES,
   SPREADLINE_DEFAULT_YEAR_RANGE,
   SPREADLINE_DEFAULT_GRANULARITY,
+  SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION,
   SPREADLINE_PAGE_SIZE,
   type SpreadlineGranularity
 } from '@/features/spreadlines/const';
@@ -35,6 +36,7 @@ const SpreadlineTabComponent = (_props: Props) => {
   const [pinnedEntityNames, setPinnedEntityNames] = useState<string[]>([]);
   const [relationTypes, setRelationTypes] = useState<string[]>(SPREADLINE_DEFAULT_RELATION_TYPES);
   const [granularity, setGranularity] = useState<SpreadlineGranularity>(SPREADLINE_DEFAULT_GRANULARITY);
+  const [splitByAffiliation, setSplitByAffiliation] = useState(SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION);
   const [pageIndex, setPageIndex] = useState(0);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
@@ -42,6 +44,7 @@ const SpreadlineTabComponent = (_props: Props) => {
     relationTypes,
     yearRange: SPREADLINE_DEFAULT_YEAR_RANGE,
     granularity,
+    splitByAffiliation,
     pageIndex,
     pageSize: SPREADLINE_PAGE_SIZE
   });
@@ -114,6 +117,8 @@ const SpreadlineTabComponent = (_props: Props) => {
               onEntityPin={setPinnedEntityNames}
               granularity={granularity}
               onGranularityChange={handleGranularityChange}
+              splitByAffiliation={splitByAffiliation}
+              onSplitByAffiliationChange={setSplitByAffiliation}
               pageIndex={pageIndex}
               totalPages={totalPages}
               onPageChange={handlePageChange}

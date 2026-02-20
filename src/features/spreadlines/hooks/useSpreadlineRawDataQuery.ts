@@ -7,6 +7,7 @@ export const useSpreadlineRawDataQuery = (params: {
   relationTypes: string[];
   yearRange: [number, number];
   granularity?: SpreadlineGranularity;
+  splitByAffiliation?: boolean;
   pageIndex?: number;
   pageSize?: number;
 }) => {

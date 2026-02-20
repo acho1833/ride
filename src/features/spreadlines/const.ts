@@ -53,6 +53,9 @@ export const SPREADLINE_GRANULARITY_OPTIONS: { label: string; value: SpreadlineG
 /** Default granularity */
 export const SPREADLINE_DEFAULT_GRANULARITY: SpreadlineGranularity = 'yearly';
 
+/** Default split by affiliation (internal/external distinction) */
+export const SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION = true;
+
 /** Number of blocks per page for pagination */
 export const SPREADLINE_PAGE_SIZE = 20;
 

@@ -45,6 +45,7 @@ export const spreadlineRouter = appProcedure.router({
         relationTypes: z.array(z.string()),
         yearRange: z.tuple([z.number(), z.number()]),
         granularity: z.enum(['yearly', 'monthly']).default('yearly'),
+        splitByAffiliation: z.boolean().default(true),
         pageIndex: z.number().default(0),
         pageSize: z.number().default(20)
       })

@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Minus, Plus, Maximize, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { SpreadLineData } from '@/lib/spreadline-viz/spreadline-types';
+import type { SpreadLineData, SpreadLineConfig } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-chart';
 import { SpreadLine } from '@/lib/spreadline';
@@ -49,6 +49,8 @@ interface Props {
   onEntityPin?: (names: string[]) => void;
   granularity: SpreadlineGranularity;
   onGranularityChange: (granularity: SpreadlineGranularity) => void;
+  splitByAffiliation: boolean;
+  onSplitByAffiliationChange: (value: boolean) => void;
   pageIndex: number;
   totalPages: number;
   onPageChange: (pageIndex: number) => void;
@@ -65,6 +67,8 @@ const SpreadlineComponent = ({
   onEntityPin,
   granularity,
   onGranularityChange,
+  splitByAffiliation,
+  onSplitByAffiliationChange,
   pageIndex,
   totalPages,
   onPageChange
@@ -180,14 +184,30 @@ const SpreadlineComponent = ({
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
 
   const config = useMemo(
-    () => ({
-      content: {
-        customize: () => {},
-        collisionDetection: true,
-        showLinks: false
-      }
-    }),
-    []
+    () =>
+      ({
+        content: {
+          customize: () => {},
+          collisionDetection: true,
+          showLinks: false
+        },
+        ...(splitByAffiliation
+          ? {}
+          : {
+              background: {
+                direction: [] as string[],
+                directionFontSize: '3rem',
+                timeLabelFormat: (d: string) => d,
+                annotations: [],
+                timeHighlight: [] as string[],
+                sliderTitle: 'Min Years'
+              },
+              legend: {
+                line: { domain: [] as string[], range: [] as string[], offset: [] as number[] }
+              }
+            })
+      }) as Partial<SpreadLineConfig>,
+    [splitByAffiliation]
   );
 
   if (!rawData || computing) {
@@ -242,6 +262,10 @@ const SpreadlineComponent = ({
         <div className="flex items-center gap-1.5">
           <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
           <label className="text-muted-foreground">Crossing only</label>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input type="checkbox" checked={splitByAffiliation} onChange={e => onSplitByAffiliationChange(e.target.checked)} />
+          <label className="text-muted-foreground">Split by affiliation</label>
         </div>
         <Select value={relationTypes[0]} onValueChange={val => onRelationTypesChange([val])}>
           <SelectTrigger className="ml-auto h-7 w-auto gap-1 text-xs">
