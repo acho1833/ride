@@ -64,7 +64,10 @@ const INTERNAL: LineCategoryValue = 'internal';
 const EXTERNAL: LineCategoryValue = 'external';
 const HOP_LIMIT = 2;
 const DATASET_NAME = 'vis-author2';
-const DATA_DIR = `data/spreadline/${DATASET_NAME}`;
+const DATASET_DIRS: Record<string, string> = {
+  yearly: 'data/spreadline/vis-author2',
+  monthly: 'data/spreadline/vis-author2-monthly'
+};
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -343,9 +346,11 @@ export async function getSpreadlineRawData(params: {
   egoId: string;
   relationTypes: string[];
   yearRange: [number, number];
+  granularity?: 'yearly' | 'monthly';
 }): Promise<SpreadlineRawDataResponse> {
-  const { egoId, relationTypes, yearRange } = params;
-  const basePath = path.join(process.cwd(), DATA_DIR);
+  const { egoId, relationTypes, yearRange, granularity = 'yearly' } = params;
+  const dataDir = DATASET_DIRS[granularity] ?? DATASET_DIRS.yearly;
+  const basePath = path.join(process.cwd(), dataDir);
 
   let relations: RelationRow[];
   let allEntities: EntityRow[];
@@ -365,7 +370,8 @@ export async function getSpreadlineRawData(params: {
 
   // Filter relations by type and year range
   relations = relations.filter(r => {
-    const year = Number(r.year);
+    const yearStr = String(r.year);
+    const year = Number(yearStr.substring(0, 4));
     return relationTypes.includes(r.type) && year >= yearRange[0] && year <= yearRange[1];
   });
 
@@ -418,7 +424,7 @@ export async function getSpreadlineRawData(params: {
   return {
     egoId,
     egoName: idToName[egoId],
-    dataset: DATASET_NAME,
+    dataset: granularity === 'monthly' ? 'vis-author2-monthly' : DATASET_NAME,
     entities,
     topology,
     groups

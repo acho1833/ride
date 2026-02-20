@@ -83,7 +83,7 @@ describe('spreadline-data.service', () => {
       const allIds = new Set([...Object.keys(result.entities), result.egoId]);
 
       for (const [year, layers] of Object.entries(result.groups)) {
-        expect(year).toMatch(/^\d{4}$/);
+        expect(year).toMatch(/^\d{4}(-\d{2})?$/);
         expect(layers).toHaveLength(5);
         for (const layer of layers) {
           for (const id of layer) {
@@ -102,9 +102,26 @@ describe('spreadline-data.service', () => {
 
       for (const entity of Object.values(result.entities)) {
         for (const [time, count] of Object.entries(entity.citations)) {
-          expect(time).toMatch(/^\d{4}$/);
+          expect(time).toMatch(/^\d{4}(-\d{2})?$/);
           expect(typeof count).toBe('number');
         }
+      }
+    });
+
+    it('returns monthly data when granularity is monthly', async () => {
+      const result = await getSpreadlineRawData({
+        egoId: 'p1199',
+        relationTypes: ['Co-co-author'],
+        yearRange: [2002, 2022],
+        granularity: 'monthly'
+      });
+
+      expect(result.dataset).toBe('vis-author2-monthly');
+      expect(result.topology.length).toBeGreaterThan(0);
+
+      // Monthly topology times should be in YYYY-MM format
+      for (const entry of result.topology) {
+        expect(entry.time).toMatch(/^\d{4}-\d{2}$/);
       }
     });
   });
