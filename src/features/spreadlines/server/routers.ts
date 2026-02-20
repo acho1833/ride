@@ -41,7 +41,8 @@ export const spreadlineRouter = appProcedure.router({
       z.object({
         egoId: z.string(),
         relationTypes: z.array(z.string()),
-        yearRange: z.tuple([z.number(), z.number()])
+        yearRange: z.tuple([z.number(), z.number()]),
+        granularity: z.enum(['yearly', 'monthly']).default('yearly')
       })
     )
     .output(spreadlineRawDataResponseSchema)
