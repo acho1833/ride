@@ -8,6 +8,9 @@ export const SPREADLINE_DEFAULT_EGO_ID = 'p1199';
 /** Default relation types to include */
 export const SPREADLINE_DEFAULT_RELATION_TYPES = ['Co-co-author'];
 
+/** Available relation types for the dropdown */
+export const SPREADLINE_RELATION_TYPE_OPTIONS = ['Co-co-author'] as const;
+
 /** Default year range [start, end] */
 export const SPREADLINE_DEFAULT_YEAR_RANGE: [number, number] = [2002, 2022];
 

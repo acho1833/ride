@@ -17,8 +17,8 @@ import { SpreadLine } from '@/lib/spreadline';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import {
   SPREADLINE_DEFAULT_EGO_ID,
-  SPREADLINE_DEFAULT_RELATION_TYPES,
   SPREADLINE_DEFAULT_YEAR_RANGE,
+  SPREADLINE_RELATION_TYPE_OPTIONS,
   SPREADLINE_MIN_WIDTH_PER_TIMESTAMP,
   SPREADLINE_CHART_HEIGHT,
   SPREADLINE_CATEGORY_COLORS,
@@ -30,18 +30,21 @@ import {
   SPREADLINE_MINIMIZE
 } from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   workspaceId?: string;
   workspaceName?: string;
   highlightTimes?: string[];
   pinnedEntityNames?: string[];
+  relationTypes: string[];
+  onRelationTypesChange: (types: string[]) => void;
   onTimeClick?: (timeLabel: string) => void;
   onHighlightRangeChange?: (startLabel: string, endLabel: string) => void;
   onEntityPin?: (names: string[]) => void;
 }
 
-const SpreadlineComponent = ({ highlightTimes, pinnedEntityNames = [], onTimeClick, onHighlightRangeChange, onEntityPin }: Props) => {
+const SpreadlineComponent = ({ highlightTimes, pinnedEntityNames = [], relationTypes, onRelationTypesChange, onTimeClick, onHighlightRangeChange, onEntityPin }: Props) => {
   const {
     data: rawData,
     isPending,
@@ -49,7 +52,7 @@ const SpreadlineComponent = ({ highlightTimes, pinnedEntityNames = [], onTimeCli
     error
   } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
-    relationTypes: SPREADLINE_DEFAULT_RELATION_TYPES,
+    relationTypes,
     yearRange: SPREADLINE_DEFAULT_YEAR_RANGE
   });
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
@@ -196,6 +199,16 @@ const SpreadlineComponent = ({ highlightTimes, pinnedEntityNames = [], onTimeCli
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="bg-background border-border flex shrink-0 items-center gap-4 border-b px-3 py-1.5 text-xs">
+        <Select value={relationTypes[0]} onValueChange={(val) => onRelationTypesChange([val])}>
+          <SelectTrigger className="h-7 w-auto gap-1 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SPREADLINE_RELATION_TYPE_OPTIONS.map(type => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <span className="text-muted-foreground">
           {computedData.storylines.length} entities | {computedData.blocks.length} blocks | Ego: {computedData.ego}
         </span>

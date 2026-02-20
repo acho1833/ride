@@ -27,10 +27,11 @@ const SpreadlineTabComponent = (_props: Props) => {
   // Default to first year ([0,0]). Before timeBlocks load, selectedTimes will be [] = ALL mode.
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>([0, 0]);
   const [pinnedEntityNames, setPinnedEntityNames] = useState<string[]>([]);
+  const [relationTypes, setRelationTypes] = useState<string[]>(SPREADLINE_DEFAULT_RELATION_TYPES);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
-    relationTypes: SPREADLINE_DEFAULT_RELATION_TYPES,
+    relationTypes,
     yearRange: SPREADLINE_DEFAULT_YEAR_RANGE
   });
 
@@ -78,7 +79,7 @@ const SpreadlineTabComponent = (_props: Props) => {
       <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
         {/* Graph Panel */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <SpreadlineGraphComponent selectedTimes={selectedTimes} pinnedEntityNames={pinnedEntityNames} />
+          <SpreadlineGraphComponent selectedTimes={selectedTimes} pinnedEntityNames={pinnedEntityNames} relationTypes={relationTypes} />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -89,6 +90,8 @@ const SpreadlineTabComponent = (_props: Props) => {
             <SpreadlineComponent
               highlightTimes={selectedTimes}
               pinnedEntityNames={pinnedEntityNames}
+              relationTypes={relationTypes}
+              onRelationTypesChange={setRelationTypes}
               onTimeClick={handleTimeClick}
               onHighlightRangeChange={handleHighlightRangeChange}
               onEntityPin={setPinnedEntityNames}

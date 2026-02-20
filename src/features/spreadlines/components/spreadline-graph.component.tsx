@@ -20,7 +20,6 @@ import { GRAPH_CONFIG, DOT_GRID_CONFIG } from '@/features/workspace/const';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import {
   SPREADLINE_DEFAULT_EGO_ID,
-  SPREADLINE_DEFAULT_RELATION_TYPES,
   SPREADLINE_DEFAULT_YEAR_RANGE,
   SPREADLINE_INTERNAL_COLOR,
   SPREADLINE_EXTERNAL_COLOR,
@@ -137,9 +136,10 @@ const bfsDistances = (startId: string, links: SpreadlineGraphLink[]): Map<string
 interface Props {
   selectedTimes?: string[];
   pinnedEntityNames?: string[];
+  relationTypes: string[];
 }
 
-const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }: Props) => {
+const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [], relationTypes }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -165,7 +165,7 @@ const SpreadlineGraphComponent = ({ selectedTimes = [], pinnedEntityNames = [] }
     error
   } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
-    relationTypes: SPREADLINE_DEFAULT_RELATION_TYPES,
+    relationTypes,
     yearRange: SPREADLINE_DEFAULT_YEAR_RANGE
   });
 
