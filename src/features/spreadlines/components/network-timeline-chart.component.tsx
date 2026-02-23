@@ -40,10 +40,7 @@ import { transformSpreadlineToTimeline } from '@/features/spreadlines/utils';
 import type { TimelineEntity } from '@/features/spreadlines/utils';
 
 /** D3 threshold scale: citation count -> heatmap fill color */
-const citationColorScale = d3
-  .scaleThreshold<number, string>()
-  .domain(SPREADLINE_FREQUENCY_THRESHOLDS)
-  .range(SPREADLINE_FREQUENCY_COLORS);
+const citationColorScale = d3.scaleThreshold<number, string>().domain(SPREADLINE_FREQUENCY_THRESHOLDS).range(SPREADLINE_FREQUENCY_COLORS);
 
 interface Props {
   rawData: SpreadlineRawData | null;
@@ -238,9 +235,7 @@ const NetworkTimelineChartComponent = ({
   const handleEntityClick = useCallback(
     (name: string) => {
       if (!onEntityPin) return;
-      const updated = pinnedEntityNames.includes(name)
-        ? pinnedEntityNames.filter(n => n !== name)
-        : [...pinnedEntityNames, name];
+      const updated = pinnedEntityNames.includes(name) ? pinnedEntityNames.filter(n => n !== name) : [...pinnedEntityNames, name];
       onEntityPin(updated);
     },
     [pinnedEntityNames, onEntityPin]
@@ -270,11 +265,7 @@ const NetworkTimelineChartComponent = ({
     timeBlocks.forEach((tb, i) => timeBlockIndex.set(tb, i));
 
     // X scale: time blocks (used as-is — descending from API, newest on left)
-    const xScale = d3
-      .scaleBand()
-      .domain(timeBlocks)
-      .range([0, chartWidth])
-      .padding(0.1);
+    const xScale = d3.scaleBand().domain(timeBlocks).range([0, chartWidth]).padding(0.1);
 
     // Y scale: entity names in filtered order
     const yScale = d3
@@ -430,22 +421,18 @@ const NetworkTimelineChartComponent = ({
           .attr('stroke-width', 1);
       }
     }
-  }, [filteredEntities, timeBlocks, selectedRange, highlightSet, pinnedEntityNames, handleEntityClick, handleTimeColumnClick, containerWidth]);
+  }, [
+    filteredEntities,
+    timeBlocks,
+    selectedRange,
+    highlightSet,
+    pinnedEntityNames,
+    handleEntityClick,
+    handleTimeColumnClick,
+    containerWidth
+  ]);
 
-  // Loading state
-  if (!rawData) {
-    return (
-      <div className="bg-background flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="border-primary mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-t-transparent" />
-          <div className="text-muted-foreground text-sm">Fetching data...</div>
-        </div>
-      </div>
-    );
-  }
-
-  const svgHeight =
-    NETWORK_TIMELINE_PADDING.top + NETWORK_TIMELINE_PADDING.bottom + filteredEntities.length * NETWORK_TIMELINE_ROW_HEIGHT;
+  const svgHeight = NETWORK_TIMELINE_PADDING.top + NETWORK_TIMELINE_PADDING.bottom + filteredEntities.length * NETWORK_TIMELINE_ROW_HEIGHT;
 
   // Compute highlight overlay position for the HTML drag layer
   const pad = NETWORK_TIMELINE_PADDING;
@@ -459,7 +446,7 @@ const NetworkTimelineChartComponent = ({
       {/* Toolbar */}
       <div className="bg-background border-border flex shrink-0 items-center gap-4 border-b px-3 py-1.5 text-xs">
         <span className="text-muted-foreground">
-          {filteredEntities.length} entities | {timeBlocks.length} blocks | Ego: {rawData.egoName}
+          {filteredEntities.length} entities | {timeBlocks.length} blocks{rawData ? ` | Ego: ${rawData.egoName}` : ''}
         </span>
 
         <div className="bg-border h-4 w-px" />
@@ -538,19 +525,11 @@ const NetworkTimelineChartComponent = ({
 
       {/* Scrollable chart area */}
       <div ref={containerRef} className="relative min-h-0 flex-1 overflow-y-auto">
-        <svg
-          ref={svgRef}
-          className="text-foreground w-full"
-          height={svgHeight}
-          style={{ minHeight: svgHeight }}
-        />
+        <svg ref={svgRef} className="text-foreground w-full" height={svgHeight} style={{ minHeight: svgHeight }} />
 
         {/* HTML drag layer for highlight handles (overlays the SVG) */}
         {selectedRange && hlWidth > 0 && (
-          <div
-            className="pointer-events-none absolute top-0"
-            style={{ left: hlLeft, width: hlWidth, height: svgHeight }}
-          >
+          <div className="pointer-events-none absolute top-0" style={{ left: hlLeft, width: hlWidth, height: svgHeight }}>
             {/* Left handle */}
             <div
               className="pointer-events-auto absolute top-0 bottom-0 -left-1.5 w-3 cursor-ew-resize"
@@ -585,12 +564,7 @@ const NetworkTimelineChartComponent = ({
               <span className="text-muted-foreground w-10 text-center text-xs tabular-nums">
                 {pageIndex + 1}/{totalPages}
               </span>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                disabled={pageIndex >= totalPages - 1}
-                onClick={() => onPageChange(pageIndex + 1)}
-              >
+              <Button variant="ghost" size="icon-xs" disabled={pageIndex >= totalPages - 1} onClick={() => onPageChange(pageIndex + 1)}>
                 <ChevronRight />
               </Button>
             </>
