@@ -140,3 +140,23 @@ export const SPREADLINE_HIGHLIGHT_HANDLE_COLOR = 'rgba(59, 130, 246, 0.4)';
 
 /** Fill color for highlight bar drag handles on hover */
 export const SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR = 'rgba(59, 130, 246, 0.7)';
+
+// ── Network Timeline Constants ────────────────────────────────────
+
+/** Bottom tab type for switching between spreadline and network timeline */
+export type SpreadlineBottomTab = 'spreadline' | 'network-timeline';
+
+/** Height of each entity row in the network timeline chart (px) */
+export const NETWORK_TIMELINE_ROW_HEIGHT = 32;
+
+/** Radius of dots at each time block (px) */
+export const NETWORK_TIMELINE_DOT_RADIUS = 5;
+
+/** Stroke width of lines connecting consecutive time blocks (px) */
+export const NETWORK_TIMELINE_LINE_WIDTH = 3;
+
+/** Width of the entity name label column (px) */
+export const NETWORK_TIMELINE_LABEL_WIDTH = 120;
+
+/** Padding around the chart area */
+export const NETWORK_TIMELINE_PADDING = { top: 30, right: 20, bottom: 10, left: 130 };
