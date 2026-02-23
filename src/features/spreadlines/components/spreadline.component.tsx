@@ -23,6 +23,8 @@ import {
   SPREADLINE_MINIMIZE,
   SPREADLINE_GRANULARITY_OPTIONS,
   SPREADLINE_TIME_CONFIG,
+  SPREADLINE_FREQUENCY_COLORS,
+  SPREADLINE_FREQUENCY_THRESHOLDS,
   type SpreadlineGranularity
 } from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
@@ -81,6 +83,10 @@ const SpreadlineComponent = ({
   const [yearsFilter, setYearsFilter] = useState(1);
   const [crossingOnly, setCrossingOnly] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+
+  // Legend toggle state
+  const [hiddenColors, setHiddenColors] = useState<Set<string>>(new Set());
+  const [labelsVisible, setLabelsVisible] = useState(true);
 
   const chartRef = useRef<SpreadLineChartHandle>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -191,6 +197,9 @@ const SpreadlineComponent = ({
           collisionDetection: true,
           showLinks: false
         },
+        legend: {
+          line: { domain: [] as string[], range: [] as string[], offset: [] as number[] }
+        } as SpreadLineConfig['legend'],
         ...(splitByAffiliation
           ? {}
           : {
@@ -201,9 +210,6 @@ const SpreadlineComponent = ({
                 annotations: [],
                 timeHighlight: [] as string[],
                 sliderTitle: 'Min Years'
-              },
-              legend: {
-                line: { domain: [] as string[], range: [] as string[], offset: [] as number[] }
               }
             })
       }) as Partial<SpreadLineConfig>,
@@ -247,6 +253,52 @@ const SpreadlineComponent = ({
         <span className="text-muted-foreground">
           {computedData.storylines.length} entities | {computedData.blocks.length} blocks | Ego: {computedData.ego}
         </span>
+        {splitByAffiliation && (
+          <>
+            <div className="bg-border h-4 w-px" />
+            {Object.entries(SPREADLINE_CATEGORY_COLORS).map(([category, color]) => (
+              <button
+                key={category}
+                className="flex items-center gap-1.5 transition-opacity hover:opacity-100"
+                style={{ opacity: hiddenColors.has(color) ? 0.3 : 0.9 }}
+                onClick={() => {
+                  chartRef.current?.toggleLineVisibility(color);
+                  setHiddenColors(prev => {
+                    const next = new Set(prev);
+                    if (next.has(color)) next.delete(color);
+                    else next.add(color);
+                    return next;
+                  });
+                }}
+              >
+                <span
+                  className="inline-block h-3 w-3 rounded-sm border"
+                  style={{
+                    backgroundColor: hiddenColors.has(color) ? 'transparent' : color,
+                    borderColor: color
+                  }}
+                />
+                <span className="capitalize">{category}</span>
+              </button>
+            ))}
+            <div className="bg-border h-4 w-px" />
+            <span className="text-muted-foreground font-medium">Frequencies</span>
+            <div className="relative">
+              <div className="flex">
+                {SPREADLINE_FREQUENCY_COLORS.map((color, i) => (
+                  <span key={i} className="border-border inline-block h-2.5 w-6 border" style={{ backgroundColor: color }} />
+                ))}
+              </div>
+              <div className="text-muted-foreground absolute flex text-[9px]">
+                {SPREADLINE_FREQUENCY_THRESHOLDS.map((t, i) => (
+                  <span key={t} className="absolute -translate-x-1/2" style={{ left: (i + 1) * 24 }}>
+                    {i === SPREADLINE_FREQUENCY_THRESHOLDS.length - 1 ? `${t}+` : t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
         <div className="flex items-center gap-2">
           <input
             type="range"
@@ -266,6 +318,17 @@ const SpreadlineComponent = ({
         <div className="flex items-center gap-1.5">
           <input type="checkbox" checked={splitByAffiliation} onChange={e => onSplitByAffiliationChange(e.target.checked)} />
           <label className="text-muted-foreground">Split by affiliation</label>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={labelsVisible}
+            onChange={e => {
+              chartRef.current?.toggleLabels();
+              setLabelsVisible(e.target.checked);
+            }}
+          />
+          <label className="text-muted-foreground">Show labels</label>
         </div>
         <Select value={relationTypes[0]} onValueChange={val => onRelationTypesChange([val])}>
           <SelectTrigger className="ml-auto h-7 w-auto gap-1 text-xs">

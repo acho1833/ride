@@ -77,6 +77,12 @@ export const SPREADLINE_CATEGORY_COLORS: Record<string, string> = {
   external: SPREADLINE_EXTERNAL_COLOR
 } as const;
 
+/** Frequency heatmap colors (low → high) matching the D3 threshold scale */
+export const SPREADLINE_FREQUENCY_COLORS = ['#ffffff', '#fcdaca', '#e599a6', '#c94b77', '#740980'];
+
+/** Frequency heatmap thresholds (boundaries between color bands) */
+export const SPREADLINE_FREQUENCY_THRESHOLDS = [10, 50, 100, 500];
+
 // ── Time Scrubber Constants ─────────────────────────────────────────
 
 /** Speed options for the time scrubber animation */

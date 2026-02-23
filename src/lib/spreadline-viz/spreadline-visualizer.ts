@@ -930,6 +930,7 @@ export class SpreadLinesVisualizer {
    * Draw node color legend
    */
   private _drawNodeLegend(): void {
+    if (this.config.legend.line.domain.length === 0) return;
     const legendContainer = this.chartContainer.append('g').attr('id', 'node-legend-container');
     const lineLegendSize = (d3.select('#line-legend-container').node() as SVGGElement)?.getBBox() || { width: 0 };
     const legendTitle = this.config.legend.node.title;
@@ -1465,6 +1466,22 @@ export class SpreadLinesVisualizer {
     }
     this.members.pinned = [];
     this.onEntityPin?.([]);
+  }
+
+  /** Toggle visibility of lines with the given color */
+  toggleLineVisibility(color: string): void {
+    const lines = d3.selectAll('.line-filter').filter((d: unknown) => (d as { color: string }).color === color);
+    const isVisible = lines.style('visibility') !== 'hidden';
+    lines.style('visibility', isVisible ? 'hidden' : 'visible');
+  }
+
+  /** Toggle visibility of all labels (except ego) */
+  toggleLabels(): void {
+    const ego = this._EGO;
+    const newStatus = this._HIDE_LABELS === 'hidden' ? 'revealed' : 'hidden';
+    const labels = d3.selectAll('.labels,.mark-links').filter((d: unknown) => (d as { name: string }).name !== ego);
+    labels.style('visibility', newStatus === 'hidden' ? 'hidden' : 'visible');
+    this._HIDE_LABELS = newStatus;
   }
 
   // ============================================
