@@ -300,7 +300,7 @@ export default function SpreadLineFrontend1Page() {
           onBlockExpand={handleBlockExpand}
           className="min-w-full"
           resetKey={resetKey}
-          yearsFilter={yearsFilter}
+          blocksFilter={yearsFilter}
           crossingOnly={crossingOnly}
         />
       </div>

@@ -56,6 +56,9 @@ interface Props {
   pageIndex: number;
   totalPages: number;
   onPageChange: (pageIndex: number) => void;
+  blocksFilter: number;
+  onBlocksFilterChange: (value: number) => void;
+  onFilteredEntityNamesChange?: (names: string[]) => void;
 }
 
 const SpreadlineComponent = ({
@@ -73,14 +76,16 @@ const SpreadlineComponent = ({
   onSplitByAffiliationChange,
   pageIndex,
   totalPages,
-  onPageChange
+  onPageChange,
+  blocksFilter,
+  onBlocksFilterChange,
+  onFilteredEntityNamesChange
 }: Props) => {
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
   const [computing, setComputing] = useState(false);
   const [computeError, setComputeError] = useState<string | null>(null);
 
   // Filter state
-  const [yearsFilter, setYearsFilter] = useState(1);
   const [crossingOnly, setCrossingOnly] = useState(false);
   const [resetKey, setResetKey] = useState(0);
 
@@ -188,6 +193,14 @@ const SpreadlineComponent = ({
   }, [rawData, granularity]);
 
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
+
+  // Report filtered entity names to parent for graph sync
+  useEffect(() => {
+    if (!computedData || !onFilteredEntityNamesChange) return;
+    const ego = computedData.ego;
+    const names = computedData.storylines.filter(s => s.name === ego || s.lifespan >= blocksFilter).map(s => s.name);
+    onFilteredEntityNamesChange(names);
+  }, [computedData, blocksFilter, onFilteredEntityNamesChange]);
 
   const config = useMemo(
     () =>
@@ -304,12 +317,12 @@ const SpreadlineComponent = ({
             type="range"
             min="1"
             max={maxLifespan}
-            value={yearsFilter}
-            onChange={e => setYearsFilter(Number(e.target.value))}
+            value={blocksFilter}
+            onChange={e => onBlocksFilterChange(Number(e.target.value))}
             className="w-20 accent-current"
           />
-          <span className="text-foreground w-4 font-medium">{yearsFilter}</span>
-          <label className="text-muted-foreground">Years</label>
+          <span className="text-foreground w-4 font-medium">{blocksFilter}</span>
+          <label className="text-muted-foreground">Blocks</label>
         </div>
         {splitByAffiliation && (
           <div className="flex items-center gap-1.5">
@@ -376,7 +389,7 @@ const SpreadlineComponent = ({
           data={computedData}
           config={config}
           resetKey={resetKey}
-          yearsFilter={yearsFilter}
+          blocksFilter={blocksFilter}
           crossingOnly={crossingOnly}
           onZoomChange={handleZoomChange}
           highlightTimes={highlightTimes && highlightTimes.length > 0 ? highlightTimes : undefined}

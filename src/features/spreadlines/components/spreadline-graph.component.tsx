@@ -155,9 +155,10 @@ interface Props {
   } | null;
   selectedTimes?: string[];
   pinnedEntityNames?: string[];
+  filteredEntityNames?: string[] | null;
 }
 
-const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNames = [] }: Props) => {
+const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNames = [], filteredEntityNames }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -312,6 +313,18 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     // Compute graph data: empty selectedTimes = ALL mode
     const graphData =
       selectedTimes.length === 0 ? transformSpreadlineToGraph(rawData) : transformSpreadlineToGraphByTimes(rawData, selectedTimes);
+
+    // Apply blocks filter: keep only entities visible in the spreadline
+    if (filteredEntityNames) {
+      const allowedNames = new Set(filteredEntityNames);
+      graphData.nodes = graphData.nodes.filter(n => n.isEgo || allowedNames.has(n.name));
+      const allowedIds = new Set(graphData.nodes.map(n => n.id));
+      graphData.links = graphData.links.filter(l => {
+        const s = typeof l.source === 'string' ? l.source : l.source.id;
+        const t = typeof l.target === 'string' ? l.target : l.target.id;
+        return allowedIds.has(s) && allowedIds.has(t);
+      });
+    }
 
     // Preserve positions from existing nodes or registry
     const prevNodesMap = new Map(nodesRef.current.map(n => [n.id, n]));
@@ -599,7 +612,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     }
 
     simulationRef.current = simulation;
-  }, [selectedTimes, rawData, dimensionsReady]);
+  }, [selectedTimes, rawData, dimensionsReady, filteredEntityNames]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // Pin Highlight Effect — styles path from ego to pinned entity

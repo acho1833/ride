@@ -38,6 +38,8 @@ const SpreadlineTabComponent = (_props: Props) => {
   const [granularity, setGranularity] = useState<SpreadlineGranularity>(SPREADLINE_DEFAULT_GRANULARITY);
   const [splitByAffiliation, setSplitByAffiliation] = useState(SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION);
   const [pageIndex, setPageIndex] = useState(0);
+  const [blocksFilter, setBlocksFilter] = useState(1);
+  const [filteredEntityNames, setFilteredEntityNames] = useState<string[] | null>(null);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
@@ -61,6 +63,7 @@ const SpreadlineTabComponent = (_props: Props) => {
     setGranularity(newGranularity);
     setPageIndex(0);
     setSelectedRange([0, 0]);
+    setBlocksFilter(1);
   }, []);
 
   const handlePageChange = useCallback((newPageIndex: number) => {
@@ -99,7 +102,12 @@ const SpreadlineTabComponent = (_props: Props) => {
     <div className="flex h-full w-full flex-col overflow-hidden">
       <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
         <ResizablePanel defaultSize={50} minSize={20}>
-          <SpreadlineGraphComponent rawData={rawData ?? null} selectedTimes={selectedTimes} pinnedEntityNames={pinnedEntityNames} />
+          <SpreadlineGraphComponent
+            rawData={rawData ?? null}
+            selectedTimes={selectedTimes}
+            pinnedEntityNames={pinnedEntityNames}
+            filteredEntityNames={filteredEntityNames}
+          />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -122,6 +130,9 @@ const SpreadlineTabComponent = (_props: Props) => {
               pageIndex={pageIndex}
               totalPages={totalPages}
               onPageChange={handlePageChange}
+              blocksFilter={blocksFilter}
+              onBlocksFilterChange={setBlocksFilter}
+              onFilteredEntityNamesChange={setFilteredEntityNames}
             />
           </div>
         </ResizablePanel>

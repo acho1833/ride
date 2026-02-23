@@ -1650,18 +1650,18 @@ export class SpreadLinesVisualizer {
    * Apply lifespan and crossing filters to storylines
    * Ported from original visualizer.js _activateFilter
    *
-   * @param yearsFilter - Minimum lifespan threshold (default 1)
+   * @param blocksFilter - Minimum lifespan threshold (default 1)
    * @param crossingOnly - Show only lines that cross blocks without being members
    */
-  applyFilter(yearsFilter: number = 1, crossingOnly: boolean = false): void {
-    this._FILTER_THRESHOLD = yearsFilter;
+  applyFilter(blocksFilter: number = 1, crossingOnly: boolean = false): void {
+    this._FILTER_THRESHOLD = blocksFilter;
     this._FILTER_CROSSING = crossingOnly;
 
     const ego = this._EGO;
     const storylines = this.data.storylines;
 
     // Get names of entities below the lifespan threshold
-    const belowThreshold = storylines.filter(d => d.name !== ego && d.lifespan < yearsFilter).map(d => d.name);
+    const belowThreshold = storylines.filter(d => d.name !== ego && d.lifespan < blocksFilter).map(d => d.name);
 
     // Determine which names to hide
     const toHide = new Set<string>();

@@ -88,9 +88,9 @@ interface SpreadLineChartProps {
   resetKey?: number;
 
   /**
-   * Years filter threshold (filter storylines with lifespan < yearsFilter)
+   * Blocks filter threshold (filter storylines with lifespan < blocksFilter)
    */
-  yearsFilter?: number;
+  blocksFilter?: number;
 
   /**
    * Show only crossing lines
@@ -135,7 +135,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     onFilterChange,
     className = '',
     resetKey = 0,
-    yearsFilter = 1,
+    blocksFilter = 1,
     crossingOnly = false,
     onZoomChange,
     highlightTimes,
@@ -162,7 +162,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   const onEntityPinRef = useCallbackRef(onEntityPin);
 
   // Refs for filter values - allows D3 to access current values without triggering React re-init
-  const yearsFilterRef = useValueRef(yearsFilter);
+  const blocksFilterRef = useValueRef(blocksFilter);
   const crossingOnlyRef = useValueRef(crossingOnly);
 
   // Expose zoom methods to parent via ref
@@ -258,7 +258,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     // Restore zoom transform on the zoom-layer
     zoomLayer.attr('transform', zoomTransformRef.current.toString());
 
-    visualizer.applyFilter(yearsFilterRef.current, crossingOnlyRef.current);
+    visualizer.applyFilter(blocksFilterRef.current, crossingOnlyRef.current);
     visualizerRef.current = visualizer;
   }, [data, getMergedConfig]);
 
@@ -342,7 +342,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     zoomBehaviorRef.current = zoom;
 
     // Apply initial filter settings using refs (doesn't add to dependencies)
-    visualizer.applyFilter(yearsFilterRef.current, crossingOnlyRef.current);
+    visualizer.applyFilter(blocksFilterRef.current, crossingOnlyRef.current);
 
     visualizerRef.current = visualizer;
   }, [data, getMergedConfig]);
@@ -384,9 +384,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
    */
   useEffect(() => {
     if (visualizerRef.current) {
-      visualizerRef.current.applyFilter(yearsFilter, crossingOnly);
+      visualizerRef.current.applyFilter(blocksFilter, crossingOnly);
     }
-  }, [yearsFilter, crossingOnly]);
+  }, [blocksFilter, crossingOnly]);
 
   /**
    * Handle highlight time changes via D3 (not React re-render).
