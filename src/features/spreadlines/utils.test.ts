@@ -22,9 +22,7 @@ const makeRawData = () => ({
 describe('transformSpreadlineToGraph', () => {
   it('aggregates link weight across all topology entries', () => {
     const { links } = transformSpreadlineToGraph(makeRawData());
-    const egoA1 = links.find(
-      l => [l.source, l.target].sort().join('::') === 'a1::ego'
-    );
+    const egoA1 = links.find(l => [l.source, l.target].sort().join('::') === 'a1::ego');
     expect(egoA1).toBeDefined();
     expect(egoA1!.weight).toBe(300);
     expect(egoA1!.paperCount).toBe(2);
@@ -47,9 +45,7 @@ describe('transformSpreadlineToGraph', () => {
 describe('transformSpreadlineToGraphByTime', () => {
   it('aggregates link weight for a single time block', () => {
     const { links } = transformSpreadlineToGraphByTime(makeRawData(), '2020');
-    const egoA1 = links.find(
-      l => [l.source, l.target].sort().join('::') === 'a1::ego'
-    );
+    const egoA1 = links.find(l => [l.source, l.target].sort().join('::') === 'a1::ego');
     expect(egoA1!.weight).toBe(100);
     expect(egoA1!.paperCount).toBe(1);
     expect(egoA1!.years).toEqual(['2020']);
@@ -59,9 +55,7 @@ describe('transformSpreadlineToGraphByTime', () => {
 describe('transformSpreadlineToGraphByTimes', () => {
   it('aggregates link weight across time range', () => {
     const { links } = transformSpreadlineToGraphByTimes(makeRawData(), ['2020', '2021']);
-    const egoA1 = links.find(
-      l => [l.source, l.target].sort().join('::') === 'a1::ego'
-    );
+    const egoA1 = links.find(l => [l.source, l.target].sort().join('::') === 'a1::ego');
     expect(egoA1!.weight).toBe(300);
     expect(egoA1!.paperCount).toBe(2);
   });

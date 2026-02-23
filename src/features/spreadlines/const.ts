@@ -115,11 +115,14 @@ export const GRAPH_RADIAL_STRENGTH = 0.3;
 /** D3 transition duration for time-block changes (ms) */
 export const GRAPH_TIME_TRANSITION_MS = 600;
 
-/** Fixed link stroke widths per citation-count band (matches SPREADLINE_FREQUENCY_THRESHOLDS) */
-export const GRAPH_LINK_WIDTH_BANDS = [1, 2, 3, 4, 6];
+/** Graph link thresholds (lower than heatmap to match typical graph weights) */
+export const GRAPH_LINK_THRESHOLDS = [2, 4, 6, 10];
 
-/** Minimum citation count to show a label on a link */
-export const GRAPH_LINK_LABEL_MIN_THRESHOLD = 10;
+/** Fixed link stroke widths per citation-count band (doubled for visibility) */
+export const GRAPH_LINK_WIDTH_BANDS = [2, 4, 6, 8, 12];
+
+/** Link colors for graph (visible on dark background) */
+export const GRAPH_LINK_COLORS = ['#d4b896', '#fcdaca', '#e599a6', '#c94b77', '#740980'];
 
 // ── Spreadline Highlight Bar ────────────────────────────────────────
 

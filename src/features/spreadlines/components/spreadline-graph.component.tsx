@@ -20,16 +20,15 @@ import { GRAPH_CONFIG, DOT_GRID_CONFIG } from '@/features/workspace/const';
 import {
   SPREADLINE_INTERNAL_COLOR,
   SPREADLINE_EXTERNAL_COLOR,
-  SPREADLINE_FREQUENCY_COLORS,
-  SPREADLINE_FREQUENCY_THRESHOLDS,
   GRAPH_HOP1_LINK_DISTANCE,
   GRAPH_HOP2_LINK_DISTANCE,
   GRAPH_HOP1_RADIAL_RADIUS,
   GRAPH_HOP2_RADIAL_RADIUS,
   GRAPH_RADIAL_STRENGTH,
   GRAPH_TIME_TRANSITION_MS,
+  GRAPH_LINK_THRESHOLDS,
   GRAPH_LINK_WIDTH_BANDS,
-  GRAPH_LINK_LABEL_MIN_THRESHOLD
+  GRAPH_LINK_COLORS
 } from '@/features/spreadlines/const';
 import { transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
@@ -54,16 +53,10 @@ const getNodeRadius = (d: SpreadlineGraphNode): number => (d.isEgo ? GRAPH_CONFI
 const getNodeIconSize = (d: SpreadlineGraphNode): number => (d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize);
 
 /** D3 threshold scale: citation count → link stroke color */
-const linkColorScale = d3
-  .scaleThreshold<number, string>()
-  .domain(SPREADLINE_FREQUENCY_THRESHOLDS)
-  .range(SPREADLINE_FREQUENCY_COLORS);
+const linkColorScale = d3.scaleThreshold<number, string>().domain(GRAPH_LINK_THRESHOLDS).range(GRAPH_LINK_COLORS);
 
 /** D3 threshold scale: citation count → link stroke width */
-const linkWidthScale = d3
-  .scaleThreshold<number, number>()
-  .domain(SPREADLINE_FREQUENCY_THRESHOLDS)
-  .range(GRAPH_LINK_WIDTH_BANDS);
+const linkWidthScale = d3.scaleThreshold<number, number>().domain(GRAPH_LINK_THRESHOLDS).range(GRAPH_LINK_WIDTH_BANDS);
 
 /** Get link stroke color from citation weight */
 const getLinkColor = (d: SpreadlineGraphLink): string => linkColorScale(d.weight);
@@ -182,28 +175,8 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
   const nodeRegistryRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const settledNodeIdsRef = useRef<Set<string>>(new Set());
 
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
-
-  const showTooltip = useCallback((event: MouseEvent, html: string) => {
-    const tooltip = tooltipRef.current;
-    const container = containerRef.current;
-    if (!tooltip || !container) return;
-    tooltip.innerHTML = html;
-    tooltip.style.display = 'block';
-    const rect = container.getBoundingClientRect();
-    const x = event.clientX - rect.left + 12;
-    const y = event.clientY - rect.top - 12;
-    tooltip.style.left = `${x}px`;
-    tooltip.style.top = `${y}px`;
-  }, []);
-
-  const hideTooltip = useCallback(() => {
-    const tooltip = tooltipRef.current;
-    if (tooltip) tooltip.style.display = 'none';
-  }, []);
 
   // Observe container size
   useEffect(() => {
@@ -281,7 +254,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
 
     // Create empty link and node containers (populated by time-change effect)
     g.append('g').attr('class', 'links');
-    g.append('g').attr('class', 'link-labels');
     g.append('g').attr('class', 'nodes');
 
     // Setup zoom (Ctrl key required)
@@ -394,21 +366,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     // Merge
     const linkMerged = linkEnter.merge(linkJoin);
 
-    // ─── Link Hover Tooltip ──────────────────────────────────────────
-    linkMerged
-      .style('pointer-events', 'visibleStroke')
-      .on('mouseover', function (event: MouseEvent, d: SpreadlineGraphLink) {
-        const s = d.source as SpreadlineGraphNode;
-        const t = d.target as SpreadlineGraphNode;
-        showTooltip(event, [
-          `<div class="font-semibold">${s.name} — ${t.name}</div>`,
-          `<div>Citations: ${d.weight.toLocaleString()}</div>`,
-          `<div>Papers: ${d.paperCount}</div>`,
-          `<div>Years: ${d.years.join(', ')}</div>`
-        ].join(''));
-      })
-      .on('mouseout', hideTooltip);
-
     // Returning links — unhide and fade in
     linkJoin
       .filter(function (this: SVGLineElement) {
@@ -421,59 +378,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .transition()
       .duration(GRAPH_TIME_TRANSITION_MS)
       .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
-
-    // ─── D3 Data Join: Link Labels ────────────────────────────────────
-    const labelLinks = links.filter(l => l.weight >= GRAPH_LINK_LABEL_MIN_THRESHOLD);
-
-    const labelJoin = g
-      .select<SVGGElement>('.link-labels')
-      .selectAll<SVGGElement, SpreadlineGraphLink>('g')
-      .data(labelLinks, (d: SpreadlineGraphLink) => {
-        const srcId = typeof d.source === 'string' ? d.source : d.source.id;
-        const tgtId = typeof d.target === 'string' ? d.target : d.target.id;
-        return [srcId, tgtId].sort().join('::');
-      });
-
-    labelJoin.exit().remove();
-
-    const labelEnter = labelJoin
-      .enter()
-      .append('g')
-      .attr('pointer-events', 'none')
-      .style('opacity', 0);
-
-    labelEnter
-      .append('rect')
-      .attr('rx', 4)
-      .attr('ry', 4)
-      .attr('fill', 'rgba(0, 0, 0, 0.7)')
-      .attr('stroke', 'none');
-
-    labelEnter
-      .append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('fill', 'white')
-      .attr('font-size', '10px')
-      .attr('font-weight', '500')
-      .text(d => String(d.weight));
-
-    // Size the background rect to fit the text
-    labelEnter.each(function () {
-      const group = d3.select(this);
-      const textEl = group.select('text').node() as SVGTextElement;
-      const bbox = textEl.getBBox();
-      group
-        .select('rect')
-        .attr('x', -bbox.width / 2 - 4)
-        .attr('y', -bbox.height / 2 - 2)
-        .attr('width', bbox.width + 8)
-        .attr('height', bbox.height + 4);
-    });
-
-    labelEnter.transition().duration(GRAPH_TIME_TRANSITION_MS).style('opacity', 1);
-
-    const labelMerged = labelEnter.merge(labelJoin);
 
     // ─── D3 Data Join: Nodes ─────────────────────────────────────────
     const nodeJoin = g
@@ -571,17 +475,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
             linkEl.setAttribute('y2', String(target.y ?? 0));
           }
         }
-
-        // Update link labels during drag
-        if (gRef.current) {
-          gRef.current.select('.link-labels')
-            .selectAll<SVGGElement, SpreadlineGraphLink>('g')
-            .attr('transform', d => {
-              const s = d.source as SpreadlineGraphNode;
-              const t = d.target as SpreadlineGraphNode;
-              return `translate(${((s.x ?? 0) + (t.x ?? 0)) / 2},${((s.y ?? 0) + (t.y ?? 0)) / 2})`;
-            });
-        }
       })
       .on('end', function (_event, d) {
         this.setAttribute('cursor', 'pointer');
@@ -592,23 +485,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       });
 
     nodeMerged.call(drag);
-
-    // ─── Node Hover Tooltip ──────────────────────────────────────────
-    nodeMerged
-      .on('mouseover', function (event: MouseEvent, d: SpreadlineGraphNode) {
-        const collaborators = links.filter(l => {
-          const s = typeof l.source === 'string' ? l.source : l.source.id;
-          const t = typeof l.target === 'string' ? l.target : l.target.id;
-          return s === d.id || t === d.id;
-        }).length;
-        showTooltip(event, [
-          `<div class="font-semibold">${d.name}</div>`,
-          `<div class="text-muted-foreground">${d.isEgo ? 'Ego' : d.category === 'internal' ? 'Internal' : 'External'}</div>`,
-          `<div>Citations: ${d.totalCitations.toLocaleString()}</div>`,
-          `<div>Collaborators: ${collaborators}</div>`
-        ].join(''));
-      })
-      .on('mouseout', hideTooltip);
 
     // ─── Force Simulation ──────────────────────────────────────────────
     const useHopLayout = selectedTimes.length > 0;
@@ -661,11 +537,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
         .attr('x2', d => (d.target as SpreadlineGraphNode).x ?? 0)
         .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
       nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
-      labelMerged.attr('transform', d => {
-        const s = d.source as SpreadlineGraphNode;
-        const t = d.target as SpreadlineGraphNode;
-        return `translate(${((s.x ?? 0) + (t.x ?? 0)) / 2},${((s.y ?? 0) + (t.y ?? 0)) / 2})`;
-      });
 
       // Mark all initial nodes as settled
       for (const n of nodes) {
@@ -704,11 +575,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
             .attr('x2', d => (d.target as SpreadlineGraphNode).x ?? 0)
             .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
           nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
-          labelMerged.attr('transform', d => {
-            const s = d.source as SpreadlineGraphNode;
-            const t = d.target as SpreadlineGraphNode;
-            return `translate(${((s.x ?? 0) + (t.x ?? 0)) / 2},${((s.y ?? 0) + (t.y ?? 0)) / 2})`;
-          });
         })
         .on('end', () => {
           // Mark all current nodes as settled and update registry
@@ -968,12 +834,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       ) : (
         <>
           <svg ref={svgRef} className="text-foreground absolute inset-0 h-full w-full" />
-
-          {/* Tooltip */}
-          <div
-            ref={tooltipRef}
-            className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-20 hidden rounded-md border px-3 py-2 text-xs shadow-md"
-          />
 
           {/* Zoom controls */}
           <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">

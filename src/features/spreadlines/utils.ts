@@ -51,10 +51,7 @@ export function transformSpreadlineToGraph(rawData: {
   topology: { sourceId: string; targetId: string; time: string; weight: number }[];
 }): { nodes: SpreadlineGraphNode[]; links: SpreadlineGraphLink[] } {
   const collabCounts = new Map<string, number>();
-  const linkMap = new Map<
-    string,
-    { source: string; target: string; weight: number; paperCount: number; years: Set<string> }
-  >();
+  const linkMap = new Map<string, { source: string; target: string; weight: number; paperCount: number; years: Set<string> }>();
 
   for (const entry of rawData.topology) {
     collabCounts.set(entry.sourceId, (collabCounts.get(entry.sourceId) ?? 0) + 1);
@@ -174,10 +171,7 @@ export function transformSpreadlineToGraphByTime(
   }
 
   // 5. Build links (deduplicated within this time block, with aggregation)
-  const linkMap = new Map<
-    string,
-    { source: string; target: string; weight: number; paperCount: number; years: Set<string> }
-  >();
+  const linkMap = new Map<string, { source: string; target: string; weight: number; paperCount: number; years: Set<string> }>();
   const nodeIds = new Set(nodes.map(n => n.id));
   for (const entry of timeTopology) {
     if (!nodeIds.has(entry.sourceId) || !nodeIds.has(entry.targetId)) continue;
@@ -294,10 +288,7 @@ export function transformSpreadlineToGraphByTimes(
   }
 
   // 5. Build links (deduplicated across all times in range, with aggregation)
-  const linkMap = new Map<
-    string,
-    { source: string; target: string; weight: number; paperCount: number; years: Set<string> }
-  >();
+  const linkMap = new Map<string, { source: string; target: string; weight: number; paperCount: number; years: Set<string> }>();
   const nodeIds = new Set(nodes.map(n => n.id));
   for (const entry of rangeTopology) {
     if (!nodeIds.has(entry.sourceId) || !nodeIds.has(entry.targetId)) continue;
