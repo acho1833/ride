@@ -20,12 +20,15 @@ import { GRAPH_CONFIG, DOT_GRID_CONFIG } from '@/features/workspace/const';
 import {
   SPREADLINE_INTERNAL_COLOR,
   SPREADLINE_EXTERNAL_COLOR,
+  SPREADLINE_FREQUENCY_COLORS,
+  SPREADLINE_FREQUENCY_THRESHOLDS,
   GRAPH_HOP1_LINK_DISTANCE,
   GRAPH_HOP2_LINK_DISTANCE,
   GRAPH_HOP1_RADIAL_RADIUS,
   GRAPH_HOP2_RADIAL_RADIUS,
   GRAPH_RADIAL_STRENGTH,
-  GRAPH_TIME_TRANSITION_MS
+  GRAPH_TIME_TRANSITION_MS,
+  GRAPH_LINK_WIDTH_BANDS
 } from '@/features/spreadlines/const';
 import { transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
@@ -48,6 +51,24 @@ const getNodeRadius = (d: SpreadlineGraphNode): number => (d.isEgo ? GRAPH_CONFI
 
 /** Get the icon size for a node (ego is larger) */
 const getNodeIconSize = (d: SpreadlineGraphNode): number => (d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize);
+
+/** D3 threshold scale: citation count → link stroke color */
+const linkColorScale = d3
+  .scaleThreshold<number, string>()
+  .domain(SPREADLINE_FREQUENCY_THRESHOLDS)
+  .range(SPREADLINE_FREQUENCY_COLORS);
+
+/** D3 threshold scale: citation count → link stroke width */
+const linkWidthScale = d3
+  .scaleThreshold<number, number>()
+  .domain(SPREADLINE_FREQUENCY_THRESHOLDS)
+  .range(GRAPH_LINK_WIDTH_BANDS);
+
+/** Get link stroke color from citation weight */
+const getLinkColor = (d: SpreadlineGraphLink): string => linkColorScale(d.weight);
+
+/** Get link stroke width from citation weight */
+const getLinkWidth = (d: SpreadlineGraphLink): number => linkWidthScale(d.weight);
 
 /** Append visual elements (rect, icon, label) to a node <g> selection */
 const appendNodeVisuals = (selection: d3.Selection<SVGGElement, SpreadlineGraphNode, SVGGElement, unknown>) => {
@@ -342,8 +363,8 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     const linkEnter = linkJoin
       .enter()
       .append('line')
-      .attr('stroke', GRAPH_CONFIG.linkStroke)
-      .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth)
+      .attr('stroke', getLinkColor)
+      .attr('stroke-width', getLinkWidth)
       .attr('stroke-opacity', 0);
 
     linkEnter.transition().duration(GRAPH_TIME_TRANSITION_MS).attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
@@ -357,6 +378,8 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
         return this.style.display === 'none';
       })
       .style('display', '')
+      .attr('stroke', getLinkColor)
+      .attr('stroke-width', getLinkWidth)
       .attr('stroke-opacity', 0)
       .transition()
       .duration(GRAPH_TIME_TRANSITION_MS)
@@ -635,8 +658,8 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
       .filter(visibleLinkFilter)
       .style('stroke', null)
-      .attr('stroke', GRAPH_CONFIG.linkStroke)
-      .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth)
+      .attr('stroke', getLinkColor)
+      .attr('stroke-width', getLinkWidth)
       .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
 
     if (pinnedEntityNames.length === 0) return;
