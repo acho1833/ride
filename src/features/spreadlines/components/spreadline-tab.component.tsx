@@ -21,10 +21,13 @@ import {
   SPREADLINE_DEFAULT_GRANULARITY,
   SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION,
   SPREADLINE_PAGE_SIZE,
-  type SpreadlineGranularity
+  type SpreadlineGranularity,
+  type SpreadlineBottomTab
 } from '@/features/spreadlines/const';
 import SpreadlineGraphComponent from './spreadline-graph.component';
 import SpreadlineComponent from './spreadline.component';
+import SpreadlineBottomTabsComponent from './spreadline-bottom-tabs.component';
+import NetworkTimelineChartComponent from './network-timeline-chart.component';
 
 interface Props {
   fileId: string;
@@ -40,6 +43,7 @@ const SpreadlineTabComponent = (_props: Props) => {
   const [pageIndex, setPageIndex] = useState(0);
   const [blocksFilter, setBlocksFilter] = useState(1);
   const [filteredEntityNames, setFilteredEntityNames] = useState<string[] | null>(null);
+  const [activeBottomTab, setActiveBottomTab] = useState<SpreadlineBottomTab>('spreadline');
 
   const { data: rawData } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
@@ -113,27 +117,49 @@ const SpreadlineTabComponent = (_props: Props) => {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={50} minSize={20}>
-          <div className="h-full w-full overflow-hidden">
-            <SpreadlineComponent
-              rawData={rawData ?? null}
-              highlightTimes={selectedTimes}
-              pinnedEntityNames={pinnedEntityNames}
-              relationTypes={relationTypes}
-              onRelationTypesChange={setRelationTypes}
-              onTimeClick={handleTimeClick}
-              onHighlightRangeChange={handleHighlightRangeChange}
-              onEntityPin={setPinnedEntityNames}
-              granularity={granularity}
-              onGranularityChange={handleGranularityChange}
-              splitByAffiliation={splitByAffiliation}
-              onSplitByAffiliationChange={setSplitByAffiliation}
-              pageIndex={pageIndex}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              blocksFilter={blocksFilter}
-              onBlocksFilterChange={setBlocksFilter}
-              onFilteredEntityNamesChange={setFilteredEntityNames}
-            />
+          <div className="flex h-full w-full flex-col overflow-hidden">
+            <SpreadlineBottomTabsComponent activeTab={activeBottomTab} onTabChange={setActiveBottomTab} />
+            <div className="min-h-0 flex-1">
+              {activeBottomTab === 'spreadline' ? (
+                <SpreadlineComponent
+                  rawData={rawData ?? null}
+                  highlightTimes={selectedTimes}
+                  pinnedEntityNames={pinnedEntityNames}
+                  relationTypes={relationTypes}
+                  onRelationTypesChange={setRelationTypes}
+                  onTimeClick={handleTimeClick}
+                  onHighlightRangeChange={handleHighlightRangeChange}
+                  onEntityPin={setPinnedEntityNames}
+                  granularity={granularity}
+                  onGranularityChange={handleGranularityChange}
+                  splitByAffiliation={splitByAffiliation}
+                  onSplitByAffiliationChange={setSplitByAffiliation}
+                  pageIndex={pageIndex}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  blocksFilter={blocksFilter}
+                  onBlocksFilterChange={setBlocksFilter}
+                  onFilteredEntityNamesChange={setFilteredEntityNames}
+                />
+              ) : (
+                <NetworkTimelineChartComponent
+                  rawData={rawData ?? null}
+                  timeBlocks={timeBlocks}
+                  pinnedEntityNames={pinnedEntityNames}
+                  relationTypes={relationTypes}
+                  onRelationTypesChange={setRelationTypes}
+                  granularity={granularity}
+                  onGranularityChange={handleGranularityChange}
+                  pageIndex={pageIndex}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                  blocksFilter={blocksFilter}
+                  onBlocksFilterChange={setBlocksFilter}
+                  onFilteredEntityNamesChange={setFilteredEntityNames}
+                  onEntityPin={setPinnedEntityNames}
+                />
+              )}
+            </div>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
