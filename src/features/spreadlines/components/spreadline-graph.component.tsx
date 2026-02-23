@@ -182,8 +182,28 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
   const nodeRegistryRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const settledNodeIdsRef = useRef<Set<string>>(new Set());
 
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
+
+  const showTooltip = useCallback((event: MouseEvent, html: string) => {
+    const tooltip = tooltipRef.current;
+    const container = containerRef.current;
+    if (!tooltip || !container) return;
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    const rect = container.getBoundingClientRect();
+    const x = event.clientX - rect.left + 12;
+    const y = event.clientY - rect.top - 12;
+    tooltip.style.left = `${x}px`;
+    tooltip.style.top = `${y}px`;
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    const tooltip = tooltipRef.current;
+    if (tooltip) tooltip.style.display = 'none';
+  }, []);
 
   // Observe container size
   useEffect(() => {
@@ -374,6 +394,21 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     // Merge
     const linkMerged = linkEnter.merge(linkJoin);
 
+    // ─── Link Hover Tooltip ──────────────────────────────────────────
+    linkMerged
+      .style('pointer-events', 'visibleStroke')
+      .on('mouseover', function (event: MouseEvent, d: SpreadlineGraphLink) {
+        const s = d.source as SpreadlineGraphNode;
+        const t = d.target as SpreadlineGraphNode;
+        showTooltip(event, [
+          `<div class="font-semibold">${s.name} — ${t.name}</div>`,
+          `<div>Citations: ${d.weight.toLocaleString()}</div>`,
+          `<div>Papers: ${d.paperCount}</div>`,
+          `<div>Years: ${d.years.join(', ')}</div>`
+        ].join(''));
+      })
+      .on('mouseout', hideTooltip);
+
     // Returning links — unhide and fade in
     linkJoin
       .filter(function (this: SVGLineElement) {
@@ -557,6 +592,23 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       });
 
     nodeMerged.call(drag);
+
+    // ─── Node Hover Tooltip ──────────────────────────────────────────
+    nodeMerged
+      .on('mouseover', function (event: MouseEvent, d: SpreadlineGraphNode) {
+        const collaborators = links.filter(l => {
+          const s = typeof l.source === 'string' ? l.source : l.source.id;
+          const t = typeof l.target === 'string' ? l.target : l.target.id;
+          return s === d.id || t === d.id;
+        }).length;
+        showTooltip(event, [
+          `<div class="font-semibold">${d.name}</div>`,
+          `<div class="text-muted-foreground">${d.isEgo ? 'Ego' : d.category === 'internal' ? 'Internal' : 'External'}</div>`,
+          `<div>Citations: ${d.totalCitations.toLocaleString()}</div>`,
+          `<div>Collaborators: ${collaborators}</div>`
+        ].join(''));
+      })
+      .on('mouseout', hideTooltip);
 
     // ─── Force Simulation ──────────────────────────────────────────────
     const useHopLayout = selectedTimes.length > 0;
@@ -916,6 +968,12 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       ) : (
         <>
           <svg ref={svgRef} className="text-foreground absolute inset-0 h-full w-full" />
+
+          {/* Tooltip */}
+          <div
+            ref={tooltipRef}
+            className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-20 hidden rounded-md border px-3 py-2 text-xs shadow-md"
+          />
 
           {/* Zoom controls */}
           <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">
