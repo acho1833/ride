@@ -50,7 +50,7 @@ export const useAppStore = create<AppStore>()(
       }),
       {
         name: 'app-store',
-        storage: createJSONStorage(() => sessionStorage)
+        storage: createJSONStorage(() => localStorage)
       }
     ),
     { name: 'App Store', enabled: IS_DEV }

@@ -42,10 +42,10 @@ export class SpreadLinesVisualizer {
   storylines: (Storyline & { label: Storyline['label'] & { show?: string } })[];
 
   // Layout
-  margin = { top: 40, right: 20, bottom: 20, left: 150 };
+  margin = { top: 70, right: 20, bottom: 20, left: 150 };
   _BAND_WIDTH: number;
   _EGO: string;
-  _LEGEND_OFFSET = 40;
+  _LEGEND_OFFSET = 60;
   _ANNOTATION_OFFSET = 0;
   _FILTER_THRESHOLD = 1;
   _FILTER_CROSSING = false;
@@ -855,7 +855,7 @@ export class SpreadLinesVisualizer {
     const betweenOffset = [
       0,
       ...config.domain
-        .map(d => getTextWidth(d, '12px') + swatchSize * 2 + 5)
+        .map(d => getTextWidth(d, '12px') + swatchSize * 2 + 15)
         .reduce((acc: number[], x, i) => [...acc, x + (acc[i - 1] || 0)], [])
     ];
 
@@ -863,14 +863,16 @@ export class SpreadLinesVisualizer {
       .append('g')
       .attr('transform', `translate(${this.margin.left + buttonOffset}, ${Math.max(this.margin.top / 2, 20)})`);
 
-    // Label toggle button
+    // Label toggle button (only when line legend has entries)
     const self = this;
+    if (config.domain.length === 0) return;
     legendContainer
       .append('g')
       .attr('transform', `translate(${this.margin.left}, ${Math.max(this.margin.top / 2, 20) + 10 + swatchSize / 2 + 3})`)
       .append('text')
       .text(this._button_labels[this._HIDE_LABELS])
       .attr('status', this._HIDE_LABELS)
+      .attr('fill', self.theme.foreground)
       .style('font-size', '12px')
       .style('font-weight', 'bold')
       .style('cursor', 'pointer')
@@ -941,6 +943,7 @@ export class SpreadLinesVisualizer {
       .join('text')
       .text(d => d)
       .attr('transform', (_, i) => `translate(${betweenOffset[i] + swatchSize + 5}, ${10 + swatchSize / 2 + 3})`)
+      .attr('fill', self.theme.foreground)
       .style('font-size', '12px')
       .style('text-anchor', 'start');
   }
@@ -966,6 +969,7 @@ export class SpreadLinesVisualizer {
       .append('text')
       .text(legendTitle)
       .attr('transform', 'translate(0, 20)')
+      .attr('fill', this.theme.foreground)
       .style('vertical-align', 'middle')
       .style('font-size', '14px')
       .style('font-weight', 'bold')
@@ -994,6 +998,7 @@ export class SpreadLinesVisualizer {
       .join('text')
       .text(d => d)
       .attr('transform', (_, i) => `translate(${offsets[i]}, ${i % 2 === 0 ? 7 : 10 + 25})`)
+      .attr('fill', this.theme.foreground)
       .style('font-size', '12px')
       .style('text-anchor', 'middle');
   }
