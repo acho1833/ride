@@ -210,13 +210,13 @@ export interface BrushComponent {
 export const createDefaultConfig = (): SpreadLineConfig => ({
   legend: {
     line: {
-      domain: ['Collaborator', 'Colleague'],
+      domain: ['External', 'Internal'],
       range: ['#146b6b', '#FA9902'],
       offset: []
     },
     node: {
       scale: d3.scaleThreshold<number, string>().domain([10, 50, 100, 500]).range(['#ffffff', '#fcdaca', '#e599a6', '#c94b77', '#740980']),
-      title: 'Citations'
+      title: 'Frequencies'
     }
   },
   background: {

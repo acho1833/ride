@@ -49,8 +49,8 @@ export class SpreadLinesVisualizer {
   _ANNOTATION_OFFSET = 0;
   _FILTER_THRESHOLD = 1;
   _FILTER_CROSSING = false;
-  _HIDE_LABELS: 'hidden' | 'revealed' | 'some' = 'some';
-  _button_labels = { hidden: 'Hide Labels', revealed: 'Reveal Labels', some: 'Some Labels' };
+  _HIDE_LABELS: 'hidden' | 'revealed' = 'revealed';
+  _button_labels = { hidden: 'Hide Labels', revealed: 'Reveal Labels' };
 
   // State
   visibility: Record<string, boolean> = {};
@@ -159,21 +159,11 @@ export class SpreadLinesVisualizer {
     this._drawBlocksAndPoints();
     this._drawLabels();
 
-    // Apply initial label visibility - match original exactly
-    if (this._HIDE_LABELS === 'some') {
+    // Apply initial label visibility
+    if (this._HIDE_LABELS === 'hidden') {
       const ego = this._EGO;
-      const storylines = this.storylines;
-      // Original uses two chained filters
       d3.selectAll('.labels,.mark-links')
         .filter((d: unknown) => (d as { name: string }).name !== ego)
-        .filter((d: unknown) => {
-          const data = d as { name: string; label?: { show?: string } };
-          if (data.label !== undefined) {
-            return data.label.show !== 'visible';
-          }
-          const entity = storylines.find(e => e.name === data.name);
-          return entity?.label.show !== 'visible';
-        })
         .style('visibility', 'hidden');
     }
 
@@ -877,9 +867,8 @@ export class SpreadLinesVisualizer {
       .style('font-weight', 'bold')
       .style('cursor', 'pointer')
       .on('click', function () {
-        const status = this.getAttribute('status') as 'hidden' | 'revealed' | 'some';
+        const status = this.getAttribute('status') as 'hidden' | 'revealed';
         const ego = self._EGO;
-        const storylines = self.storylines;
 
         if (status === 'revealed') {
           d3.selectAll('.labels,.mark-links')
@@ -888,22 +877,11 @@ export class SpreadLinesVisualizer {
         }
         if (status === 'hidden') {
           d3.selectAll('.labels,.mark-links')
-            .filter((d: unknown) => {
-              const data = d as { name: string; label?: { show?: string } };
-              if (data.name === ego) return false;
-              if (data.label?.show !== undefined) return data.label.show === 'visible';
-              const entity = storylines.find(e => e.name === data.name);
-              return entity?.label.show === 'visible';
-            })
-            .style('visibility', 'visible');
-        }
-        if (status === 'some') {
-          d3.selectAll('.labels,.mark-links')
             .filter((d: unknown) => (d as { name: string }).name !== ego)
             .style('visibility', 'visible');
         }
 
-        const newStatus = status === 'revealed' ? 'hidden' : status === 'hidden' ? 'some' : 'revealed';
+        const newStatus = status === 'revealed' ? 'hidden' : 'revealed';
         this.setAttribute('status', newStatus);
         this.textContent = self._button_labels[newStatus];
       });

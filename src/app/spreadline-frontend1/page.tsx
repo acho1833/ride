@@ -246,18 +246,17 @@ export default function SpreadLineFrontend1Page() {
       <div className="border-b border-gray-200 bg-white px-4 py-2">
         <div className="flex flex-wrap items-center gap-6 text-sm">
           <div className="flex items-center gap-4">
-            <span className="font-bold text-gray-700">Some Labels</span>
             <span className="flex items-center gap-1.5">
               <span className="h-4 w-4 bg-[#424242]" />
               <span className="text-gray-700">Ego</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-4 w-4 bg-[#FA9902]" />
-              <span className="text-gray-700">Colleague</span>
+              <span className="text-gray-700">Internal</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-4 w-4 bg-[#146b6b]" />
-              <span className="text-gray-700">Collaborator</span>
+              <span className="text-gray-700">External</span>
             </span>
           </div>
           <div className="ml-4 flex items-center gap-4">
