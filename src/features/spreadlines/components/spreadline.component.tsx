@@ -311,10 +311,12 @@ const SpreadlineComponent = ({
           <span className="text-foreground w-4 font-medium">{yearsFilter}</span>
           <label className="text-muted-foreground">Years</label>
         </div>
-        <div className="flex items-center gap-1.5">
-          <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
-          <label className="text-muted-foreground">Crossing only</label>
-        </div>
+        {splitByAffiliation && (
+          <div className="flex items-center gap-1.5">
+            <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
+            <label className="text-muted-foreground">Crossing only</label>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <input type="checkbox" checked={splitByAffiliation} onChange={e => onSplitByAffiliationChange(e.target.checked)} />
           <label className="text-muted-foreground">Split by affiliation</label>
