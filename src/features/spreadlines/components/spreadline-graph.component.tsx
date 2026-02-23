@@ -148,7 +148,10 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const nodesRef = useRef<SpreadlineGraphNode[]>([]);
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  // Dimensions stored as ref so resize doesn't trigger effect re-runs.
+  // dimensionsReady fires once to kick off the initial render.
+  const dimensionsRef = useRef<{ width: number; height: number } | null>(null);
+  const [dimensionsReady, setDimensionsReady] = useState(false);
 
   // D3 selection refs for time-change effect
   const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
@@ -169,7 +172,8 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       if (entry) {
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
-          setDimensions({ width, height });
+          dimensionsRef.current = { width, height };
+          setDimensionsReady(true); // No-op after first call (React bails out)
         }
       }
     });
@@ -184,7 +188,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
   // the time-change effect to use.
   // ═══════════════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!svgRef.current || !dimensions || !rawData) return;
+    if (!svgRef.current || !dimensionsRef.current || !rawData) return;
 
     const svg = d3.select(svgRef.current);
 
@@ -271,7 +275,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
         simulationRef.current = null;
       }
     };
-  }, [rawData, dimensions]);
+  }, [rawData, dimensionsReady]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // Time-Change Effect — D3 data joins (runs on selectedTimes change)
@@ -279,10 +283,10 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
   // Also runs on initial mount after main effect sets up the SVG.
   // ═══════════════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!gRef.current || !rawData || !dimensions) return;
+    if (!gRef.current || !rawData || !dimensionsRef.current) return;
 
     const g = gRef.current;
-    const { width, height } = dimensions;
+    const { width, height } = dimensionsRef.current;
 
     // Stop any running simulation
     if (simulationRef.current) {
@@ -578,7 +582,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     }
 
     simulationRef.current = simulation;
-  }, [selectedTimes, rawData, dimensions]);
+  }, [selectedTimes, rawData, dimensionsReady]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // Pin Highlight Effect — styles path from ego to pinned entity
@@ -776,12 +780,12 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
   }, []);
 
   const handleZoomToFit = useCallback(() => {
-    if (!svgRef.current || !zoomRef.current || !dimensions) return;
+    if (!svgRef.current || !zoomRef.current || !dimensionsRef.current) return;
 
     const nodes = nodesRef.current;
     if (nodes.length === 0) return;
 
-    const { width, height } = dimensions;
+    const { width, height } = dimensionsRef.current;
     const padding = GRAPH_CONFIG.fitPadding;
     const xExtent = d3.extent(nodes, d => d.x) as [number, number];
     const yExtent = d3.extent(nodes, d => d.y) as [number, number];
@@ -799,7 +803,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .transition()
       .duration(GRAPH_CONFIG.zoomAnimationMs)
       .call(zoomRef.current.transform, d3.zoomIdentity.translate(fitTranslateX, fitTranslateY).scale(scale));
-  }, [dimensions]);
+  }, []);
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
