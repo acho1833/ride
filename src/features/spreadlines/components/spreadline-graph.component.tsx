@@ -28,7 +28,8 @@ import {
   GRAPH_HOP2_RADIAL_RADIUS,
   GRAPH_RADIAL_STRENGTH,
   GRAPH_TIME_TRANSITION_MS,
-  GRAPH_LINK_WIDTH_BANDS
+  GRAPH_LINK_WIDTH_BANDS,
+  GRAPH_LINK_LABEL_MIN_THRESHOLD
 } from '@/features/spreadlines/const';
 import { transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
@@ -260,6 +261,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
 
     // Create empty link and node containers (populated by time-change effect)
     g.append('g').attr('class', 'links');
+    g.append('g').attr('class', 'link-labels');
     g.append('g').attr('class', 'nodes');
 
     // Setup zoom (Ctrl key required)
@@ -385,6 +387,59 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .duration(GRAPH_TIME_TRANSITION_MS)
       .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
 
+    // ─── D3 Data Join: Link Labels ────────────────────────────────────
+    const labelLinks = links.filter(l => l.weight >= GRAPH_LINK_LABEL_MIN_THRESHOLD);
+
+    const labelJoin = g
+      .select<SVGGElement>('.link-labels')
+      .selectAll<SVGGElement, SpreadlineGraphLink>('g')
+      .data(labelLinks, (d: SpreadlineGraphLink) => {
+        const srcId = typeof d.source === 'string' ? d.source : d.source.id;
+        const tgtId = typeof d.target === 'string' ? d.target : d.target.id;
+        return [srcId, tgtId].sort().join('::');
+      });
+
+    labelJoin.exit().remove();
+
+    const labelEnter = labelJoin
+      .enter()
+      .append('g')
+      .attr('pointer-events', 'none')
+      .style('opacity', 0);
+
+    labelEnter
+      .append('rect')
+      .attr('rx', 4)
+      .attr('ry', 4)
+      .attr('fill', 'rgba(0, 0, 0, 0.7)')
+      .attr('stroke', 'none');
+
+    labelEnter
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('fill', 'white')
+      .attr('font-size', '10px')
+      .attr('font-weight', '500')
+      .text(d => String(d.weight));
+
+    // Size the background rect to fit the text
+    labelEnter.each(function () {
+      const group = d3.select(this);
+      const textEl = group.select('text').node() as SVGTextElement;
+      const bbox = textEl.getBBox();
+      group
+        .select('rect')
+        .attr('x', -bbox.width / 2 - 4)
+        .attr('y', -bbox.height / 2 - 2)
+        .attr('width', bbox.width + 8)
+        .attr('height', bbox.height + 4);
+    });
+
+    labelEnter.transition().duration(GRAPH_TIME_TRANSITION_MS).style('opacity', 1);
+
+    const labelMerged = labelEnter.merge(labelJoin);
+
     // ─── D3 Data Join: Nodes ─────────────────────────────────────────
     const nodeJoin = g
       .select<SVGGElement>('.nodes')
@@ -481,6 +536,17 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
             linkEl.setAttribute('y2', String(target.y ?? 0));
           }
         }
+
+        // Update link labels during drag
+        if (gRef.current) {
+          gRef.current.select('.link-labels')
+            .selectAll<SVGGElement, SpreadlineGraphLink>('g')
+            .attr('transform', d => {
+              const s = d.source as SpreadlineGraphNode;
+              const t = d.target as SpreadlineGraphNode;
+              return `translate(${((s.x ?? 0) + (t.x ?? 0)) / 2},${((s.y ?? 0) + (t.y ?? 0)) / 2})`;
+            });
+        }
       })
       .on('end', function (_event, d) {
         this.setAttribute('cursor', 'pointer');
@@ -543,6 +609,11 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
         .attr('x2', d => (d.target as SpreadlineGraphNode).x ?? 0)
         .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
       nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+      labelMerged.attr('transform', d => {
+        const s = d.source as SpreadlineGraphNode;
+        const t = d.target as SpreadlineGraphNode;
+        return `translate(${((s.x ?? 0) + (t.x ?? 0)) / 2},${((s.y ?? 0) + (t.y ?? 0)) / 2})`;
+      });
 
       // Mark all initial nodes as settled
       for (const n of nodes) {
@@ -581,6 +652,11 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
             .attr('x2', d => (d.target as SpreadlineGraphNode).x ?? 0)
             .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
           nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+          labelMerged.attr('transform', d => {
+            const s = d.source as SpreadlineGraphNode;
+            const t = d.target as SpreadlineGraphNode;
+            return `translate(${((s.x ?? 0) + (t.x ?? 0)) / 2},${((s.y ?? 0) + (t.y ?? 0)) / 2})`;
+          });
         })
         .on('end', () => {
           // Mark all current nodes as settled and update registry
