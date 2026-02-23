@@ -959,7 +959,7 @@ export class SpreadLinesVisualizer {
     const swatchSize = 10;
     const swatchWidth = 3.5;
     const domain = this.nodeColorScale.domain();
-    const colors = [...this.nodeColorScale.range(), '#ffffff'];
+    const colors = [...this.nodeColorScale.range()];
 
     const legend = legendContainer
       .append('g')
@@ -982,24 +982,24 @@ export class SpreadLinesVisualizer {
       .attr('width', swatchSize * swatchWidth)
       .attr('height', swatchSize)
       .attr('fill', d => d)
-      .attr('stroke', d => (d === '#ffffff' ? this.theme.border : ''))
-      .attr('stroke-width', d => (d === '#ffffff' ? 0.4 : 0))
-      .attr('transform', (_, i) =>
-        i === colors.length - 1
-          ? `translate(${(i + 1) * swatchSize * swatchWidth + i * 1 + 10}, 12)`
-          : `translate(${i * swatchSize * swatchWidth + i * 1 + 10}, 12)`
-      );
+      .attr('stroke', this.theme.border)
+      .attr('stroke-width', 0.4)
+      .attr('transform', (_, i) => `translate(${i * swatchSize * swatchWidth + i * 1 + 10}, 12)`);
 
-    const offsets = [25, 65, 100, 170];
-    const labels = ['Negative', 'Controversial', 'Positive', 'Neutral'];
+    // Threshold labels below swatch boundaries
+    const thresholdLabels = domain.map((threshold, i) => ({
+      label: String(threshold),
+      x: (i + 1) * swatchSize * swatchWidth + i * 1 + 10
+    }));
     legend
       .selectAll('legendText')
-      .data(labels)
+      .data(thresholdLabels)
       .join('text')
-      .text(d => d)
-      .attr('transform', (_, i) => `translate(${offsets[i]}, ${i % 2 === 0 ? 7 : 10 + 25})`)
+      .text(d => d.label)
+      .attr('x', d => d.x)
+      .attr('y', 12 + swatchSize + 12)
       .attr('fill', this.theme.foreground)
-      .style('font-size', '12px')
+      .style('font-size', '11px')
       .style('text-anchor', 'middle');
   }
 
