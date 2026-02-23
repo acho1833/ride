@@ -115,6 +115,12 @@ export const GRAPH_RADIAL_STRENGTH = 0.3;
 /** D3 transition duration for time-block changes (ms) */
 export const GRAPH_TIME_TRANSITION_MS = 600;
 
+/** Fixed link stroke widths per citation-count band (matches SPREADLINE_FREQUENCY_THRESHOLDS) */
+export const GRAPH_LINK_WIDTH_BANDS = [1, 2, 3, 4, 6];
+
+/** Minimum citation count to show a label on a link */
+export const GRAPH_LINK_LABEL_MIN_THRESHOLD = 10;
+
 // ── Spreadline Highlight Bar ────────────────────────────────────────
 
 /** Fill color for the time highlight bar on the spreadline chart */
