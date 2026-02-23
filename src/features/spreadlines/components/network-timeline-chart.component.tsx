@@ -188,7 +188,8 @@ const NetworkTimelineChartComponent = ({
       const labelColor = entity.isEgo ? EGO_LABEL_COLOR : isPinned ? 'var(--primary)' : 'currentColor';
       const labelWeight = entity.isEgo || isPinned ? '600' : 'normal';
 
-      g.append('text')
+      const label = g
+        .append('text')
         .attr('x', -10)
         .attr('y', cy)
         .attr('text-anchor', 'end')
@@ -197,12 +198,10 @@ const NetworkTimelineChartComponent = ({
         .attr('font-weight', labelWeight)
         .attr('fill', labelColor)
         .attr('cursor', 'pointer')
-        .text(entity.name.length > 16 ? entity.name.slice(0, 15) + '\u2026' : entity.name)
-        .append('title')
-        .text(entity.name);
+        .text(entity.name)
+        .on('click', () => handleEntityClick(entity.name));
 
-      // Attach click handler to the text node
-      g.select<SVGTextElement>('text:last-of-type').on('click', () => handleEntityClick(entity.name));
+      label.append('title').text(entity.name);
 
       // Lines between CONSECUTIVE active time blocks
       const sortedActive = entity.timeBlocks
