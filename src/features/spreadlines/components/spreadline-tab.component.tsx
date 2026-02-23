@@ -145,9 +145,13 @@ const SpreadlineTabComponent = (_props: Props) => {
                 <NetworkTimelineChartComponent
                   rawData={rawData ?? null}
                   timeBlocks={timeBlocks}
+                  highlightTimes={selectedTimes}
+                  selectedRange={selectedRange}
                   pinnedEntityNames={pinnedEntityNames}
                   relationTypes={relationTypes}
                   onRelationTypesChange={setRelationTypes}
+                  onTimeClick={handleTimeClick}
+                  onHighlightRangeChange={handleHighlightRangeChange}
                   granularity={granularity}
                   onGranularityChange={handleGranularityChange}
                   pageIndex={pageIndex}

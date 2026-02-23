@@ -6,9 +6,15 @@
  * Renders horizontal dot-and-line timelines per entity, sorted by activity count.
  * Dots are colored by citation frequency using a heatmap threshold scale.
  * Shares all state (filters, pins, pagination) with the sibling Spreadline tab.
+ *
+ * Features:
+ * - Entities filtered by selected time range (only active ones shown)
+ * - Highlight overlay with drag handles for time range selection
+ * - Click time column to select, drag to expand/pan
+ * - Graph syncs via shared selectedRange state
  */
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import * as d3 from 'd3';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,14 +28,16 @@ import {
   NETWORK_TIMELINE_DOT_RADIUS,
   NETWORK_TIMELINE_LINE_WIDTH,
   NETWORK_TIMELINE_PADDING,
+  SPREADLINE_HIGHLIGHT_FILL,
+  SPREADLINE_HIGHLIGHT_STROKE,
+  SPREADLINE_HIGHLIGHT_HANDLE_WIDTH,
+  SPREADLINE_HIGHLIGHT_HANDLE_COLOR,
+  SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR,
   type SpreadlineGranularity
 } from '@/features/spreadlines/const';
 import type { SpreadlineRawData } from '@/features/spreadlines/components/spreadline.component';
 import { transformSpreadlineToTimeline } from '@/features/spreadlines/utils';
 import type { TimelineEntity } from '@/features/spreadlines/utils';
-
-/** Ego name label color — blue matching the spreadline chart ego highlight */
-const EGO_LABEL_COLOR = 'hsl(210, 70%, 50%)';
 
 /** D3 threshold scale: citation count -> heatmap fill color */
 const citationColorScale = d3
@@ -40,9 +48,13 @@ const citationColorScale = d3
 interface Props {
   rawData: SpreadlineRawData | null;
   timeBlocks: string[];
+  highlightTimes?: string[];
+  selectedRange: [number, number] | null;
   pinnedEntityNames: string[];
   relationTypes: string[];
   onRelationTypesChange: (types: string[]) => void;
+  onTimeClick?: (timeLabel: string) => void;
+  onHighlightRangeChange?: (startLabel: string, endLabel: string) => void;
   granularity: SpreadlineGranularity;
   onGranularityChange: (granularity: SpreadlineGranularity) => void;
   pageIndex: number;
@@ -54,12 +66,23 @@ interface Props {
   onEntityPin?: (names: string[]) => void;
 }
 
+/** Drag state for highlight overlay handles */
+interface DragState {
+  mode: 'left' | 'right' | 'pan';
+  startX: number;
+  origRange: [number, number];
+}
+
 const NetworkTimelineChartComponent = ({
   rawData,
   timeBlocks,
+  highlightTimes,
+  selectedRange,
   pinnedEntityNames,
   relationTypes,
   onRelationTypesChange,
+  onTimeClick,
+  onHighlightRangeChange,
   granularity,
   onGranularityChange,
   pageIndex,
@@ -73,6 +96,21 @@ const NetworkTimelineChartComponent = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragState | null>(null);
+
+  // Keep refs for drag handlers (avoids re-registering window listeners)
+  const timeBlocksRef = useRef(timeBlocks);
+  useLayoutEffect(() => {
+    timeBlocksRef.current = timeBlocks;
+  }, [timeBlocks]);
+  const onHighlightRangeChangeRef = useRef(onHighlightRangeChange);
+  useLayoutEffect(() => {
+    onHighlightRangeChangeRef.current = onHighlightRangeChange;
+  }, [onHighlightRangeChange]);
+  const selectedRangeRef = useRef(selectedRange);
+  useLayoutEffect(() => {
+    selectedRangeRef.current = selectedRange;
+  }, [selectedRange]);
 
   // Observe container width for responsive X scale
   useEffect(() => {
@@ -85,16 +123,103 @@ const NetworkTimelineChartComponent = ({
     return () => observer.disconnect();
   }, []);
 
-  // 1. Compute timeline entities from raw data
+  // Convert clientX to time block index using the band scale geometry
+  const xToIndex = useCallback(
+    (clientX: number): number => {
+      if (!containerRef.current || timeBlocks.length === 0) return 0;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pad = NETWORK_TIMELINE_PADDING;
+      const chartWidth = rect.width - pad.left - pad.right;
+      const relX = clientX - rect.left - pad.left;
+      const fraction = Math.max(0, Math.min(1, relX / chartWidth));
+      return Math.round(fraction * (timeBlocks.length - 1));
+    },
+    [timeBlocks.length]
+  );
+
+  // Window-level drag listeners for highlight overlay
+  useEffect(() => {
+    const handleMove = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const tbs = timeBlocksRef.current;
+      const idx = xToIndex(e.clientX);
+      const max = tbs.length - 1;
+      const [origStart, origEnd] = drag.origRange;
+
+      let newStart: number;
+      let newEnd: number;
+
+      if (drag.mode === 'left') {
+        newStart = Math.min(idx, origEnd);
+        newEnd = origEnd;
+      } else if (drag.mode === 'right') {
+        newStart = origStart;
+        newEnd = Math.max(idx, origStart);
+      } else {
+        // pan
+        const delta = idx - xToIndex(drag.startX);
+        const rangeSize = origEnd - origStart;
+        newStart = origStart + delta;
+        newEnd = origEnd + delta;
+        if (newStart < 0) {
+          newStart = 0;
+          newEnd = rangeSize;
+        }
+        if (newEnd > max) {
+          newEnd = max;
+          newStart = max - rangeSize;
+        }
+      }
+
+      newStart = Math.max(0, Math.min(max, newStart));
+      newEnd = Math.max(0, Math.min(max, newEnd));
+      onHighlightRangeChangeRef.current?.(tbs[newStart], tbs[newEnd]);
+    };
+
+    const handleUp = () => {
+      dragRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+  }, [xToIndex]);
+
+  const startDrag = useCallback(
+    (e: React.PointerEvent, mode: DragState['mode']) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = {
+        mode,
+        startX: e.clientX,
+        origRange: selectedRange ? [...selectedRange] : [0, 0]
+      };
+    },
+    [selectedRange]
+  );
+
+  // 1. Compute timeline entities from raw data (exclude ego)
   const allEntities = useMemo<TimelineEntity[]>(() => {
     if (!rawData) return [];
-    return transformSpreadlineToTimeline(rawData);
+    return transformSpreadlineToTimeline(rawData).filter(e => !e.isEgo);
   }, [rawData]);
 
-  // 2. Filter by blocksFilter: ego always included
-  const filteredEntities = useMemo(() => {
-    return allEntities.filter(e => e.isEgo || e.lifespan >= blocksFilter);
+  // 2. Filter by blocksFilter
+  const blocksFiltered = useMemo(() => {
+    return allEntities.filter(e => e.lifespan >= blocksFilter);
   }, [allEntities, blocksFilter]);
+
+  // 3. Filter by selected time range — only show entities with activity in highlighted times
+  const highlightSet = useMemo(() => new Set(highlightTimes ?? []), [highlightTimes]);
+
+  const filteredEntities = useMemo(() => {
+    if (highlightSet.size === 0) return blocksFiltered;
+    return blocksFiltered.filter(e => e.timeBlocks.some(tb => highlightSet.has(tb.time)));
+  }, [blocksFiltered, highlightSet]);
 
   // Max lifespan for slider range
   const maxLifespan = useMemo(() => {
@@ -102,7 +227,7 @@ const NetworkTimelineChartComponent = ({
     return Math.max(...allEntities.map(e => e.lifespan), 1);
   }, [allEntities]);
 
-  // 3. Report filteredEntityNames to parent
+  // 4. Report filteredEntityNames to parent
   useEffect(() => {
     if (!onFilteredEntityNamesChange) return;
     const names = filteredEntities.map(e => e.name);
@@ -121,7 +246,15 @@ const NetworkTimelineChartComponent = ({
     [pinnedEntityNames, onEntityPin]
   );
 
-  // 5. D3 SVG rendering
+  // Handle clicking a time column
+  const handleTimeColumnClick = useCallback(
+    (timeLabel: string) => {
+      onTimeClick?.(timeLabel);
+    },
+    [onTimeClick]
+  );
+
+  // D3 SVG rendering
   useEffect(() => {
     if (!svgRef.current || filteredEntities.length === 0 || timeBlocks.length === 0 || containerWidth === 0) return;
 
@@ -152,6 +285,50 @@ const NetworkTimelineChartComponent = ({
 
     const g = svg.append('g').attr('transform', `translate(${pad.left},${pad.top})`);
 
+    // Highlight overlay for selected time range
+    if (selectedRange && selectedRange[0] <= selectedRange[1]) {
+      const startTime = timeBlocks[selectedRange[0]];
+      const endTime = timeBlocks[selectedRange[1]];
+      if (startTime && endTime) {
+        const x1 = xScale(startTime) ?? 0;
+        const x2 = (xScale(endTime) ?? 0) + xScale.bandwidth();
+        const hlGroup = g.append('g').attr('class', 'highlight-overlay');
+
+        // Highlight rect
+        hlGroup
+          .append('rect')
+          .attr('x', x1)
+          .attr('y', -pad.top)
+          .attr('width', x2 - x1)
+          .attr('height', chartHeight + pad.top)
+          .attr('fill', SPREADLINE_HIGHLIGHT_FILL)
+          .attr('stroke', SPREADLINE_HIGHLIGHT_STROKE)
+          .attr('stroke-width', 1);
+
+        // Left drag handle
+        hlGroup
+          .append('rect')
+          .attr('x', x1 - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2)
+          .attr('y', -pad.top)
+          .attr('width', SPREADLINE_HIGHLIGHT_HANDLE_WIDTH)
+          .attr('height', chartHeight + pad.top)
+          .attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_COLOR)
+          .attr('cursor', 'ew-resize')
+          .attr('class', 'handle-left');
+
+        // Right drag handle
+        hlGroup
+          .append('rect')
+          .attr('x', x2 - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2)
+          .attr('y', -pad.top)
+          .attr('width', SPREADLINE_HIGHLIGHT_HANDLE_WIDTH)
+          .attr('height', chartHeight + pad.top)
+          .attr('fill', SPREADLINE_HIGHLIGHT_HANDLE_COLOR)
+          .attr('cursor', 'ew-resize')
+          .attr('class', 'handle-right');
+      }
+    }
+
     // Grid lines (vertical at each time block)
     g.selectAll('.grid-line')
       .data(timeBlocks)
@@ -165,7 +342,7 @@ const NetworkTimelineChartComponent = ({
       .attr('stroke-width', 1)
       .attr('stroke-dasharray', '2,3');
 
-    // Time labels at top
+    // Time labels at top (clickable)
     g.selectAll('.time-label')
       .data(timeBlocks)
       .enter()
@@ -174,19 +351,33 @@ const NetworkTimelineChartComponent = ({
       .attr('y', -8)
       .attr('text-anchor', 'middle')
       .attr('font-size', '10px')
-      .attr('fill', 'var(--muted-foreground)')
-      .text(d => d);
+      .attr('fill', d => (highlightSet.has(d) ? 'var(--primary)' : 'var(--muted-foreground)'))
+      .attr('font-weight', d => (highlightSet.has(d) ? '600' : 'normal'))
+      .attr('cursor', 'pointer')
+      .text(d => d)
+      .on('click', (_, d) => handleTimeColumnClick(d));
+
+    // Clickable invisible rects over each time column (easier click targets)
+    g.selectAll('.time-click-target')
+      .data(timeBlocks)
+      .enter()
+      .append('rect')
+      .attr('x', d => xScale(d) ?? 0)
+      .attr('y', -pad.top)
+      .attr('width', xScale.bandwidth())
+      .attr('height', chartHeight + pad.top)
+      .attr('fill', 'transparent')
+      .attr('cursor', 'pointer')
+      .on('click', (_, d) => handleTimeColumnClick(d));
 
     // Render each entity row
     for (const entity of filteredEntities) {
       const cy = (yScale(entity.name) ?? 0) + yScale.bandwidth() / 2;
-      const activeTimesSet = new Set(entity.timeBlocks.map(tb => tb.time));
-      const citationMap = new Map(entity.timeBlocks.map(tb => [tb.time, tb.citationCount]));
 
       // Entity name label (clickable for pin toggle)
       const isPinned = pinnedEntityNames.includes(entity.name);
-      const labelColor = entity.isEgo ? EGO_LABEL_COLOR : isPinned ? 'var(--primary)' : 'currentColor';
-      const labelWeight = entity.isEgo || isPinned ? '600' : 'normal';
+      const labelColor = isPinned ? 'var(--primary)' : 'currentColor';
+      const labelWeight = isPinned ? '600' : 'normal';
 
       const label = g
         .append('text')
@@ -228,9 +419,8 @@ const NetworkTimelineChartComponent = ({
 
       // Dots at each active time block
       for (const tb of entity.timeBlocks) {
-        if (!activeTimesSet.has(tb.time)) continue;
         const cx = (xScale(tb.time) ?? 0) + xScale.bandwidth() / 2;
-        const color = citationColorScale(citationMap.get(tb.time) ?? 0);
+        const color = citationColorScale(tb.citationCount);
         g.append('circle')
           .attr('cx', cx)
           .attr('cy', cy)
@@ -240,7 +430,7 @@ const NetworkTimelineChartComponent = ({
           .attr('stroke-width', 1);
       }
     }
-  }, [filteredEntities, timeBlocks, pinnedEntityNames, handleEntityClick, containerWidth]);
+  }, [filteredEntities, timeBlocks, selectedRange, highlightSet, pinnedEntityNames, handleEntityClick, handleTimeColumnClick, containerWidth]);
 
   // Loading state
   if (!rawData) {
@@ -256,6 +446,13 @@ const NetworkTimelineChartComponent = ({
 
   const svgHeight =
     NETWORK_TIMELINE_PADDING.top + NETWORK_TIMELINE_PADDING.bottom + filteredEntities.length * NETWORK_TIMELINE_ROW_HEIGHT;
+
+  // Compute highlight overlay position for the HTML drag layer
+  const pad = NETWORK_TIMELINE_PADDING;
+  const chartWidth = containerWidth - pad.left - pad.right;
+  const bandWidth = timeBlocks.length > 0 ? chartWidth / timeBlocks.length : 0;
+  const hlLeft = selectedRange ? pad.left + selectedRange[0] * bandWidth : 0;
+  const hlWidth = selectedRange ? (selectedRange[1] - selectedRange[0] + 1) * bandWidth : 0;
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -348,6 +545,36 @@ const NetworkTimelineChartComponent = ({
           style={{ minHeight: svgHeight }}
         />
 
+        {/* HTML drag layer for highlight handles (overlays the SVG) */}
+        {selectedRange && hlWidth > 0 && (
+          <div
+            className="pointer-events-none absolute top-0"
+            style={{ left: hlLeft, width: hlWidth, height: svgHeight }}
+          >
+            {/* Left handle */}
+            <div
+              className="pointer-events-auto absolute top-0 bottom-0 -left-1.5 w-3 cursor-ew-resize"
+              style={{ background: SPREADLINE_HIGHLIGHT_HANDLE_COLOR }}
+              onPointerDown={e => startDrag(e, 'left')}
+              onPointerEnter={e => ((e.target as HTMLElement).style.background = SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR)}
+              onPointerLeave={e => ((e.target as HTMLElement).style.background = SPREADLINE_HIGHLIGHT_HANDLE_COLOR)}
+            />
+            {/* Pan area */}
+            <div
+              className="pointer-events-auto absolute inset-0 cursor-grab active:cursor-grabbing"
+              onPointerDown={e => startDrag(e, 'pan')}
+            />
+            {/* Right handle */}
+            <div
+              className="pointer-events-auto absolute top-0 -right-1.5 bottom-0 w-3 cursor-ew-resize"
+              style={{ background: SPREADLINE_HIGHLIGHT_HANDLE_COLOR }}
+              onPointerDown={e => startDrag(e, 'right')}
+              onPointerEnter={e => ((e.target as HTMLElement).style.background = SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR)}
+              onPointerLeave={e => ((e.target as HTMLElement).style.background = SPREADLINE_HIGHLIGHT_HANDLE_COLOR)}
+            />
+          </div>
+        )}
+
         {/* Floating controls */}
         <div className="bg-background/80 border-border absolute right-2 bottom-2 flex items-center gap-0.5 rounded-lg border px-1 py-0.5">
           {totalPages > 1 && (
@@ -368,7 +595,6 @@ const NetworkTimelineChartComponent = ({
               </Button>
             </>
           )}
-          <span className="text-muted-foreground px-2 text-xs">Zoom</span>
         </div>
       </div>
     </div>
