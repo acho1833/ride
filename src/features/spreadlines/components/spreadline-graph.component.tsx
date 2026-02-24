@@ -164,6 +164,13 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const nodesRef = useRef<SpreadlineGraphNode[]>([]);
+  const linksRef = useRef<SpreadlineGraphLink[]>([]);
+  const prevHighlightRef = useRef<{
+    pathNodeIds: Set<string>;
+    pathLinkKeys: Set<string>;
+    targetNodeIds: Set<string>;
+    intermediateIds: Set<string>;
+  } | null>(null);
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
   // Dimensions stored as ref so resize doesn't trigger effect re-runs.
   // dimensionsReady fires once to kick off the initial render.
@@ -300,6 +307,8 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     }
 
     initializedRef.current = true;
+    // Force pin-highlight to re-apply after full graph rebuild
+    prevHighlightRef.current = null;
 
     return () => {
       if (simulationRef.current) {
@@ -394,6 +403,10 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
 
     // Merge
     const linkMerged = linkEnter.merge(linkJoin);
+
+    // Persisting links — interrupt any running exit transitions and restore opacity.
+    // Must run BEFORE returning links (same pattern as nodeJoin.interrupt()).
+    linkJoin.interrupt().attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
 
     // Returning links — unhide and fade in
     linkJoin
@@ -618,6 +631,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
     }
 
     nodesRef.current = nodes;
+    linksRef.current = links;
 
     // Seed registry with current positions (covers first-render synchronous layout;
     // animated path overwrites with final positions in simulation.on('end'))
@@ -647,7 +661,61 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       return this.style.display !== 'none';
     };
 
-    // Reset all nodes and links to default style
+    // ── Compute new path sets BEFORE any DOM work ──────────────────────
+    const allPathNodeIds = new Set<string>();
+    const allPathLinkKeys = new Set<string>();
+    const targetNodeIds = new Set<string>();
+    const intermediateIds = new Set<string>();
+
+    if (pinnedEntityNames.length > 0) {
+      const currentLinks = linksRef.current;
+      const egoDistances = bfsDistances(egoId, currentLinks);
+
+      for (const name of pinnedEntityNames) {
+        const targetNode = nodes.find(n => n.name === name);
+        if (!targetNode) continue;
+        const shortestDist = egoDistances.get(targetNode.id);
+        if (shortestDist === undefined) continue;
+
+        targetNodeIds.add(targetNode.id);
+        const targetDistances = bfsDistances(targetNode.id, currentLinks);
+
+        for (const [nodeId, distFromEgo] of egoDistances) {
+          const distFromTarget = targetDistances.get(nodeId);
+          if (distFromTarget !== undefined && distFromEgo + distFromTarget <= shortestDist + 1) {
+            allPathNodeIds.add(nodeId);
+            if (nodeId !== egoId && !targetNodeIds.has(nodeId)) {
+              intermediateIds.add(nodeId);
+            }
+          }
+        }
+      }
+
+      for (const link of currentLinks) {
+        const s = typeof link.source === 'string' ? link.source : link.source.id;
+        const t = typeof link.target === 'string' ? link.target : link.target.id;
+        if (allPathNodeIds.has(s) && allPathNodeIds.has(t)) {
+          allPathLinkKeys.add([s, t].sort().join('::'));
+        }
+      }
+    }
+
+    // ── Bail if path unchanged ─────────────────────────────────────────
+    const prev = prevHighlightRef.current;
+    const setsEqual = (a: Set<string>, b: Set<string>) =>
+      a.size === b.size && [...a].every(v => b.has(v));
+
+    if (
+      prev &&
+      setsEqual(allPathNodeIds, prev.pathNodeIds) &&
+      setsEqual(allPathLinkKeys, prev.pathLinkKeys) &&
+      setsEqual(targetNodeIds, prev.targetNodeIds) &&
+      setsEqual(intermediateIds, prev.intermediateIds)
+    ) {
+      return;
+    }
+
+    // ── Reset all nodes and links to default style ─────────────────────
     g.select('.nodes').selectAll<SVGGElement, SpreadlineGraphNode>('g').filter(visibleNodeFilter).style('opacity', null);
     g.select('.nodes')
       .selectAll<SVGGElement, SpreadlineGraphNode>('g')
@@ -681,63 +749,21 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
       .filter(visibleLinkFilter)
       .style('stroke', null)
-      .attr('stroke', getLinkColor)
-      .attr('stroke-width', getLinkWidth)
-      .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
+      .style('stroke-width', null)
+      .style('stroke-opacity', null);
 
-    if (pinnedEntityNames.length === 0) return;
-
-    // Collect current links from DOM
-    const currentLinks: SpreadlineGraphLink[] = [];
-    g.select('.links')
-      .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
-      .filter(visibleLinkFilter)
-      .each(function (d) {
-        currentLinks.push(d);
-      });
-
-    // BFS distances from ego (computed once, shared across all targets)
-    const egoDistances = bfsDistances(egoId, currentLinks);
-
-    // For each target, include all nodes on any path (within 1 hop of shortest)
-    const allPathNodeIds = new Set<string>();
-    const allPathLinkKeys = new Set<string>();
-    const targetNodeIds = new Set<string>();
-    const intermediateIds = new Set<string>();
-
-    for (const name of pinnedEntityNames) {
-      const targetNode = nodes.find(n => n.name === name);
-      if (!targetNode) continue;
-      const shortestDist = egoDistances.get(targetNode.id);
-      if (shortestDist === undefined) continue;
-
-      targetNodeIds.add(targetNode.id);
-      const targetDistances = bfsDistances(targetNode.id, currentLinks);
-
-      // A node is on "a path" if distFromEgo + distFromTarget <= shortest + 1
-      for (const [nodeId, distFromEgo] of egoDistances) {
-        const distFromTarget = targetDistances.get(nodeId);
-        if (distFromTarget !== undefined && distFromEgo + distFromTarget <= shortestDist + 1) {
-          allPathNodeIds.add(nodeId);
-          if (nodeId !== egoId && !targetNodeIds.has(nodeId)) {
-            intermediateIds.add(nodeId);
-          }
-        }
-      }
+    // ── Store current state and exit if no pins ────────────────────────
+    if (pinnedEntityNames.length === 0) {
+      prevHighlightRef.current = { pathNodeIds: allPathNodeIds, pathLinkKeys: allPathLinkKeys, targetNodeIds, intermediateIds };
+      return;
     }
 
-    if (allPathNodeIds.size === 0) return;
-
-    // Include links where both endpoints are path nodes
-    for (const link of currentLinks) {
-      const s = typeof link.source === 'string' ? link.source : link.source.id;
-      const t = typeof link.target === 'string' ? link.target : link.target.id;
-      if (allPathNodeIds.has(s) && allPathNodeIds.has(t)) {
-        allPathLinkKeys.add([s, t].sort().join('::'));
-      }
+    if (allPathNodeIds.size === 0) {
+      prevHighlightRef.current = { pathNodeIds: allPathNodeIds, pathLinkKeys: allPathLinkKeys, targetNodeIds, intermediateIds };
+      return;
     }
 
-    // Highlight path links, dim non-path links
+    // ── Highlight path links, dim non-path links ───────────────────────
     g.select('.links')
       .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
       .filter(visibleLinkFilter)
@@ -748,10 +774,10 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
         if (allPathLinkKeys.has(key)) {
           d3.select(this)
             .style('stroke', 'var(--primary)')
-            .attr('stroke-width', GRAPH_CONFIG.linkStrokeWidth * 2)
-            .attr('stroke-opacity', 1);
+            .style('stroke-width', `${GRAPH_CONFIG.linkStrokeWidth * 2}px`)
+            .style('stroke-opacity', '1');
         } else {
-          d3.select(this).attr('stroke-opacity', 0.15);
+          d3.select(this).style('stroke-opacity', '0.15');
         }
       });
 
@@ -807,7 +833,10 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
           .attr('font-size', '14px')
           .attr('font-weight', '600');
       });
-  }, [pinnedEntityNames, rawData, selectedTimes]);
+
+    // ── Store current state ────────────────────────────────────────────
+    prevHighlightRef.current = { pathNodeIds: allPathNodeIds, pathLinkKeys: allPathLinkKeys, targetNodeIds, intermediateIds };
+  }, [pinnedEntityNames, rawData, selectedTimes, filteredEntityNames]);
 
   // ═══════════════════════════════════════════════════════════════════════
   // Zoom Controls
