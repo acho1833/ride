@@ -45,7 +45,7 @@ export class SpreadLinesVisualizer {
   margin = { top: 70, right: 20, bottom: 20, left: 150 };
   _BAND_WIDTH: number;
   _EGO: string;
-  _LEGEND_OFFSET = 60;
+  _CONTENT_OFFSET = 110;
   _ANNOTATION_OFFSET = 0;
   _FILTER_THRESHOLD = 1;
   _FILTER_CROSSING = false;
@@ -128,7 +128,7 @@ export class SpreadLinesVisualizer {
 
     chartContainer
       .attr('width', Math.max(...timeLabels.map(d => d.posX)) + this.margin.left + this.margin.right + 100)
-      .attr('height', heightExtents[1] + this.margin.top + this.margin.bottom + this._LEGEND_OFFSET + this._ANNOTATION_OFFSET + 20);
+      .attr('height', heightExtents[1] + this.margin.top + this.margin.bottom + this._CONTENT_OFFSET + this._ANNOTATION_OFFSET + 20);
 
     // Initialize visibility
     this.data.storylines.forEach(d => (this.visibility[d.name] = true));
@@ -205,7 +205,7 @@ export class SpreadLinesVisualizer {
     this.chartContainer
       .append('g')
       .attr('id', 'direction-container')
-      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._LEGEND_OFFSET + this._ANNOTATION_OFFSET})`)
+      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._CONTENT_OFFSET + this._ANNOTATION_OFFSET})`)
       .selectAll('text')
       .data(config.direction)
       .join('text')
@@ -270,7 +270,7 @@ export class SpreadLinesVisualizer {
       this.chartContainer
         .append('g')
         .attr('id', 'time-annotation-container')
-        .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._LEGEND_OFFSET / 2})`)
+        .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._CONTENT_OFFSET / 2})`)
         .selectAll('g')
         .data(config.annotations)
         .join(enter => {
@@ -303,7 +303,7 @@ export class SpreadLinesVisualizer {
     this.chartContainer
       .append('g')
       .attr('id', 'storyline-container')
-      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._LEGEND_OFFSET + this._ANNOTATION_OFFSET})`)
+      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._CONTENT_OFFSET + this._ANNOTATION_OFFSET})`)
       .selectAll('g')
       .data(this.data.storylines)
       .join(enter => {
@@ -365,7 +365,7 @@ export class SpreadLinesVisualizer {
     this.chartContainer
       .append('g')
       .attr('id', 'block-container')
-      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._LEGEND_OFFSET + this._ANNOTATION_OFFSET})`)
+      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._CONTENT_OFFSET + this._ANNOTATION_OFFSET})`)
       .selectAll('g')
       .data(this.data.blocks)
       .join(enter => {
@@ -755,7 +755,7 @@ export class SpreadLinesVisualizer {
     this.chartContainer
       .append('g')
       .attr('id', 'label-container')
-      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._LEGEND_OFFSET + this._ANNOTATION_OFFSET})`)
+      .attr('transform', `translate(${this.margin.left}, ${this.margin.top + this._CONTENT_OFFSET + this._ANNOTATION_OFFSET})`)
       .selectAll('g')
       .data(this.storylines)
       .join(enter => {

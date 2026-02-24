@@ -39,6 +39,21 @@ import type { SpreadlineRawData } from '@/features/spreadlines/components/spread
 import { transformSpreadlineToTimeline } from '@/features/spreadlines/utils';
 import type { TimelineEntity } from '@/features/spreadlines/utils';
 
+/** Force a global cursor during drag so element-level cursors don't override it. */
+const DRAG_CURSOR_STYLE_ID = 'network-timeline-drag-cursor';
+function setDragCursor(cursor: string) {
+  let el = document.getElementById(DRAG_CURSOR_STYLE_ID) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement('style');
+    el.id = DRAG_CURSOR_STYLE_ID;
+    document.head.appendChild(el);
+  }
+  el.textContent = `* { cursor: ${cursor} !important; }`;
+}
+function clearDragCursor() {
+  document.getElementById(DRAG_CURSOR_STYLE_ID)?.remove();
+}
+
 /** D3 threshold scale: citation count -> heatmap fill color */
 const citationColorScale = d3.scaleThreshold<number, string>().domain(SPREADLINE_FREQUENCY_THRESHOLDS).range(SPREADLINE_FREQUENCY_COLORS);
 
@@ -176,6 +191,7 @@ const NetworkTimelineChartComponent = ({
 
     const handleUp = () => {
       dragRef.current = null;
+      clearDragCursor();
     };
 
     window.addEventListener('pointermove', handleMove);
@@ -190,6 +206,7 @@ const NetworkTimelineChartComponent = ({
     (e: React.PointerEvent, mode: DragState['mode']) => {
       e.preventDefault();
       e.stopPropagation();
+      setDragCursor(mode === 'pan' ? 'grabbing' : 'ew-resize');
       dragRef.current = {
         mode,
         startX: e.clientX,

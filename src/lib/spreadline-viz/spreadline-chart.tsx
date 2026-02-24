@@ -20,7 +20,9 @@ import {
   SPREADLINE_HIGHLIGHT_STROKE,
   SPREADLINE_HIGHLIGHT_HANDLE_WIDTH,
   SPREADLINE_HIGHLIGHT_HANDLE_COLOR,
-  SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR
+  SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR,
+  SPREADLINE_BLOCK_TOP_PADDING,
+  SPREADLINE_BLOCK_BOTTOM_PADDING
 } from '@/features/spreadlines/const';
 
 /**
@@ -121,6 +123,21 @@ interface SpreadLineChartProps {
 
   /** Callback when pinned entities change in the chart */
   onEntityPin?: (names: string[]) => void;
+}
+
+/** Force a global cursor during drag so element-level cursors don't override it. */
+const DRAG_CURSOR_STYLE_ID = 'spreadline-drag-cursor';
+function setDragCursor(cursor: string) {
+  let el = document.getElementById(DRAG_CURSOR_STYLE_ID) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement('style');
+    el.id = DRAG_CURSOR_STYLE_ID;
+    document.head.appendChild(el);
+  }
+  el.textContent = `* { cursor: ${cursor} !important; }`;
+}
+function clearDragCursor() {
+  document.getElementById(DRAG_CURSOR_STYLE_ID)?.remove();
 }
 
 const ZOOM_SCALE_EXTENT: [number, number] = [0.1, 10];
@@ -422,8 +439,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
 
     const bandWidth = data.bandWidth;
     const heightExtent = data.heightExtents[1] - data.heightExtents[0];
-    const barY = data.heightExtents[0] - 20;
-    const barHeight = heightExtent + 40;
+    const barY = data.heightExtents[0] - SPREADLINE_BLOCK_TOP_PADDING;
+    const barHeight = heightExtent + SPREADLINE_BLOCK_TOP_PADDING + SPREADLINE_BLOCK_BOTTOM_PADDING;
     const barX = Math.min(firstLabel.posX, lastLabel.posX) - bandWidth / 2;
     const barWidth = Math.abs(lastLabel.posX - firstLabel.posX) + bandWidth;
 
@@ -493,7 +510,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         event.sourceEvent.stopPropagation();
         event.sourceEvent.preventDefault();
         isDraggingHighlightRef.current = true;
-        document.body.style.cursor = 'ew-resize';
+        setDragCursor('ew-resize');
       })
       .on('drag', event => {
         const idx = findNearestLabelIdx(event.x);
@@ -505,7 +522,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       })
       .on('end', () => {
         isDraggingHighlightRef.current = false;
-        document.body.style.cursor = '';
+        clearDragCursor();
         fireRangeChange();
       });
 
@@ -519,7 +536,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         event.sourceEvent.stopPropagation();
         event.sourceEvent.preventDefault();
         isDraggingHighlightRef.current = true;
-        document.body.style.cursor = 'ew-resize';
+        setDragCursor('ew-resize');
       })
       .on('drag', event => {
         const idx = findNearestLabelIdx(event.x);
@@ -531,7 +548,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       })
       .on('end', () => {
         isDraggingHighlightRef.current = false;
-        document.body.style.cursor = '';
+        clearDragCursor();
         fireRangeChange();
       });
 
@@ -548,8 +565,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         event.sourceEvent.stopPropagation();
         event.sourceEvent.preventDefault();
         isDraggingHighlightRef.current = true;
-        document.body.style.cursor = 'grabbing';
-        bar.attr('cursor', 'grabbing');
+        setDragCursor('grabbing');
         panStartIdx = findNearestLabelIdx(event.x);
         panOrigStart = currentStartIdx;
         panOrigEnd = currentEndIdx;
@@ -575,8 +591,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       })
       .on('end', () => {
         isDraggingHighlightRef.current = false;
-        document.body.style.cursor = '';
-        bar.attr('cursor', 'grab');
+        clearDragCursor();
         fireRangeChange();
       });
 
@@ -642,9 +657,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         .insert('rect', ':first-child')
         .attr('class', 'time-click-receptor')
         .attr('x', tl.posX - bandWidth / 2)
-        .attr('y', data.heightExtents[0] - 20)
+        .attr('y', data.heightExtents[0] - SPREADLINE_BLOCK_TOP_PADDING)
         .attr('width', bandWidth)
-        .attr('height', heightExtent + 40)
+        .attr('height', heightExtent + SPREADLINE_BLOCK_TOP_PADDING + SPREADLINE_BLOCK_BOTTOM_PADDING)
         .attr('fill', 'transparent')
         .attr('cursor', 'pointer')
         .on('click', () => onTimeClickRef.current?.(tl.label));

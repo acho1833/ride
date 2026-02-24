@@ -124,6 +124,15 @@ export const GRAPH_LINK_WIDTH_BANDS = [2, 4, 6, 8, 12];
 /** Link colors for graph (visible on dark background) */
 export const GRAPH_LINK_COLORS = ['#d4b896', '#fcdaca', '#e599a6', '#c94b77', '#740980'];
 
+// ── Spreadline Block Padding ────────────────────────────────────────
+
+/** Extra top padding above the first node in each block column (px).
+ *  Creates a larger clickable area between the year label and the pills. */
+export const SPREADLINE_BLOCK_TOP_PADDING = 60;
+
+/** Bottom padding below the last node in each block column (px) */
+export const SPREADLINE_BLOCK_BOTTOM_PADDING = 20;
+
 // ── Spreadline Highlight Bar ────────────────────────────────────────
 
 /** Fill color for the time highlight bar on the spreadline chart */
