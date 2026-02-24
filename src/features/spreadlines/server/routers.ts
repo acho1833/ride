@@ -3,6 +3,8 @@ import 'server-only';
 import { z } from 'zod';
 import { appProcedure } from '@/lib/orpc';
 import * as spreadlineDataService from './services/spreadline-data.service';
+import { relationEventSchema } from '@/models/relation-event.model';
+import * as relationEventService from './services/relation-event.service';
 
 const API_SPREADLINE_PREFIX = '/spreadlines';
 const tags = ['Spreadline'];
@@ -53,5 +55,18 @@ export const spreadlineRouter = appProcedure.router({
     .output(spreadlineRawDataResponseSchema)
     .handler(async ({ input }) => {
       return spreadlineDataService.getSpreadlineRawData(input);
+    }),
+
+  getRelationEvents: appProcedure
+    .route({
+      method: 'GET',
+      path: `${API_SPREADLINE_PREFIX}/relation-events`,
+      summary: 'Get relation events between two entities',
+      tags
+    })
+    .input(z.object({ sourceId: z.string(), targetId: z.string() }))
+    .output(relationEventSchema.array())
+    .handler(async ({ input }) => {
+      return relationEventService.getRelationEvents(input.sourceId, input.targetId);
     })
 });
