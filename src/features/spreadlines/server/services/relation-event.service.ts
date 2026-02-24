@@ -40,9 +40,7 @@ export async function getRelationEvents(sourceId: string, targetId: string): Pro
   }
 
   const filtered = relations.filter(
-    r =>
-      (r.sourceId === sourceId && r.targetId === targetId) ||
-      (r.sourceId === targetId && r.targetId === sourceId)
+    r => (r.sourceId === sourceId && r.targetId === targetId) || (r.sourceId === targetId && r.targetId === sourceId)
   );
 
   const events: RelationEvent[] = filtered.map(r => ({

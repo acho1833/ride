@@ -160,7 +160,13 @@ interface Props {
   onLinkDoubleClick?: (sourceId: string, targetId: string, sourceName: string, targetName: string) => void;
 }
 
-const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNames = [], filteredEntityNames, onLinkDoubleClick }: Props) => {
+const SpreadlineGraphComponent = ({
+  rawData,
+  selectedTimes = [],
+  pinnedEntityNames = [],
+  filteredEntityNames,
+  onLinkDoubleClick
+}: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -427,15 +433,13 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
 
     // Double-click on link: open relationship evidence tab
-    linkMerged
-      .style('cursor', 'pointer')
-      .on('dblclick', function (event: MouseEvent, d: SpreadlineGraphLink) {
-        event.preventDefault();
-        event.stopPropagation();
-        const source = d.source as SpreadlineGraphNode;
-        const target = d.target as SpreadlineGraphNode;
-        onLinkDoubleClickRef.current?.(source.id, target.id, source.name, target.name);
-      });
+    linkMerged.style('cursor', 'pointer').on('dblclick', function (event: MouseEvent, d: SpreadlineGraphLink) {
+      event.preventDefault();
+      event.stopPropagation();
+      const source = d.source as SpreadlineGraphNode;
+      const target = d.target as SpreadlineGraphNode;
+      onLinkDoubleClickRef.current?.(source.id, target.id, source.name, target.name);
+    });
 
     // ─── D3 Data Join: Nodes ─────────────────────────────────────────
     const nodeJoin = g
