@@ -157,9 +157,10 @@ interface Props {
   selectedTimes?: string[];
   pinnedEntityNames?: string[];
   filteredEntityNames?: string[] | null;
+  onLinkDoubleClick?: (sourceId: string, targetId: string, sourceName: string, targetName: string) => void;
 }
 
-const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNames = [], filteredEntityNames }: Props) => {
+const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNames = [], filteredEntityNames, onLinkDoubleClick }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -186,6 +187,10 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
 
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
+
+  // Ref to avoid stale closures in D3 event handlers
+  const onLinkDoubleClickRef = useRef(onLinkDoubleClick);
+  onLinkDoubleClickRef.current = onLinkDoubleClick;
 
   // Observe container size
   useEffect(() => {
@@ -420,6 +425,17 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .transition()
       .duration(GRAPH_TIME_TRANSITION_MS)
       .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
+
+    // Double-click on link: open relationship evidence tab
+    linkMerged
+      .style('cursor', 'pointer')
+      .on('dblclick', function (event: MouseEvent, d: SpreadlineGraphLink) {
+        event.preventDefault();
+        event.stopPropagation();
+        const source = d.source as SpreadlineGraphNode;
+        const target = d.target as SpreadlineGraphNode;
+        onLinkDoubleClickRef.current?.(source.id, target.id, source.name, target.name);
+      });
 
     // ─── D3 Data Join: Nodes ─────────────────────────────────────────
     const nodeJoin = g

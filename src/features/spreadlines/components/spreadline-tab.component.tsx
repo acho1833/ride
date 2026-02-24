@@ -12,6 +12,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
+import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
 import {
@@ -96,6 +97,23 @@ const SpreadlineTabComponent = (_props: Props) => {
     [timeBlocks]
   );
 
+  const { openNewFile } = useOpenFilesActions();
+
+  const handleLinkDoubleClick = useCallback(
+    (sourceId: string, targetId: string, sourceName: string, targetName: string) => {
+      const getLastName = (name: string) => name.split(' ').pop() ?? name;
+      const sortedIds = [sourceId, targetId].sort();
+      const timeStart = selectedTimes.length > 0 ? selectedTimes[selectedTimes.length - 1] : '';
+      const timeEnd = selectedTimes.length > 0 ? selectedTimes[0] : '';
+      openNewFile({
+        id: `re-${sortedIds[0]}-${sortedIds[1]}`,
+        name: `${getLastName(sourceName)} ↔ ${getLastName(targetName)}.re`,
+        metadata: { sourceId, targetId, sourceName, targetName, timeStart, timeEnd }
+      });
+    },
+    [openNewFile, selectedTimes]
+  );
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
@@ -105,6 +123,7 @@ const SpreadlineTabComponent = (_props: Props) => {
             selectedTimes={selectedTimes}
             pinnedEntityNames={pinnedEntityNames}
             filteredEntityNames={filteredEntityNames}
+            onLinkDoubleClick={handleLinkDoubleClick}
           />
         </ResizablePanel>
 
