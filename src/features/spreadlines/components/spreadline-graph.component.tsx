@@ -700,68 +700,61 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       }
     }
 
-    // ── Bail if path unchanged ─────────────────────────────────────────
+    // ── Compare with previous state ───────────────────────────────────
     const prev = prevHighlightRef.current;
     const setsEqual = (a: Set<string>, b: Set<string>) =>
       a.size === b.size && [...a].every(v => b.has(v));
 
-    if (
-      prev &&
-      setsEqual(allPathNodeIds, prev.pathNodeIds) &&
-      setsEqual(allPathLinkKeys, prev.pathLinkKeys) &&
-      setsEqual(targetNodeIds, prev.targetNodeIds) &&
-      setsEqual(intermediateIds, prev.intermediateIds)
-    ) {
-      return;
-    }
+    const pathChanged =
+      !prev ||
+      !setsEqual(allPathNodeIds, prev.pathNodeIds) ||
+      !setsEqual(allPathLinkKeys, prev.pathLinkKeys) ||
+      !setsEqual(targetNodeIds, prev.targetNodeIds) ||
+      !setsEqual(intermediateIds, prev.intermediateIds);
 
-    // ── Reset all nodes and links to default style ─────────────────────
-    g.select('.nodes').selectAll<SVGGElement, SpreadlineGraphNode>('g').filter(visibleNodeFilter).style('opacity', null);
-    g.select('.nodes')
-      .selectAll<SVGGElement, SpreadlineGraphNode>('g')
-      .filter(visibleNodeFilter)
-      .each(function (d) {
-        const node = d3.select(this);
-        const radius = d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius;
-        const iconSize = d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize;
-        node
-          .select('rect')
-          .attr('x', -radius)
-          .attr('y', -radius)
-          .attr('width', radius * 2)
-          .attr('height', radius * 2)
-          .attr('fill', getNodeFill(d))
-          .attr('stroke-width', d.isEgo ? 3 : GRAPH_CONFIG.linkStrokeWidth)
-          .attr('filter', d.isEgo ? 'url(#sl-ego-glow)' : null);
-        node
-          .select('use')
-          .attr('x', -iconSize / 2)
-          .attr('y', -iconSize / 2)
-          .attr('width', iconSize)
-          .attr('height', iconSize);
-        node
-          .select('text')
-          .attr('dy', radius + GRAPH_CONFIG.labelOffsetY)
-          .attr('font-size', d.isEgo ? '14px' : '12px')
-          .attr('font-weight', d.isEgo ? '600' : 'normal');
-      });
-    g.select('.links')
-      .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
-      .filter(visibleLinkFilter)
-      .style('stroke', null)
-      .style('stroke-width', null)
-      .style('stroke-opacity', null);
+    // ── Reset only when path actually changed (avoids flash) ───────────
+    if (pathChanged) {
+      g.select('.nodes').selectAll<SVGGElement, SpreadlineGraphNode>('g').filter(visibleNodeFilter).style('opacity', null);
+      g.select('.nodes')
+        .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+        .filter(visibleNodeFilter)
+        .each(function (d) {
+          const node = d3.select(this);
+          const radius = d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius;
+          const iconSize = d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize;
+          node
+            .select('rect')
+            .attr('x', -radius)
+            .attr('y', -radius)
+            .attr('width', radius * 2)
+            .attr('height', radius * 2)
+            .attr('fill', getNodeFill(d))
+            .attr('stroke-width', d.isEgo ? 3 : GRAPH_CONFIG.linkStrokeWidth)
+            .attr('filter', d.isEgo ? 'url(#sl-ego-glow)' : null);
+          node
+            .select('use')
+            .attr('x', -iconSize / 2)
+            .attr('y', -iconSize / 2)
+            .attr('width', iconSize)
+            .attr('height', iconSize);
+          node
+            .select('text')
+            .attr('dy', radius + GRAPH_CONFIG.labelOffsetY)
+            .attr('font-size', d.isEgo ? '14px' : '12px')
+            .attr('font-weight', d.isEgo ? '600' : 'normal');
+        });
+      g.select('.links')
+        .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
+        .filter(visibleLinkFilter)
+        .style('stroke', null)
+        .style('stroke-width', null)
+        .style('stroke-opacity', null);
 
-    // ── Store current state and exit if no pins ────────────────────────
-    if (pinnedEntityNames.length === 0) {
       prevHighlightRef.current = { pathNodeIds: allPathNodeIds, pathLinkKeys: allPathLinkKeys, targetNodeIds, intermediateIds };
-      return;
     }
 
-    if (allPathNodeIds.size === 0) {
-      prevHighlightRef.current = { pathNodeIds: allPathNodeIds, pathLinkKeys: allPathLinkKeys, targetNodeIds, intermediateIds };
-      return;
-    }
+    // ── Exit if no pins or no path ─────────────────────────────────────
+    if (pinnedEntityNames.length === 0 || allPathNodeIds.size === 0) return;
 
     // ── Highlight path links, dim non-path links ───────────────────────
     g.select('.links')
@@ -834,8 +827,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
           .attr('font-weight', '600');
       });
 
-    // ── Store current state ────────────────────────────────────────────
-    prevHighlightRef.current = { pathNodeIds: allPathNodeIds, pathLinkKeys: allPathLinkKeys, targetNodeIds, intermediateIds };
   }, [pinnedEntityNames, rawData, selectedTimes, filteredEntityNames]);
 
   // ═══════════════════════════════════════════════════════════════════════
