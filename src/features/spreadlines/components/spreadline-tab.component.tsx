@@ -91,15 +91,9 @@ const SpreadlineTabComponent = (_props: Props) => {
       const idx = timeBlocks.indexOf(timeLabel);
       if (idx === -1) return;
 
-      if (!selectedRange) {
-        setSelectedRange([idx, idx]);
-      } else {
-        const newStart = Math.min(selectedRange[0], idx);
-        const newEnd = Math.max(selectedRange[1], idx);
-        setSelectedRange([newStart, newEnd]);
-      }
+      setSelectedRange([idx, idx]);
     },
-    [timeBlocks, selectedRange]
+    [timeBlocks]
   );
 
   return (
