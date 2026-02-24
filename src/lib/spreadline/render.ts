@@ -358,7 +358,7 @@ class Renderer {
     const [numEntities, numTimestamps] = span;
 
     // Scale heights
-    const heights = heightTable.map(row => row.map(h => (h === -1 ? NaN : (h + 1) * 6)));
+    const heights = heightTable.map(row => row.map(h => (h === -1 ? NaN : (h + 1) * 8)));
 
     const allHeights = heights.flat().filter(h => !isNaN(h));
     const topY = Math.min(...allHeights);
@@ -507,9 +507,12 @@ class Renderer {
       const area = (Math.sqrt(3) / 4) * a * a;
 
       if (rIdx !== ego) {
+        // Order markers left-to-right visually so visualizer rotation (▷ ◁) is correct
+        const leftBlock = lineStart[0][0] <= lineEnd[0][0] ? lineStart : lineEnd;
+        const rightBlock = lineStart[0][0] <= lineEnd[0][0] ? lineEnd : lineStart;
         update.marks = [
-          { posX: lineStart[0][0] - h / 2, posY: lineStart[1], name: names[rIdx], size: area, visibility: 'visible' },
-          { posX: lineEnd[0][1] + h / 2, posY: lineEnd[1], name: names[rIdx], size: area, visibility: 'visible' }
+          { posX: leftBlock[0][0] - h / 2, posY: leftBlock[1], name: names[rIdx], size: area, visibility: 'visible' },
+          { posX: rightBlock[0][1] + h / 2, posY: rightBlock[1], name: names[rIdx], size: area, visibility: 'visible' }
         ];
       }
 
