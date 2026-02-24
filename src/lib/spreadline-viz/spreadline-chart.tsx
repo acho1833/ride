@@ -418,6 +418,14 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     zoomLayer.selectAll('.time-highlight-bar').remove();
     zoomLayer.selectAll('.time-highlight-handle').remove();
 
+    // Reset all time label styles when highlight is removed or rebuilt
+    const timeContainer = zoomLayer.select('#time-container');
+    timeContainer.selectAll('.time-labels').each(function () {
+      const el = d3.select(this);
+      const orig = el.attr('data-original-fill');
+      if (orig) el.attr('fill', orig).attr('font-weight', null);
+    });
+
     if (!highlightTimes || highlightTimes.length === 0 || !data) return;
 
     const storylineContainer = zoomLayer.select('#storyline-container');
@@ -429,9 +437,17 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     if (!firstLabel || !lastLabel) return;
 
     const bandWidth = data.bandWidth;
-    const heightExtent = data.heightExtents[1] - data.heightExtents[0];
-    const barY = data.heightExtents[0] - SPREADLINE_BLOCK_TOP_PADDING;
-    const barHeight = heightExtent + SPREADLINE_BLOCK_TOP_PADDING + SPREADLINE_BLOCK_BOTTOM_PADDING;
+
+    // Compute bar top: extend up to cover year labels in time-container
+    // Parse Y offsets from the sibling container transforms
+    const storyTransformY = parseFloat(storylineContainer.attr('transform')?.match(/translate\([^,]+,\s*([^)]+)\)/)?.[1] ?? '0');
+    const timeTransformY = parseFloat(timeContainer.attr('transform')?.match(/translate\([^,]+,\s*([^)]+)\)/)?.[1] ?? '0');
+    const labelYInTimeContainer = parseFloat(timeContainer.select('.time-labels').attr('y') ?? '0');
+    // Year label Y in storyline-container coords (typically -75)
+    const yearLabelYInStoryline = timeTransformY + labelYInTimeContainer - storyTransformY;
+    const barY = yearLabelYInStoryline - 15; // 15px above label baseline
+    const barBottom = data.heightExtents[1] + SPREADLINE_BLOCK_BOTTOM_PADDING;
+    const barHeight = barBottom - barY;
     const barX = Math.min(firstLabel.posX, lastLabel.posX) - bandWidth / 2;
     const barWidth = Math.abs(lastLabel.posX - firstLabel.posX) + bandWidth;
 
@@ -458,6 +474,34 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       return nearest;
     };
 
+    // Build set of highlighted labels for styling
+    const buildHighlightSet = (): Set<string> => {
+      const minIdx = Math.min(currentStartIdx, currentEndIdx);
+      const maxIdx = Math.max(currentStartIdx, currentEndIdx);
+      const set = new Set<string>();
+      for (let i = minIdx; i <= maxIdx; i++) set.add(data.timeLabels[i].label);
+      return set;
+    };
+
+    // Style year labels: blue + bold when highlighted, restore original otherwise
+    const updateLabelStyles = () => {
+      const hlSet = buildHighlightSet();
+      timeContainer.selectAll('.time-labels').each(function () {
+        const el = d3.select(this);
+        // Persist original fill on first touch
+        if (!el.attr('data-original-fill')) {
+          el.attr('data-original-fill', el.attr('fill'));
+        }
+        const id = el.attr('id') ?? '';
+        const label = id.replace('time-label-', '');
+        if (hlSet.has(label)) {
+          el.attr('fill', 'var(--primary)').attr('font-weight', '600');
+        } else {
+          el.attr('fill', el.attr('data-original-fill')).attr('font-weight', null);
+        }
+      });
+    };
+
     // Update bar and handle positions from current indices
     const updateVisuals = () => {
       const posX1 = data.timeLabels[currentStartIdx].posX;
@@ -468,6 +512,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       storylineContainer.select('.time-highlight-bar').attr('x', startX).attr('width', width);
       storylineContainer.select('.time-highlight-handle-left').attr('x', startX - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2);
       storylineContainer.select('.time-highlight-handle-right').attr('x', endX - SPREADLINE_HIGHLIGHT_HANDLE_WIDTH / 2);
+      updateLabelStyles();
     };
 
     // Create highlight bar (on top of content for reliable drag; semi-transparent so content shows through)
@@ -485,6 +530,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       .attr('opacity', 0);
 
     bar.transition().duration(300).attr('opacity', 1);
+
+    // Apply initial label styling for the highlight range
+    updateLabelStyles();
 
     // Helper: fire range change callback with current indices
     const fireRangeChange = () => {
