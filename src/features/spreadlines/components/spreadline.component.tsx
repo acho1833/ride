@@ -396,6 +396,7 @@ const SpreadlineComponent = ({
           onTimeClick={onTimeClick}
           onHighlightRangeChange={onHighlightRangeChange}
           onEntityPin={onEntityPin}
+          pinnedEntityNames={pinnedEntityNames}
         />
 
         {/* Floating zoom controls */}

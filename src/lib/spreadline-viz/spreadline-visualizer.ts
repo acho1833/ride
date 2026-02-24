@@ -1372,6 +1372,23 @@ export class SpreadLinesVisualizer {
     this.BLOCK_SELECTION(names, group).classed('storyline-arc-dehighlight', decision);
   }
 
+  private _applyPinStyle(storylineId: number, name: string): void {
+    d3.selectAll(`.line-${storylineId}.path-movable`).style('stroke', 'var(--primary)').style('stroke-width', '8px');
+    d3.selectAll(`.line-${storylineId}.marks`).style('fill', 'var(--primary)');
+    const labelEl = d3.select(document.getElementById(`label-${name}`));
+    labelEl.selectAll('text.labels').style('fill', 'var(--primary)');
+    labelEl.select('.mark-links').style('stroke', 'var(--primary)');
+  }
+
+  private _clearPinStyle(storylineId: number, name: string): void {
+    d3.selectAll(`.line-${storylineId}.path-movable`).style('stroke', null).style('stroke-width', null);
+    d3.selectAll(`.line-${storylineId}.marks`).style('fill', null);
+    const labelEl = d3.select(document.getElementById(`label-${name}`));
+    labelEl.attr('pin', '0');
+    labelEl.selectAll('text.labels').style('fill', null);
+    labelEl.select('.mark-links').style('stroke', null);
+  }
+
   private _linePin = (d: Storyline, status = 'pinned'): void => {
     if (d.name === this._EGO) return;
 
@@ -1392,20 +1409,12 @@ export class SpreadLinesVisualizer {
       this.LINE_SELECTION(d.id).classed('storyline-hover', false);
       const storyline = this.storylines.find(s => s.name === d.name);
       if (storyline) {
-        d3.selectAll(`.line-${d.id}.path-movable`).style('stroke', null).style('stroke-width', null);
-        d3.selectAll(`.line-${d.id}.marks`).style('fill', null);
-        const labelEl = d3.select(document.getElementById(`label-${d.name}`));
-        labelEl.selectAll('text.labels').style('fill', null);
-        labelEl.select('.mark-links').style('stroke', null);
+        this._clearPinStyle(d.id, d.name);
       }
       this.onEntityPin?.([...this.members.pinned]);
     } else {
       // Pinning — apply primary blue
-      d3.selectAll(`.line-${d.id}.path-movable`).style('stroke', 'var(--primary)').style('stroke-width', '8px');
-      d3.selectAll(`.line-${d.id}.marks`).style('fill', 'var(--primary)');
-      const labelEl = d3.select(document.getElementById(`label-${d.name}`));
-      labelEl.selectAll('text.labels').style('fill', 'var(--primary)');
-      labelEl.select('.mark-links').style('stroke', 'var(--primary)');
+      this._applyPinStyle(d.id, d.name);
       this.onEntityPin?.([...this.members.pinned]);
     }
   };
@@ -1415,16 +1424,38 @@ export class SpreadLinesVisualizer {
     for (const name of [...this.members.pinned]) {
       const storyline = this.storylines.find(s => s.name === name);
       if (!storyline) continue;
-      // Reset visual styles
-      d3.selectAll(`.line-${storyline.id}.path-movable`).style('stroke', null).style('stroke-width', null);
-      d3.selectAll(`.line-${storyline.id}.marks`).style('fill', null);
-      const labelEl = d3.select(document.getElementById(`label-${name}`));
-      labelEl.attr('pin', '0');
-      labelEl.selectAll('text.labels').style('fill', null);
-      labelEl.select('.mark-links').style('stroke', null);
+      this._clearPinStyle(storyline.id, name);
     }
     this.members.pinned = [];
     this.onEntityPin?.([]);
+  }
+
+  /**
+   * Apply pin styling for the given entity names (syncs React state with visualizer).
+   * Does NOT fire onEntityPin callback since this is called FROM React state
+   * (firing would create a feedback loop).
+   */
+  applyPins(names: string[]): void {
+    // Clear existing pin visuals without firing callbacks
+    for (const name of [...this.members.pinned]) {
+      const storyline = this.storylines.find(s => s.name === name);
+      if (!storyline) continue;
+      this._clearPinStyle(storyline.id, name);
+    }
+    this.members.pinned = [];
+
+    // Apply pin styling for each name
+    for (const name of names) {
+      if (name === this._EGO) continue;
+      const storyline = this.storylines.find(s => s.name === name);
+      if (!storyline) continue;
+      const ele = document.getElementById(`label-${name}`);
+      if (!ele) continue;
+
+      ele.setAttribute('pin', '1');
+      this.members.pinned.push(name);
+      this._applyPinStyle(storyline.id, name);
+    }
   }
 
   /** Toggle visibility of lines with the given color */

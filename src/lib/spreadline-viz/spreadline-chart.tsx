@@ -118,6 +118,9 @@ interface SpreadLineChartProps {
 
   /** Callback when pinned entities change in the chart */
   onEntityPin?: (names: string[]) => void;
+
+  /** Currently pinned entity names (for syncing visual state from React) */
+  pinnedEntityNames?: string[];
 }
 
 /** Force a global cursor during drag so element-level cursors don't override it. */
@@ -152,7 +155,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     highlightTimes,
     onTimeClick,
     onHighlightRangeChange,
-    onEntityPin
+    onEntityPin,
+    pinnedEntityNames
   },
   ref
 ) {
@@ -174,6 +178,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   // Refs for filter values - allows D3 to access current values without triggering React re-init
   const blocksFilterRef = useValueRef(blocksFilter);
   const crossingOnlyRef = useValueRef(crossingOnly);
+  const pinnedEntityNamesRef = useValueRef(pinnedEntityNames ?? []);
 
   // Expose zoom methods to parent via ref
   useImperativeHandle(
@@ -269,6 +274,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
 
     visualizer.applyFilter(blocksFilterRef.current, crossingOnlyRef.current);
     visualizerRef.current = visualizer;
+    if (pinnedEntityNamesRef.current.length > 0) {
+      visualizer.applyPins(pinnedEntityNamesRef.current);
+    }
   }, [data, getMergedConfig]);
 
   /**
@@ -353,6 +361,9 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     visualizer.applyFilter(blocksFilterRef.current, crossingOnlyRef.current);
 
     visualizerRef.current = visualizer;
+    if (pinnedEntityNamesRef.current.length > 0) {
+      visualizer.applyPins(pinnedEntityNamesRef.current);
+    }
   }, [data, getMergedConfig]);
 
   /**
