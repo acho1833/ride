@@ -557,12 +557,14 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
 
     // Run simulation
     simulation.stop();
-    // Pin ego to center on all renders
+    // Pin ego to center, and pin target nodes at current position
     for (const n of nodes) {
       if (n.isEgo) {
         n.fx = width / 2;
         n.fy = height / 2;
-        break;
+      } else if (pinnedEntityNames.includes(n.name) && n.x != null && n.y != null) {
+        n.fx = n.x;
+        n.fy = n.y;
       }
     }
 
@@ -718,6 +720,8 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
         .selectAll<SVGGElement, SpreadlineGraphNode>('g')
         .filter(visibleNodeFilter)
         .each(function (d) {
+          // Skip nodes that remain targets — preserve their enlarged styling
+          if (targetNodeIds.has(d.id)) return;
           const node = d3.select(this);
           const radius = d.isEgo ? GRAPH_CONFIG.nodeRadius * EGO_SCALE : GRAPH_CONFIG.nodeRadius;
           const iconSize = d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize;
