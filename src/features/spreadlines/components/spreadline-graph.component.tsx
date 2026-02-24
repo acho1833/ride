@@ -702,8 +702,7 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
 
     // ── Compare with previous state ───────────────────────────────────
     const prev = prevHighlightRef.current;
-    const setsEqual = (a: Set<string>, b: Set<string>) =>
-      a.size === b.size && [...a].every(v => b.has(v));
+    const setsEqual = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every(v => b.has(v));
 
     const pathChanged =
       !prev ||
@@ -826,7 +825,6 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
           .attr('font-size', '14px')
           .attr('font-weight', '600');
       });
-
   }, [pinnedEntityNames, rawData, selectedTimes, filteredEntityNames]);
 
   // ═══════════════════════════════════════════════════════════════════════

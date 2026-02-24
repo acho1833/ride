@@ -227,12 +227,12 @@ const NetworkTimelineChartComponent = ({
     return allEntities.filter(e => e.lifespan >= blocksFilter);
   }, [allEntities, blocksFilter]);
 
-  // 3. Filter by selected time range — only show entities with activity in highlighted times
+  // 3. Filter by selected time range — entities with activity in highlighted times
   const highlightSet = useMemo(() => new Set(highlightTimes ?? []), [highlightTimes]);
 
-  const filteredEntities = useMemo(() => {
-    if (highlightSet.size === 0) return blocksFiltered;
-    return blocksFiltered.filter(e => e.timeBlocks.some(tb => highlightSet.has(tb.time)));
+  const inTimeRangeNames = useMemo(() => {
+    if (highlightSet.size === 0) return null; // null = all in range (no filter active)
+    return new Set(blocksFiltered.filter(e => e.timeBlocks.some(tb => highlightSet.has(tb.time))).map(e => e.name));
   }, [blocksFiltered, highlightSet]);
 
   // Max lifespan for slider range
@@ -241,12 +241,14 @@ const NetworkTimelineChartComponent = ({
     return Math.max(...allEntities.map(e => e.lifespan), 1);
   }, [allEntities]);
 
-  // 4. Report filteredEntityNames to parent
+  // 4. Report filteredEntityNames to parent (only in-range entities for graph filtering)
   useEffect(() => {
     if (!onFilteredEntityNamesChange) return;
-    const names = filteredEntities.map(e => e.name);
+    const names = inTimeRangeNames
+      ? blocksFiltered.filter(e => inTimeRangeNames.has(e.name)).map(e => e.name)
+      : blocksFiltered.map(e => e.name);
     onFilteredEntityNamesChange(names);
-  }, [filteredEntities, onFilteredEntityNamesChange]);
+  }, [blocksFiltered, inTimeRangeNames, onFilteredEntityNamesChange]);
 
   // Pin toggle handler
   const handleEntityClick = useCallback(
@@ -268,14 +270,14 @@ const NetworkTimelineChartComponent = ({
 
   // D3 SVG rendering
   useEffect(() => {
-    if (!svgRef.current || filteredEntities.length === 0 || timeBlocks.length === 0 || containerWidth === 0) return;
+    if (!svgRef.current || blocksFiltered.length === 0 || timeBlocks.length === 0 || containerWidth === 0) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
     const pad = NETWORK_TIMELINE_PADDING;
     const chartWidth = containerWidth - pad.left - pad.right;
-    const chartHeight = filteredEntities.length * NETWORK_TIMELINE_ROW_HEIGHT;
+    const chartHeight = blocksFiltered.length * NETWORK_TIMELINE_ROW_HEIGHT;
 
     // Build a set of time block indices for consecutive-check lookups
     const timeBlockIndex = new Map<string, number>();
@@ -287,7 +289,7 @@ const NetworkTimelineChartComponent = ({
     // Y scale: entity names in filtered order
     const yScale = d3
       .scaleBand()
-      .domain(filteredEntities.map(e => e.name))
+      .domain(blocksFiltered.map(e => e.name))
       .range([0, chartHeight])
       .padding(0.1);
 
@@ -379,15 +381,20 @@ const NetworkTimelineChartComponent = ({
       .on('click', (_, d) => handleTimeColumnClick(d));
 
     // Render each entity row
-    for (const entity of filteredEntities) {
+    for (const entity of blocksFiltered) {
       const cy = (yScale(entity.name) ?? 0) + yScale.bandwidth() / 2;
+      const isDimmed = inTimeRangeNames !== null && !inTimeRangeNames.has(entity.name);
+
+      // Wrap entity row in a group for opacity
+      const row = g.append('g');
+      if (isDimmed) row.attr('opacity', 0.25);
 
       // Entity name label (clickable for pin toggle)
       const isPinned = pinnedEntityNames.includes(entity.name);
       const labelColor = isPinned ? 'var(--primary)' : 'currentColor';
       const labelWeight = isPinned ? '600' : 'normal';
 
-      const label = g
+      const label = row
         .append('text')
         .attr('x', -10)
         .attr('y', cy)
@@ -414,7 +421,8 @@ const NetworkTimelineChartComponent = ({
         if (Math.abs(curr.idx - next.idx) === 1) {
           const x1 = (xScale(curr.time) ?? 0) + xScale.bandwidth() / 2;
           const x2 = (xScale(next.time) ?? 0) + xScale.bandwidth() / 2;
-          g.append('line')
+          row
+            .append('line')
             .attr('x1', x1)
             .attr('y1', cy)
             .attr('x2', x2)
@@ -429,7 +437,8 @@ const NetworkTimelineChartComponent = ({
       for (const tb of entity.timeBlocks) {
         const cx = (xScale(tb.time) ?? 0) + xScale.bandwidth() / 2;
         const color = citationColorScale(tb.citationCount);
-        g.append('circle')
+        row
+          .append('circle')
           .attr('cx', cx)
           .attr('cy', cy)
           .attr('r', NETWORK_TIMELINE_DOT_RADIUS)
@@ -439,7 +448,8 @@ const NetworkTimelineChartComponent = ({
       }
     }
   }, [
-    filteredEntities,
+    blocksFiltered,
+    inTimeRangeNames,
     timeBlocks,
     selectedRange,
     highlightSet,
@@ -449,7 +459,7 @@ const NetworkTimelineChartComponent = ({
     containerWidth
   ]);
 
-  const svgHeight = NETWORK_TIMELINE_PADDING.top + NETWORK_TIMELINE_PADDING.bottom + filteredEntities.length * NETWORK_TIMELINE_ROW_HEIGHT;
+  const svgHeight = NETWORK_TIMELINE_PADDING.top + NETWORK_TIMELINE_PADDING.bottom + blocksFiltered.length * NETWORK_TIMELINE_ROW_HEIGHT;
 
   // Compute highlight overlay position for the HTML drag layer
   const pad = NETWORK_TIMELINE_PADDING;
@@ -463,7 +473,8 @@ const NetworkTimelineChartComponent = ({
       {/* Toolbar */}
       <div className="bg-background border-border flex shrink-0 items-center gap-4 border-b px-3 py-1.5 text-xs">
         <span className="text-muted-foreground">
-          {filteredEntities.length} entities | {timeBlocks.length} blocks{rawData ? ` | Ego: ${rawData.egoName}` : ''}
+          {blocksFiltered.length} entities{inTimeRangeNames ? ` (${inTimeRangeNames.size} in range)` : ''} | {timeBlocks.length} blocks
+          {rawData ? ` | Ego: ${rawData.egoName}` : ''}
         </span>
 
         <div className="bg-border h-4 w-px" />
