@@ -216,7 +216,7 @@ export class SpreadLinesVisualizer {
         i === 0 ? egoLabel.posY - (egoLabel.posY - heightExtents[0]) * 0.5 : egoLabel.posY + (heightExtents[1] - egoLabel.posY) * 0.5
       )
       .attr('fill', self.theme.mutedForeground)
-      .style('opacity', 0.25)
+      .style('opacity', 0.4)
       .style('font-size', config.directionFontSize)
       .style('text-anchor', 'start');
 

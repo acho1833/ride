@@ -414,7 +414,7 @@ class Renderer {
         if (!invalidity[i]) valids.push(i);
       }
 
-      const lineColor = rIdx === ego ? '#424242' : color[names[rIdx]] || '#424242';
+      const lineColor = rIdx === ego ? '#888888' : color[names[rIdx]] || '#424242';
       const lifeStart = valids[0];
       const lifeEnd = valids[valids.length - 1];
 
