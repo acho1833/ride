@@ -471,10 +471,13 @@ const NetworkTimelineChartComponent = ({
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="bg-background border-border flex shrink-0 items-center gap-4 border-b px-3 py-1.5 text-xs">
-        <span className="text-muted-foreground">
-          {blocksFiltered.length} entities{inTimeRangeNames ? ` (${inTimeRangeNames.size} in range)` : ''} | {timeBlocks.length} blocks
-          {rawData ? ` | Ego: ${rawData.egoName}` : ''}
+      <div className="bg-background border-border flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-xs">
+        <span className="text-muted-foreground whitespace-nowrap">
+          <span className="hidden min-[1400px]:inline">
+            {blocksFiltered.length} entities{inTimeRangeNames ? ` (${inTimeRangeNames.size} in range)` : ''} | {timeBlocks.length} blocks
+            {rawData ? ' | ' : ''}
+          </span>
+          {rawData ? `Ego: ${rawData.egoName}` : ''}
         </span>
 
         <div className="bg-border h-4 w-px" />

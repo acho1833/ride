@@ -262,9 +262,12 @@ const SpreadlineComponent = ({
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="bg-background border-border flex shrink-0 items-center gap-4 border-b px-3 py-1.5 text-xs">
-        <span className="text-muted-foreground">
-          {computedData.storylines.length} entities | {computedData.blocks.length} blocks | Ego: {computedData.ego}
+      <div className="bg-background border-border flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-xs">
+        <span className="text-muted-foreground whitespace-nowrap">
+          <span className="hidden min-[1400px]:inline">
+            {computedData.storylines.length} entities | {computedData.blocks.length} blocks |{' '}
+          </span>
+          Ego: {computedData.ego}
         </span>
         {splitByAffiliation && (
           <>
