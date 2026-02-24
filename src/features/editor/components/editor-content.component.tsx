@@ -8,6 +8,7 @@ import TextComponent from '@/features/text/components/text.component';
 import WorkspaceComponent from '@/features/workspace/components/workspace.component';
 import NetworkTimelineComponent from '@/features/network-timeline/components/network-timeline.component';
 import SpreadlineTabComponent from '@/features/spreadlines/components/spreadline-tab.component';
+import RelationshipEvidenceComponent from '@/features/relationship-evidence/components/relationship-evidence.component';
 
 interface Props {
   fileId: string;
@@ -53,6 +54,9 @@ const EditorContentComponent = ({ fileId, fileName, metadata, groupId }: Props) 
 
     case 'txt':
       return <TextComponent fileId={fileId} fileName={fileName} />;
+
+    case 're':
+      return <RelationshipEvidenceComponent metadata={metadata} />;
 
     default:
       // Fallback editor for unknown types
