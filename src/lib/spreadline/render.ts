@@ -439,37 +439,41 @@ class Renderer {
       }
 
       const validLines = valids.map(i => marks[i]);
-      const lines: string[] = [];
+
+      // Build a single continuous SVG path per entity (no intermediate M commands)
+      const firstMark = validLines[0] as [[number, number], number];
+      const [firstLeft, firstRight] = firstMark[0];
+      let path = `M${toSvgJoin([(firstLeft + firstRight) / 2, firstMark[1]])}`;
 
       for (let idx = 1; idx < validLines.length; idx++) {
         const cIdx = valids[idx];
         const prevMark = validLines[idx - 1] as [[number, number], number];
         const currMark = validLines[idx] as [[number, number], number];
 
-        const leftPosY = prevMark[1];
-        const rightPosY = currMark[1];
-        const [leftStart, leftEnd] = prevMark[0];
-        const [rightStart, rightEnd] = currMark[0];
+        const prevY = prevMark[1];
+        const currY = currMark[1];
+        const [prevLeft, prevRight] = prevMark[0];
+        const [currLeft, currRight] = currMark[0];
 
-        let start = [leftStart, leftPosY];
-        let end = [rightEnd, rightPosY];
+        // Determine which edges face each other based on traversal direction
+        const goingLeft = prevLeft > currLeft;
+        const prevExit = goingLeft ? prevLeft : prevRight;
+        const currEntry = goingLeft ? currRight : currLeft;
 
-        if (idx === 1) start = [(leftStart + leftEnd) / 2, leftPosY];
-        if (idx === validLines.length - 1) end = [(rightStart + rightEnd) / 2, rightPosY];
+        // Line to exit edge of previous block
+        path += ` L${toSvgJoin([prevExit, prevY])}`;
 
-        let svgString: string;
-        if (leftPosY === rightPosY) {
+        // Connect to entry edge of next block
+        if (prevY === currY) {
           this.labelTable[rIdx][cIdx] = cIdx;
-          svgString = `M${toSvgJoin(start)} L${toSvgJoin([rightStart, rightPosY])}`;
+          path += ` L${toSvgJoin([currEntry, currY])}`;
         } else {
-          const [control1, control2] = computeBezierLine([leftEnd, leftPosY], [rightStart, rightPosY]);
-          svgString = `M${toSvgJoin(start)} L${toSvgJoin([leftEnd, leftPosY])}`;
-          svgString += ` C${toSvgJoin(control1)} ${toSvgJoin(control2)} ${toSvgJoin([rightStart, rightPosY])}`;
+          const [control1, control2] = computeBezierLine([prevExit, prevY], [currEntry, currY]);
+          path += ` C${toSvgJoin(control1)} ${toSvgJoin(control2)} ${toSvgJoin([currEntry, currY])}`;
         }
-        lines.push(svgString);
       }
 
-      chunk.lines = lines;
+      chunk.lines = [path];
       result.push(chunk);
     }
 

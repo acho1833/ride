@@ -12,8 +12,6 @@
  */
 
 import * as d3 from 'd3';
-import { Expander } from './spreadline-expander';
-import { Collapser } from './spreadline-collapser';
 import {
   SpreadLineData,
   SpreadLineConfig,
@@ -55,7 +53,6 @@ export class SpreadLinesVisualizer {
   // State
   visibility: Record<string, boolean> = {};
   members = { slider: [] as string[], crossing: [] as string[], pinned: [] as string[] };
-  actors: Record<number, Expander | Collapser> = {};
   force = true;
   nodeColorScale: d3.ScaleThreshold<number, string>;
   theme: ThemeColors;
@@ -76,7 +73,6 @@ export class SpreadLinesVisualizer {
 
   // Callbacks for React integration
   onFilterChange?: (filteredNames: string[]) => void;
-  onBlockExpand?: (blockId: number, expanded: boolean) => void;
   onEntityPin?: (names: string[]) => void;
 
   constructor(json: SpreadLineData, config?: Partial<SpreadLineConfig>) {
@@ -242,13 +238,7 @@ export class SpreadLinesVisualizer {
             const annotation = config.annotations.find(e => e.time === d.label);
             return annotation ? annotation.color : self.theme.foreground;
           })
-          .style('cursor', 'pointer')
-          .on('click', function (event: MouseEvent, d: TimeLabel) {
-            const block = self.data.blocks.find(b => b.time === d.label);
-            if (block) {
-              self._blockUpdate(event, block);
-            }
-          });
+          .style('cursor', 'default');
 
         container
           .append('line')
@@ -374,10 +364,7 @@ export class SpreadLinesVisualizer {
           .attr('class', 'arcs')
           .attr('id', d => `arc-group-${d.id}`)
           .append('g')
-          .attr('id', d => `block-click-${d.id}`)
-          .on('click', (event: MouseEvent, d: Block) => {
-            this._blockUpdate(event, d);
-          });
+          .attr('id', d => `block-click-${d.id}`);
 
         // Main section - Left arc
         container
@@ -985,36 +972,6 @@ export class SpreadLinesVisualizer {
   }
 
   /**
-   * Block click handler - expand/collapse
-   */
-  private _blockUpdate = (event: MouseEvent, d: Block): void => {
-    const ele = document.getElementById(`left-arc-${d.id}`) as SVGGraphicsElement | null;
-    if (!ele) return;
-
-    const active = Boolean(+ele.getAttribute('active')!);
-    ele.setAttribute('active', String(+!active));
-    const bbox = ele.getBBox();
-
-    const supplement = {
-      nodeColorScale: this.nodeColorScale,
-      reference: this.data.reference?.filter(e => String(e.year) === String(d.time)) || []
-    };
-
-    const moveX = d.moveX;
-    const actor = active
-      ? new Collapser(d, bbox.x, this._BAND_WIDTH, this.brushComponent)
-      : new Expander(d, bbox.x, this._BAND_WIDTH, this.brushComponent, supplement, this.config.content, this._EGO);
-
-    this.actors[d.id] = actor;
-    const currWidth = +this.chartContainer.node()!.getAttribute('width')!;
-    this.chartContainer.attr('width', active ? currWidth - moveX : currWidth + moveX);
-    actor.act();
-
-    if (active) delete this.actors[d.id];
-    this.onBlockExpand?.(d.id, !active);
-  };
-
-  /**
    * Toggle collapse/expand for a hop section (top or bottom 2-hop)
    */
   private _toggleHopSection = (blockId: number, section: 'top' | 'bottom'): void => {
@@ -1556,19 +1513,6 @@ export class SpreadLinesVisualizer {
 
       const timeSelection = timePositions.slice(startIdx, endIdx + 1).map(d => d.label);
       brusher.brushedBlocks = blocks.filter(d => timeSelection.includes(d.time));
-
-      const expandedBlockIDs = d3
-        .selectAll('.left-arcs')
-        .nodes()
-        .filter(d => +(d as SVGPathElement).getAttribute('active')! === 1)
-        .map(d => (d as unknown as { __data__: Block }).__data__.id);
-
-      expandedBlockIDs.forEach(id => {
-        const actor = visualizer.actors[id];
-        if (actor && 'updateBrushedSelection' in actor) {
-          (actor as Expander).updateBrushedSelection();
-        }
-      });
     }
 
     const timeContainer = d3.select('#time-container') as any;

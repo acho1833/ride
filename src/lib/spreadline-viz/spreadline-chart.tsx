@@ -70,11 +70,6 @@ interface SpreadLineChartProps {
   config?: Partial<SpreadLineConfig>;
 
   /**
-   * Callback when a block is expanded or collapsed
-   */
-  onBlockExpand?: (blockId: number, expanded: boolean) => void;
-
-  /**
    * Callback when filtered entities change
    */
   onFilterChange?: (filteredNames: string[]) => void;
@@ -148,7 +143,6 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   {
     data,
     config,
-    onBlockExpand,
     onFilterChange,
     className = '',
     resetKey = 0,
@@ -171,7 +165,6 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   const isDraggingHighlightRef = useRef(false);
 
   // Refs for callbacks - prevents re-init when callback identity changes
-  const onBlockExpandRef = useCallbackRef(onBlockExpand);
   const onFilterChangeRef = useCallbackRef(onFilterChange);
   const onZoomChangeRef = useCallbackRef(onZoomChange);
   const onTimeClickRef = useCallbackRef(onTimeClick);
@@ -258,7 +251,6 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
 
     // Create new visualizer and render into SVG
     const visualizer = new SpreadLinesVisualizer(data, getMergedConfig());
-    visualizer.onBlockExpand = (blockId, expanded) => onBlockExpandRef.current?.(blockId, expanded);
     visualizer.onFilterChange = names => onFilterChangeRef.current?.(names);
     visualizer.onEntityPin = name => onEntityPinRef.current?.(name);
     visualizer.visualize(svg);
@@ -301,7 +293,6 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
 
     // Create visualizer and render
     const visualizer = new SpreadLinesVisualizer(data, getMergedConfig());
-    visualizer.onBlockExpand = (blockId, expanded) => onBlockExpandRef.current?.(blockId, expanded);
     visualizer.onFilterChange = names => onFilterChangeRef.current?.(names);
     visualizer.onEntityPin = name => onEntityPinRef.current?.(name);
     visualizer.visualize(svgRef.current);
