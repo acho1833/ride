@@ -816,7 +816,9 @@ export class SpreadLinesVisualizer {
           .attr('x', e => e.posX)
           .attr('y', e => e.posY)
           .style('text-anchor', 'middle')
-          .attr('dy', '4px');
+          .attr('dy', '4px')
+          .append('title')
+          .text(e => e.fullName);
 
         // Label connector line
         container

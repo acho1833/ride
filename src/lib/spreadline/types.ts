@@ -427,6 +427,7 @@ export interface InlineLabelResult {
   posX: number;
   posY: number;
   name: string;
+  fullName: string;
 }
 
 export interface HopSectionInfo {

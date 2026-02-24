@@ -10,6 +10,11 @@ import { Path, Session, SpreadLineResult, StorylineResult, BlockResult, PointRes
 import { full2D, nanMin, nanMax } from './helpers';
 import type { SpreadLine } from './spreadline';
 import type { ContextResult } from './contextualize';
+import { SPREADLINE_LABEL_MAX_CHARS } from '@/features/spreadlines/const';
+
+function truncateLabel(name: string, max: number): string {
+  return name.length > max ? name.slice(0, max) + '...' : name;
+}
 
 /**
  * Convert point to SVG coordinate string
@@ -516,7 +521,7 @@ class Renderer {
         posY: lineStart[1],
         textAlign: 'end',
         line: `M${toSvgJoin([lineStart[0][0] - dxOffset, lineStart[1]])} L${toSvgJoin([lineStart[0][0] - markOffset, lineStart[1]])}`,
-        label: name,
+        label: truncateLabel(name, SPREADLINE_LABEL_MAX_CHARS),
         fullLabel: name,
         visibility: 'visible'
       };
@@ -678,7 +683,7 @@ class Renderer {
     const storylines = this.render.storylines.map(s => s.name);
 
     for (let rIdx = 0; rIdx < numEntities; rIdx++) {
-      const result: { posX: number; posY: number; name: string }[] = [];
+      const result: { posX: number; posY: number; name: string; fullName: string }[] = [];
       const marks = this.origin[rIdx];
       const name = names[rIdx];
       const storylineIdx = storylines.indexOf(name);
@@ -723,7 +728,8 @@ class Renderer {
         result.push({
           posX: (mark[0][0] + mark[0][1]) / 2,
           posY: mark[1],
-          name
+          name: truncateLabel(name, SPREADLINE_LABEL_MAX_CHARS),
+          fullName: name
         });
       }
 

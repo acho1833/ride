@@ -65,6 +65,9 @@ export const SPREADLINE_TIME_CONFIG: Record<SpreadlineGranularity, { delta: stri
   monthly: { delta: 'month', format: '%Y-%m' }
 };
 
+/** Maximum characters for entity name labels before truncation */
+export const SPREADLINE_LABEL_MAX_CHARS = 12;
+
 /** Compact same-category lines closer together */
 export const SPREADLINE_SQUEEZE_SAME_CATEGORY = true;
 

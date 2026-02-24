@@ -110,6 +110,7 @@ export interface StorylineLabel {
 
 export interface InlineLabel {
   name: string;
+  fullName: string;
   posX: number;
   posY: number;
 }
