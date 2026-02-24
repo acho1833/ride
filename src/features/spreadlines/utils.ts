@@ -324,3 +324,83 @@ export function transformSpreadlineToGraphByTimes(
 
   return { nodes, links };
 }
+
+/** Timeline entity for the network timeline chart */
+export interface TimelineEntity {
+  id: string;
+  name: string;
+  isEgo: boolean;
+  totalActivity: number;
+  lifespan: number;
+  timeBlocks: Array<{
+    time: string;
+    citationCount: number;
+  }>;
+}
+
+/**
+ * Transform spreadline raw data into timeline entities.
+ *
+ * Each entity gets a row with time blocks where it has relations,
+ * plus citation counts per block. Sorted by total activity (ego first).
+ */
+export function transformSpreadlineToTimeline(rawData: {
+  egoId: string;
+  egoName: string;
+  entities: Record<string, { name: string; citations: Record<string, number> }>;
+  topology: { sourceId: string; targetId: string; time: string; weight: number }[];
+}): TimelineEntity[] {
+  // 1. Collect active time blocks per entity from topology
+  const entityTimes = new Map<string, Set<string>>();
+  for (const entry of rawData.topology) {
+    if (!entityTimes.has(entry.sourceId)) entityTimes.set(entry.sourceId, new Set());
+    if (!entityTimes.has(entry.targetId)) entityTimes.set(entry.targetId, new Set());
+    entityTimes.get(entry.sourceId)!.add(entry.time);
+    entityTimes.get(entry.targetId)!.add(entry.time);
+  }
+
+  // 2. Build timeline entities
+  const results: TimelineEntity[] = [];
+
+  // Ego entity
+  const egoTimes = entityTimes.get(rawData.egoId) ?? new Set<string>();
+  results.push({
+    id: rawData.egoId,
+    name: rawData.egoName,
+    isEgo: true,
+    totalActivity: egoTimes.size,
+    lifespan: egoTimes.size,
+    timeBlocks: Array.from(egoTimes)
+      .sort()
+      .map(time => ({ time, citationCount: 0 }))
+  });
+
+  // Non-ego entities
+  for (const [id, entity] of Object.entries(rawData.entities)) {
+    const times = entityTimes.get(id) ?? new Set<string>();
+    const timeBlocks = Array.from(times)
+      .sort()
+      .map(time => ({
+        time,
+        citationCount: entity.citations[time] ?? 0
+      }));
+
+    results.push({
+      id,
+      name: entity.name,
+      isEgo: false,
+      totalActivity: times.size,
+      lifespan: times.size,
+      timeBlocks
+    });
+  }
+
+  // 3. Sort: ego first, then by totalActivity descending
+  results.sort((a, b) => {
+    if (a.isEgo) return -1;
+    if (b.isEgo) return 1;
+    return b.totalActivity - a.totalActivity;
+  });
+
+  return results;
+}
