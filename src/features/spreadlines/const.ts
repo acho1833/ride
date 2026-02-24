@@ -29,6 +29,9 @@ export const SPREADLINE_INTERNAL_COLOR = '#FA9902';
 /** Line color for entities with different affiliation from ego */
 export const SPREADLINE_EXTERNAL_COLOR = '#166b6b';
 
+/** Color for entities selected/pinned via spreadline (violet) */
+export const SPREADLINE_SELECTED_COLOR = 'hsl(270, 65%, 55%)';
+
 /** Approximate width of a single character in label text (px) */
 export const SPREADLINE_CHAR_WIDTH_PX = 8;
 

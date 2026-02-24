@@ -20,6 +20,7 @@ import { GRAPH_CONFIG, DOT_GRID_CONFIG } from '@/features/workspace/const';
 import {
   SPREADLINE_INTERNAL_COLOR,
   SPREADLINE_EXTERNAL_COLOR,
+  SPREADLINE_SELECTED_COLOR,
   GRAPH_HOP1_LINK_DISTANCE,
   GRAPH_HOP2_LINK_DISTANCE,
   GRAPH_HOP1_RADIAL_RADIUS,
@@ -226,6 +227,21 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
       .attr('dy', 0)
       .attr('stdDeviation', 6)
       .attr('flood-color', EGO_NODE_COLOR)
+      .attr('flood-opacity', 0.6);
+
+    const selectedGlow = defs
+      .append('filter')
+      .attr('id', 'sl-selected-glow')
+      .attr('x', '-50%')
+      .attr('y', '-50%')
+      .attr('width', '200%')
+      .attr('height', '200%');
+    selectedGlow
+      .append('feDropShadow')
+      .attr('dx', 0)
+      .attr('dy', 0)
+      .attr('stdDeviation', 6)
+      .attr('flood-color', SPREADLINE_SELECTED_COLOR)
       .attr('flood-opacity', 0.6);
 
     defs
@@ -772,9 +788,9 @@ const SpreadlineGraphComponent = ({ rawData, selectedTimes = [], pinnedEntityNam
           .attr('y', -egoRadius)
           .attr('width', egoRadius * 2)
           .attr('height', egoRadius * 2)
-          .attr('fill', EGO_NODE_COLOR)
+          .attr('fill', SPREADLINE_SELECTED_COLOR)
           .attr('stroke-width', 3)
-          .attr('filter', 'url(#sl-ego-glow)');
+          .attr('filter', 'url(#sl-selected-glow)');
         node
           .select('use')
           .transition()
