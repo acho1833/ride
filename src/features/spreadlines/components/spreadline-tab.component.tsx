@@ -103,8 +103,12 @@ const SpreadlineTabComponent = (_props: Props) => {
     (sourceId: string, targetId: string, sourceName: string, targetName: string) => {
       const getLastName = (name: string) => name.split(' ').pop() ?? name;
       const sortedIds = [sourceId, targetId].sort();
-      const timeStart = selectedTimes.length > 0 ? selectedTimes[selectedTimes.length - 1] : '';
-      const timeEnd = selectedTimes.length > 0 ? selectedTimes[0] : '';
+      // Convert yearly values ("2022") to monthly bounds ("2022-01"/"2022-12")
+      // so the year range filter works with monthly event data
+      const toMonthlyMin = (t: string) => (t && !t.includes('-') ? `${t}-01` : t);
+      const toMonthlyMax = (t: string) => (t && !t.includes('-') ? `${t}-12` : t);
+      const timeStart = selectedTimes.length > 0 ? toMonthlyMax(selectedTimes[selectedTimes.length - 1]) : '';
+      const timeEnd = selectedTimes.length > 0 ? toMonthlyMin(selectedTimes[0]) : '';
       openNewFile({
         id: `re-${sortedIds[0]}-${sortedIds[1]}`,
         name: `${getLastName(sourceName)} ↔ ${getLastName(targetName)}.re`,
