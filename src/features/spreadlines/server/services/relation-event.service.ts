@@ -3,9 +3,9 @@ import 'server-only';
 import { promises as fs } from 'fs';
 import path from 'path';
 import Papa from 'papaparse';
+import { ORPCError } from '@orpc/server';
 import type { RelationEvent } from '@/models/relation-event.model';
-
-const MAX_RELATION_EVENTS = 500;
+import { MAX_RELATION_EVENTS } from '@/features/relationship-evidence/const';
 
 interface RelationRow {
   year: string;
@@ -30,7 +30,14 @@ async function loadCSV<T>(filePath: string): Promise<T[]> {
 
 export async function getRelationEvents(sourceId: string, targetId: string): Promise<RelationEvent[]> {
   const basePath = path.join(process.cwd(), DATASET_DIR);
-  const relations = await loadCSV<RelationRow>(path.join(basePath, 'relations.csv'));
+  let relations: RelationRow[];
+  try {
+    relations = await loadCSV<RelationRow>(path.join(basePath, 'relations.csv'));
+  } catch {
+    throw new ORPCError('INTERNAL_SERVER_ERROR', {
+      message: 'Failed to load relations data'
+    });
+  }
 
   const filtered = relations.filter(
     r =>

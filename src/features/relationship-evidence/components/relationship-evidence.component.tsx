@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useRelationEventsQuery } from '@/features/spreadlines/hooks/useRelationEventsQuery';
-import { columns, yearRangeFilterFn } from '@/features/relationship-evidence/utils';
+import { columns } from '@/features/relationship-evidence/utils';
 import { RE_PAGE_SIZE } from '@/features/relationship-evidence/const';
 
 interface Props {
@@ -40,20 +40,9 @@ const RelationshipEvidenceComponent = ({ metadata }: Props) => {
     return [];
   });
 
-  const columnsWithYearRange = useMemo(
-    () =>
-      columns.map(col => {
-        if ('accessorKey' in col && col.accessorKey === 'year') {
-          return { ...col, filterFn: yearRangeFilterFn };
-        }
-        return col;
-      }),
-    []
-  );
-
   const table = useReactTable({
     data: events,
-    columns: columnsWithYearRange,
+    columns,
     state: { sorting, columnFilters },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,

@@ -7,7 +7,7 @@ export const columns = [
   columnHelper.accessor('year', {
     header: 'Year',
     cell: info => info.getValue(),
-    filterFn: 'includesString'
+    filterFn: yearRangeFilterFn
   }),
   columnHelper.accessor('id', {
     header: 'Paper ID',
