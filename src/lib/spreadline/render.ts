@@ -516,11 +516,14 @@ class Renderer {
 
       const name = names[rIdx];
 
+      // Use the visually leftmost end for label placement (works for both ascending/descending order)
+      const labelEnd = lineStart[0][0] <= lineEnd[0][0] ? lineStart : lineEnd;
+
       update.label = {
-        posX: lineStart[0][0] - dx,
-        posY: lineStart[1],
+        posX: labelEnd[0][0] - dx,
+        posY: labelEnd[1],
         textAlign: 'end',
-        line: `M${toSvgJoin([lineStart[0][0] - dxOffset, lineStart[1]])} L${toSvgJoin([lineStart[0][0] - markOffset, lineStart[1]])}`,
+        line: `M${toSvgJoin([labelEnd[0][0] - dxOffset, labelEnd[1]])} L${toSvgJoin([labelEnd[0][0] - markOffset, labelEnd[1]])}`,
         label: truncateLabel(name, SPREADLINE_LABEL_MAX_CHARS),
         fullLabel: name,
         visibility: 'visible'
