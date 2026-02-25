@@ -839,6 +839,7 @@ const SpreadlineGraphComponent = ({
     if (pinnedEntityNames.length === 0 || allPathNodeIds.size === 0) return;
 
     // ── Highlight path links, dim non-path links ───────────────────────
+    // interrupt() cancels any competing reset transitions so immediate styles stick
     g.select('.links')
       .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
       .filter(visibleLinkFilter)
@@ -848,19 +849,22 @@ const SpreadlineGraphComponent = ({
         const key = [s, t].sort().join('::');
         if (allPathLinkKeys.has(key)) {
           d3.select(this)
+            .interrupt()
             .style('stroke', 'var(--primary)')
             .style('stroke-width', `${GRAPH_CONFIG.linkStrokeWidth * 2}px`)
             .style('stroke-opacity', '1');
         } else {
-          d3.select(this).style('stroke-opacity', '0.15');
+          d3.select(this).interrupt().style('stroke-opacity', '0.15');
         }
       });
 
     // Dim non-path nodes
+    // interrupt() cancels any competing reset transitions so opacity sticks
     g.select('.nodes')
       .selectAll<SVGGElement, SpreadlineGraphNode>('g')
       .filter(visibleNodeFilter)
       .filter(d => !allPathNodeIds.has(d.id))
+      .interrupt()
       .style('opacity', 0.25);
 
     // Style intermediate path nodes — blue fill only, keep original size
