@@ -957,7 +957,7 @@ const SpreadlineGraphComponent = ({
   }, []);
 
   return (
-    <div ref={containerRef} className="relative h-full w-full select-none overflow-hidden">
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden select-none">
       {!rawData ? (
         <div className="flex h-full items-center justify-center">
           <div className="text-center">
