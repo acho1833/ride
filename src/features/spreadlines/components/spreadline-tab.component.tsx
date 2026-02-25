@@ -11,7 +11,7 @@
  * Range state: [startIndex, endIndex] into timeBlocks, or null = ALL mode.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useOpenFilesActions } from '@/stores/open-files/open-files.selector';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { useSpreadlineRawDataQuery } from '@/features/spreadlines/hooks/useSpreadlineRawDataQuery';
@@ -30,21 +30,50 @@ import SpreadlineComponent from './spreadline.component';
 import SpreadlineBottomTabsComponent from './spreadline-bottom-tabs.component';
 import NetworkTimelineChartComponent from './network-timeline-chart.component';
 
+interface SpreadlineTabCache {
+  selectedRange: [number, number] | null;
+  pinnedEntityNames: string[];
+  relationTypes: string[];
+  granularity: SpreadlineGranularity;
+  splitByAffiliation: boolean;
+  pageIndex: number;
+  blocksFilter: number;
+  activeBottomTab: SpreadlineBottomTab;
+}
+
+/** Module-level cache: preserves tab state across unmount/remount (e.g. split-and-move) */
+const tabStateCache = new Map<string, SpreadlineTabCache>();
+
 interface Props {
   fileId: string;
   fileName: string;
 }
 
-const SpreadlineTabComponent = (_props: Props) => {
-  const [selectedRange, setSelectedRange] = useState<[number, number] | null>([0, 0]);
-  const [pinnedEntityNames, setPinnedEntityNames] = useState<string[]>([]);
-  const [relationTypes, setRelationTypes] = useState<string[]>(SPREADLINE_DEFAULT_RELATION_TYPES);
-  const [granularity, setGranularity] = useState<SpreadlineGranularity>(SPREADLINE_DEFAULT_GRANULARITY);
-  const [splitByAffiliation, setSplitByAffiliation] = useState(SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [blocksFilter, setBlocksFilter] = useState(1);
+const SpreadlineTabComponent = ({ fileId }: Props) => {
+  const cached = tabStateCache.get(fileId);
+  const [selectedRange, setSelectedRange] = useState<[number, number] | null>(cached?.selectedRange ?? [0, 0]);
+  const [pinnedEntityNames, setPinnedEntityNames] = useState<string[]>(cached?.pinnedEntityNames ?? []);
+  const [relationTypes, setRelationTypes] = useState<string[]>(cached?.relationTypes ?? SPREADLINE_DEFAULT_RELATION_TYPES);
+  const [granularity, setGranularity] = useState<SpreadlineGranularity>(cached?.granularity ?? SPREADLINE_DEFAULT_GRANULARITY);
+  const [splitByAffiliation, setSplitByAffiliation] = useState(cached?.splitByAffiliation ?? SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION);
+  const [pageIndex, setPageIndex] = useState(cached?.pageIndex ?? 0);
+  const [blocksFilter, setBlocksFilter] = useState(cached?.blocksFilter ?? 1);
   const [filteredEntityNames, setFilteredEntityNames] = useState<string[] | null>(null);
-  const [activeBottomTab, setActiveBottomTab] = useState<SpreadlineBottomTab>('spreadline');
+  const [activeBottomTab, setActiveBottomTab] = useState<SpreadlineBottomTab>(cached?.activeBottomTab ?? 'spreadline');
+
+  // Sync state to cache so it survives unmount/remount
+  useEffect(() => {
+    tabStateCache.set(fileId, {
+      selectedRange,
+      pinnedEntityNames,
+      relationTypes,
+      granularity,
+      splitByAffiliation,
+      pageIndex,
+      blocksFilter,
+      activeBottomTab
+    });
+  }, [fileId, selectedRange, pinnedEntityNames, relationTypes, granularity, splitByAffiliation, pageIndex, blocksFilter, activeBottomTab]);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
@@ -107,8 +136,8 @@ const SpreadlineTabComponent = (_props: Props) => {
       // so the year range filter works with monthly event data
       const toMonthlyMin = (t: string) => (t && !t.includes('-') ? `${t}-01` : t);
       const toMonthlyMax = (t: string) => (t && !t.includes('-') ? `${t}-12` : t);
-      const timeStart = selectedTimes.length > 0 ? toMonthlyMax(selectedTimes[selectedTimes.length - 1]) : '';
-      const timeEnd = selectedTimes.length > 0 ? toMonthlyMin(selectedTimes[0]) : '';
+      const timeStart = selectedTimes.length > 0 ? toMonthlyMax(selectedTimes[0]) : '';
+      const timeEnd = selectedTimes.length > 0 ? toMonthlyMin(selectedTimes[selectedTimes.length - 1]) : '';
       openNewFile({
         id: `re-${sortedIds[0]}-${sortedIds[1]}`,
         name: `${getLastName(sourceName)} ↔ ${getLastName(targetName)}.re`,

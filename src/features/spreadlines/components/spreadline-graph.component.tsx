@@ -146,6 +146,9 @@ const bfsDistances = (startId: string, links: SpreadlineGraphLink[]): Map<string
   return dist;
 };
 
+/** Module-level cache: preserves node positions across unmount/remount (e.g. split-and-move) */
+const nodePositionCache = new Map<string, Map<string, { x: number; y: number }>>();
+
 interface Props {
   rawData: {
     egoId: string;
@@ -205,6 +208,18 @@ const SpreadlineGraphComponent = ({
 
   const pinnedEntityNamesRef = useRef(pinnedEntityNames);
   pinnedEntityNamesRef.current = pinnedEntityNames;
+
+  // Save node positions to cache on unmount (survives split-and-move)
+  const rawDataRef = useRef(rawData);
+  rawDataRef.current = rawData;
+  useEffect(() => {
+    return () => {
+      const egoId = rawDataRef.current?.egoId;
+      if (egoId) {
+        nodePositionCache.set(egoId, new Map(nodeRegistryRef.current));
+      }
+    };
+  }, []);
 
   // Observe container size
   useEffect(() => {
@@ -370,9 +385,19 @@ const SpreadlineGraphComponent = ({
       });
     }
 
+    // Seed registry from cache on remount (e.g. after split-and-move)
+    const registry = nodeRegistryRef.current;
+    if (registry.size === 0) {
+      const cached = nodePositionCache.get(rawData.egoId);
+      if (cached) {
+        for (const [id, pos] of cached) {
+          registry.set(id, pos);
+        }
+      }
+    }
+
     // Preserve positions from existing nodes or registry
     const prevNodesMap = new Map(nodesRef.current.map(n => [n.id, n]));
-    const registry = nodeRegistryRef.current;
     const nodes: SpreadlineGraphNode[] = graphData.nodes.map(n => {
       const prev = prevNodesMap.get(n.id);
       if (prev) return { ...n, x: prev.x, y: prev.y };
@@ -425,7 +450,11 @@ const SpreadlineGraphComponent = ({
 
     // Persisting links — interrupt any running exit transitions and restore opacity.
     // Must run BEFORE returning links (same pattern as nodeJoin.interrupt()).
-    linkJoin.interrupt().attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
+    linkJoin
+      .interrupt()
+      .attr('stroke', getLinkColor)
+      .attr('stroke-width', getLinkWidth)
+      .attr('stroke-opacity', GRAPH_CONFIG.linkStrokeOpacity);
 
     // Returning links — unhide and fade in
     linkJoin
@@ -752,7 +781,12 @@ const SpreadlineGraphComponent = ({
 
     // ── Reset only when path actually changed (avoids flash) ───────────
     if (pathChanged) {
-      g.select('.nodes').selectAll<SVGGElement, SpreadlineGraphNode>('g').filter(visibleNodeFilter).style('opacity', null);
+      g.select('.nodes')
+        .selectAll<SVGGElement, SpreadlineGraphNode>('g')
+        .filter(visibleNodeFilter)
+        .transition()
+        .duration(GRAPH_TIME_TRANSITION_MS)
+        .style('opacity', '1');
       g.select('.nodes')
         .selectAll<SVGGElement, SpreadlineGraphNode>('g')
         .filter(visibleNodeFilter)
@@ -764,6 +798,8 @@ const SpreadlineGraphComponent = ({
           const iconSize = d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize;
           node
             .select('rect')
+            .transition()
+            .duration(GRAPH_TIME_TRANSITION_MS)
             .attr('x', -radius)
             .attr('y', -radius)
             .attr('width', radius * 2)
@@ -773,12 +809,16 @@ const SpreadlineGraphComponent = ({
             .attr('filter', d.isEgo ? 'url(#sl-ego-glow)' : null);
           node
             .select('use')
+            .transition()
+            .duration(GRAPH_TIME_TRANSITION_MS)
             .attr('x', -iconSize / 2)
             .attr('y', -iconSize / 2)
             .attr('width', iconSize)
             .attr('height', iconSize);
           node
             .select('text')
+            .transition()
+            .duration(GRAPH_TIME_TRANSITION_MS)
             .attr('dy', radius + GRAPH_CONFIG.labelOffsetY)
             .attr('font-size', d.isEgo ? '14px' : '12px')
             .attr('font-weight', d.isEgo ? '600' : 'normal');
@@ -786,6 +826,8 @@ const SpreadlineGraphComponent = ({
       g.select('.links')
         .selectAll<SVGLineElement, SpreadlineGraphLink>('line')
         .filter(visibleLinkFilter)
+        .transition()
+        .duration(GRAPH_TIME_TRANSITION_MS)
         .style('stroke', null)
         .style('stroke-width', null)
         .style('stroke-opacity', null);
