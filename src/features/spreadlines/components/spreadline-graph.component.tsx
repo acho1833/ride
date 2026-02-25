@@ -158,6 +158,7 @@ interface Props {
   pinnedEntityNames?: string[];
   filteredEntityNames?: string[] | null;
   onLinkDoubleClick?: (sourceId: string, targetId: string, sourceName: string, targetName: string) => void;
+  onEntityPin?: (names: string[]) => void;
 }
 
 const SpreadlineGraphComponent = ({
@@ -165,7 +166,8 @@ const SpreadlineGraphComponent = ({
   selectedTimes = [],
   pinnedEntityNames = [],
   filteredEntityNames,
-  onLinkDoubleClick
+  onLinkDoubleClick,
+  onEntityPin
 }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -197,6 +199,12 @@ const SpreadlineGraphComponent = ({
   // Ref to avoid stale closures in D3 event handlers
   const onLinkDoubleClickRef = useRef(onLinkDoubleClick);
   onLinkDoubleClickRef.current = onLinkDoubleClick;
+
+  const onEntityPinRef = useRef(onEntityPin);
+  onEntityPinRef.current = onEntityPin;
+
+  const pinnedEntityNamesRef = useRef(pinnedEntityNames);
+  pinnedEntityNamesRef.current = pinnedEntityNames;
 
   // Observe container size
   useEffect(() => {
@@ -547,6 +555,15 @@ const SpreadlineGraphComponent = ({
       });
 
     nodeMerged.call(drag);
+
+    nodeMerged.on('click', function (event: MouseEvent, d: SpreadlineGraphNode) {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (d.id === rawData?.egoId) return; // Can't pin ego
+      event.stopPropagation();
+      const current = pinnedEntityNamesRef.current;
+      const updated = current.includes(d.name) ? current.filter(n => n !== d.name) : [...current, d.name];
+      onEntityPinRef.current?.(updated);
+    });
 
     // ─── Force Simulation ──────────────────────────────────────────────
     const useHopLayout = selectedTimes.length > 0;
