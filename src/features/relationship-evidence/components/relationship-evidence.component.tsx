@@ -73,21 +73,23 @@ const RelationshipEvidenceComponent = ({ metadata }: Props) => {
   }
 
   const yearFilter = (table.getColumn('year')?.getFilterValue() as [string, string]) ?? ['', ''];
+  const filteredRows = table.getFilteredRowModel().rows;
+  const totalCitations = filteredRows.reduce((sum, row) => sum + (row.original.citationCount ?? 0), 0);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
       {/* Header */}
-      <div>
+      <div className="shrink-0">
         <h2 className="text-lg font-semibold">
           {sourceName} &harr; {targetName}
         </h2>
         <p className="text-muted-foreground text-sm">
-          {table.getFilteredRowModel().rows.length} of {events.length} events
+          {filteredRows.length} events &middot; {totalCitations.toLocaleString()} total citations
         </p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex shrink-0 flex-wrap items-end gap-3">
         <div className="flex items-end gap-1">
           <div>
             <label className="text-muted-foreground mb-1 block text-xs">Year From</label>
@@ -174,7 +176,7 @@ const RelationshipEvidenceComponent = ({ metadata }: Props) => {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between">
+      <div className="flex shrink-0 items-center justify-between">
         <p className="text-muted-foreground text-sm">
           Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
         </p>

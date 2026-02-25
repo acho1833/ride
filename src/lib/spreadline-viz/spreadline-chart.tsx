@@ -408,6 +408,17 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
   }, [blocksFilter, crossingOnly]);
 
   /**
+   * Handle pin changes via D3 (not React re-render).
+   * Syncs external pinnedEntityNames changes (e.g. from graph ctrl+click)
+   * to the visualizer's pin styling.
+   */
+  useEffect(() => {
+    if (visualizerRef.current) {
+      visualizerRef.current.applyPins(pinnedEntityNames ?? []);
+    }
+  }, [pinnedEntityNames]);
+
+  /**
    * Handle highlight time changes via D3 (not React re-render).
    * Renders a semi-transparent vertical bar spanning the highlighted time range,
    * with draggable left/right handles for resizing the range.
