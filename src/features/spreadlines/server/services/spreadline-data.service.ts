@@ -13,7 +13,6 @@ interface RelationRow {
   targetId: string;
   id: string;
   type: string;
-  count?: number;
   citationcount?: number;
 }
 
@@ -250,13 +249,6 @@ function constructAuthorNetwork(
         colorAssign[year][author] = category;
       }
     }
-
-    // Count collaborations
-    const collab = network.filter(
-      r => r.sourceId === (author === egoId ? firstAuthor : author) || r.targetId === (author === egoId ? firstAuthor : author)
-    );
-    const uniquePapers = new Set(collab.map(r => r.id));
-    row.count = uniquePapers.size;
   }
 
   // Handle overlaps and sort groups
@@ -336,7 +328,7 @@ function constructAuthorNetwork(
     sourceId: row.sourceId,
     targetId: row.targetId,
     time: row.year,
-    weight: row.count || 1
+    weight: 1
   }));
 
   return { topology, categoryMap, groups: finalGroups, network };
