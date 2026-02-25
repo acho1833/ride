@@ -128,6 +128,7 @@ const SpreadlineTabComponent = (_props: Props) => {
             pinnedEntityNames={pinnedEntityNames}
             filteredEntityNames={filteredEntityNames}
             onLinkDoubleClick={handleLinkDoubleClick}
+            onEntityPin={setPinnedEntityNames}
           />
         </ResizablePanel>
 
