@@ -38,21 +38,8 @@ import {
 import type { SpreadlineRawData } from '@/features/spreadlines/components/spreadline.component';
 import { transformSpreadlineToTimeline } from '@/features/spreadlines/utils';
 import type { TimelineEntity } from '@/features/spreadlines/utils';
+import { setDragCursor, clearDragCursor } from '@/features/spreadlines/utils/drag-cursor';
 
-/** Force a global cursor during drag so element-level cursors don't override it. */
-const DRAG_CURSOR_STYLE_ID = 'network-timeline-drag-cursor';
-function setDragCursor(cursor: string) {
-  let el = document.getElementById(DRAG_CURSOR_STYLE_ID) as HTMLStyleElement | null;
-  if (!el) {
-    el = document.createElement('style');
-    el.id = DRAG_CURSOR_STYLE_ID;
-    document.head.appendChild(el);
-  }
-  el.textContent = `* { cursor: ${cursor} !important; }`;
-}
-function clearDragCursor() {
-  document.getElementById(DRAG_CURSOR_STYLE_ID)?.remove();
-}
 
 /** D3 threshold scale: citation count -> heatmap fill color */
 const citationColorScale = d3.scaleThreshold<number, string>().domain(SPREADLINE_FREQUENCY_THRESHOLDS).range(SPREADLINE_FREQUENCY_COLORS);

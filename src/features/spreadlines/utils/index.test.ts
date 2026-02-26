@@ -3,7 +3,7 @@ import {
   transformSpreadlineToGraphByTime,
   transformSpreadlineToGraphByTimes,
   transformSpreadlineToTimeline
-} from './utils';
+} from '.';
 
 const makeRawData = () => ({
   egoId: 'ego',

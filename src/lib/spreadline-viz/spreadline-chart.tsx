@@ -24,6 +24,7 @@ import {
   SPREADLINE_BLOCK_TOP_PADDING,
   SPREADLINE_BLOCK_BOTTOM_PADDING
 } from '@/features/spreadlines/const';
+import { setDragCursor, clearDragCursor } from '@/features/spreadlines/utils/drag-cursor';
 
 /**
  * Keep callback in ref to prevent re-renders when callback identity changes.
@@ -123,20 +124,6 @@ interface SpreadLineChartProps {
   pinnedEntityNames?: string[];
 }
 
-/** Force a global cursor during drag so element-level cursors don't override it. */
-const DRAG_CURSOR_STYLE_ID = 'spreadline-drag-cursor';
-function setDragCursor(cursor: string) {
-  let el = document.getElementById(DRAG_CURSOR_STYLE_ID) as HTMLStyleElement | null;
-  if (!el) {
-    el = document.createElement('style');
-    el.id = DRAG_CURSOR_STYLE_ID;
-    document.head.appendChild(el);
-  }
-  el.textContent = `* { cursor: ${cursor} !important; }`;
-}
-function clearDragCursor() {
-  document.getElementById(DRAG_CURSOR_STYLE_ID)?.remove();
-}
 
 const ZOOM_SCALE_EXTENT: [number, number] = [0.1, 10];
 const ZOOM_STEP = 1.3;
