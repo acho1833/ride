@@ -1,4 +1,5 @@
 import {
+  bfsDistances,
   deduplicateLinks,
   transformSpreadlineToGraph,
   transformSpreadlineToGraphByTime,
@@ -169,5 +170,34 @@ describe('deduplicateLinks', () => {
 
   it('returns empty array for empty input', () => {
     expect(deduplicateLinks([], new Set())).toEqual([]);
+  });
+});
+
+describe('bfsDistances', () => {
+  it('computes shortest distances from a start node', () => {
+    const links = [
+      { source: 'a', target: 'b' },
+      { source: 'b', target: 'c' },
+      { source: 'a', target: 'd' }
+    ];
+    const distances = bfsDistances('a', links);
+
+    expect(distances.get('a')).toBe(0);
+    expect(distances.get('b')).toBe(1);
+    expect(distances.get('c')).toBe(2);
+    expect(distances.get('d')).toBe(1);
+  });
+
+  it('returns only reachable nodes', () => {
+    const links = [
+      { source: 'a', target: 'b' },
+      { source: 'c', target: 'd' } // disconnected
+    ];
+    const distances = bfsDistances('a', links);
+
+    expect(distances.has('a')).toBe(true);
+    expect(distances.has('b')).toBe(true);
+    expect(distances.has('c')).toBe(false);
+    expect(distances.has('d')).toBe(false);
   });
 });

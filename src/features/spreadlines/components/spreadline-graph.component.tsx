@@ -36,7 +36,7 @@ import {
   GRAPH_LINK_WIDTH_BANDS,
   GRAPH_LINK_COLORS
 } from '@/features/spreadlines/const';
-import { transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
+import { bfsDistances, transformSpreadlineToGraph, transformSpreadlineToGraphByTimes } from '@/features/spreadlines/utils';
 import type { SpreadlineGraphNode, SpreadlineGraphLink } from '@/features/spreadlines/utils';
 
 /** Ego node uses the selected color to visually distinguish it */
@@ -123,32 +123,6 @@ const getRadialRadius = (d: SpreadlineGraphNode): number => {
   if (d.hopDistance === 0) return 0;
   if (d.hopDistance === 1) return GRAPH_HOP1_RADIAL_RADIUS;
   return GRAPH_HOP2_RADIAL_RADIUS;
-};
-
-/** BFS: compute distances from a start node to all reachable nodes */
-const bfsDistances = (startId: string, links: SpreadlineGraphLink[]): Map<string, number> => {
-  const adj = new Map<string, string[]>();
-  for (const link of links) {
-    const s = typeof link.source === 'string' ? link.source : link.source.id;
-    const t = typeof link.target === 'string' ? link.target : link.target.id;
-    if (!adj.has(s)) adj.set(s, []);
-    if (!adj.has(t)) adj.set(t, []);
-    adj.get(s)!.push(t);
-    adj.get(t)!.push(s);
-  }
-  const dist = new Map<string, number>([[startId, 0]]);
-  const queue = [startId];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const d = dist.get(current)!;
-    for (const neighbor of adj.get(current) ?? []) {
-      if (!dist.has(neighbor)) {
-        dist.set(neighbor, d + 1);
-        queue.push(neighbor);
-      }
-    }
-  }
-  return dist;
 };
 
 /** Module-level cache: preserves node positions across unmount/remount (e.g. split-and-move) */

@@ -319,6 +319,35 @@ export function transformSpreadlineToGraphByTimes(
   return { nodes, links };
 }
 
+/** BFS: compute shortest distances from a start node to all reachable nodes */
+export const bfsDistances = (
+  startId: string,
+  links: { source: string | { id: string }; target: string | { id: string } }[]
+): Map<string, number> => {
+  const adj = new Map<string, string[]>();
+  for (const link of links) {
+    const s = typeof link.source === 'string' ? link.source : link.source.id;
+    const t = typeof link.target === 'string' ? link.target : link.target.id;
+    if (!adj.has(s)) adj.set(s, []);
+    if (!adj.has(t)) adj.set(t, []);
+    adj.get(s)!.push(t);
+    adj.get(t)!.push(s);
+  }
+  const dist = new Map<string, number>([[startId, 0]]);
+  const queue = [startId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const d = dist.get(current)!;
+    for (const neighbor of adj.get(current) ?? []) {
+      if (!dist.has(neighbor)) {
+        dist.set(neighbor, d + 1);
+        queue.push(neighbor);
+      }
+    }
+  }
+  return dist;
+};
+
 /** Timeline entity for the network timeline chart */
 export interface TimelineEntity {
   id: string;
