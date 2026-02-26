@@ -1,32 +1,12 @@
 import 'server-only';
 
-import { promises as fs } from 'fs';
 import path from 'path';
-import Papa from 'papaparse';
 import { ORPCError } from '@orpc/server';
 import type { RelationEvent } from '@/models/relation-event.model';
 import { MAX_RELATION_EVENTS } from '@/features/relationship-evidence/const';
-
-interface RelationRow {
-  year: string;
-  sourceId: string;
-  targetId: string;
-  id: string;
-  type: string;
-  citationcount?: number;
-}
+import { loadCSV, type RelationRow } from './csv.utils';
 
 const DATASET_DIR = 'data/spreadline/vis-author2-monthly';
-
-async function loadCSV<T>(filePath: string): Promise<T[]> {
-  const content = await fs.readFile(filePath, 'utf-8');
-  const result = Papa.parse<T>(content, {
-    header: true,
-    dynamicTyping: true,
-    skipEmptyLines: true
-  });
-  return result.data;
-}
 
 export async function getRelationEvents(sourceId: string, targetId: string): Promise<RelationEvent[]> {
   const basePath = path.join(process.cwd(), DATASET_DIR);

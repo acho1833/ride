@@ -1,20 +1,8 @@
 import 'server-only';
 
-import { promises as fs } from 'fs';
 import path from 'path';
-import Papa from 'papaparse';
 import { ORPCError } from '@orpc/server';
-
-// ── Internal CSV row types ──────────────────────────────────────────
-
-interface RelationRow {
-  year: string;
-  sourceId: string;
-  targetId: string;
-  id: string;
-  type: string;
-  citationcount?: number;
-}
+import { loadCSV, type RelationRow } from './csv.utils';
 
 interface EntityRow {
   id: string;
@@ -71,16 +59,6 @@ const DATASET_DIRS: Record<string, string> = {
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
-
-async function loadCSV<T>(filePath: string): Promise<T[]> {
-  const content = await fs.readFile(filePath, 'utf-8');
-  const result = Papa.parse<T>(content, {
-    header: true,
-    dynamicTyping: true,
-    skipEmptyLines: true
-  });
-  return result.data;
-}
 
 function remapJHAffiliation(affiliation: string | null | undefined): string {
   if (!affiliation || typeof affiliation !== 'string') {
