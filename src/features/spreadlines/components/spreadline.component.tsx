@@ -28,6 +28,7 @@ import {
   type SpreadlineGranularity
 } from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface SpreadlineRawData {
@@ -329,24 +330,34 @@ const SpreadlineComponent = ({
         </div>
         {splitByAffiliation && (
           <div className="flex items-center gap-1.5">
-            <input type="checkbox" checked={crossingOnly} onChange={e => setCrossingOnly(e.target.checked)} />
-            <label className="text-muted-foreground">Crossing only</label>
+            <Checkbox id="crossing-only" checked={crossingOnly} onCheckedChange={checked => setCrossingOnly(checked === true)} />
+            <label htmlFor="crossing-only" className="text-muted-foreground cursor-pointer">
+              Crossing only
+            </label>
           </div>
         )}
         <div className="flex items-center gap-1.5">
-          <input type="checkbox" checked={splitByAffiliation} onChange={e => onSplitByAffiliationChange(e.target.checked)} />
-          <label className="text-muted-foreground">Split by affiliation</label>
+          <Checkbox
+            id="split-affiliation"
+            checked={splitByAffiliation}
+            onCheckedChange={checked => onSplitByAffiliationChange(checked === true)}
+          />
+          <label htmlFor="split-affiliation" className="text-muted-foreground cursor-pointer">
+            Split by affiliation
+          </label>
         </div>
         <div className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
+          <Checkbox
+            id="show-labels"
             checked={labelsVisible}
-            onChange={e => {
+            onCheckedChange={checked => {
               chartRef.current?.toggleLabels();
-              setLabelsVisible(e.target.checked);
+              setLabelsVisible(checked === true);
             }}
           />
-          <label className="text-muted-foreground">Show labels</label>
+          <label htmlFor="show-labels" className="text-muted-foreground cursor-pointer">
+            Show labels
+          </label>
         </div>
         <Select value={relationTypes[0]} onValueChange={val => onRelationTypesChange([val])}>
           <SelectTrigger className="ml-auto h-7 w-auto gap-1 text-xs">
