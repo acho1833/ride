@@ -18,7 +18,9 @@ const { parse, unparse } = pkg;
 
 // ── Configuration ────────────────────────────────────────────────────
 const SEED = 42;
-const MULTIPLIER = 12;
+const MULTIPLIER = 24;
+const EGO_INTERNAL_EXTRA = 8; // Extra synthetic relations per ego-internal pair per year
+const EGO_ID = 'p1199';
 const SRC = 'data/spreadline/vis-author2';
 const DST = 'data/spreadline/vis-author2-monthly';
 
@@ -131,7 +133,68 @@ for (const [year, yearRelations] of relationsByYear) {
   }
 }
 
-// Step 4: Convert entities to monthly
+// Step 3b: Boost ego-internal relations
+// Find ego's collaborators who share affiliations (internal) and add extra relations
+function remapAffiliation(aff: string): string {
+  if (!aff) return '';
+  if (aff.includes('Berkeley')) return 'Berkeley';
+  if (aff.includes('PARC') || aff.includes('Palo Alto') || aff.includes('Xerox')) return 'PARC';
+  if (aff.includes('Stanford')) return 'Stanford';
+  if (aff.includes('Washington')) return 'Washington';
+  return aff;
+}
+
+// Build ego affiliation per year
+const egoAffByYear = new Map<number, string>();
+for (const e of entities) {
+  if (e.id === EGO_ID) {
+    const year = Number(e.year);
+    if (!egoAffByYear.has(year)) {
+      egoAffByYear.set(year, remapAffiliation(e.affiliation));
+    }
+  }
+}
+
+// Find direct ego collaborators per year
+const egoCollabsByYear = new Map<number, Set<string>>();
+for (const r of relations) {
+  const year = Number(r.year);
+  if (r.sourceId === EGO_ID || r.targetId === EGO_ID) {
+    const other = r.sourceId === EGO_ID ? r.targetId : r.sourceId;
+    if (!egoCollabsByYear.has(year)) egoCollabsByYear.set(year, new Set());
+    egoCollabsByYear.get(year)!.add(other);
+  }
+}
+
+// For each year, find internal collaborators and generate extra relations
+for (const [year, collabs] of egoCollabsByYear) {
+  const egoAff = egoAffByYear.get(year);
+  if (!egoAff) continue;
+
+  for (const collab of collabs) {
+    // Check if collaborator shares affiliation with ego in this year
+    const collabEntries = entities.filter(e => e.id === collab && Number(e.year) === year);
+    const isInternal = collabEntries.some(e => remapAffiliation(e.affiliation) === egoAff);
+    if (!isInternal) continue;
+
+    // Generate extra synthetic relations for this internal pair
+    for (let i = 0; i < EGO_INTERNAL_EXTRA; i++) {
+      const month = randomMonth();
+      const paperId = generatePaperId();
+      monthlyRelations.push({
+        year: `${year}-${padMonth(month)}`,
+        sourceId: collab,
+        targetId: EGO_ID,
+        id: paperId,
+        type: 'Co-author',
+        citationcount: faker.number.int({ min: 5, max: 300 }),
+        count: 1
+      });
+    }
+  }
+}
+
+// Step 4: Convert entities to monthly (with year-correct affiliations)
 const entityMonths = new Map<string, Set<string>>();
 for (const r of monthlyRelations) {
   const ym = String(r.year);
@@ -141,16 +204,33 @@ for (const r of monthlyRelations) {
   entityMonths.get(r.targetId)!.add(ym);
 }
 
+// Build year-specific entity lookup: entityId -> year -> EntityRow
+const entityByIdYear = new Map<string, Map<number, EntityRow>>();
 const entityById = new Map<string, EntityRow>();
 for (const e of entities) {
+  const year = Number(e.year);
+  if (!entityByIdYear.has(e.id)) entityByIdYear.set(e.id, new Map());
+  if (!entityByIdYear.get(e.id)!.has(year)) {
+    entityByIdYear.get(e.id)!.set(year, e);
+  }
   if (!entityById.has(e.id)) entityById.set(e.id, e);
+}
+
+function getEntityForMonth(entityId: string, ym: string): EntityRow | undefined {
+  const yearNum = Number(ym.split('-')[0]);
+  const yearMap = entityByIdYear.get(entityId);
+  if (!yearMap) return entityById.get(entityId);
+  // Use the exact year if available, otherwise nearest year
+  if (yearMap.has(yearNum)) return yearMap.get(yearNum);
+  const years = [...yearMap.keys()].sort((a, b) => Math.abs(a - yearNum) - Math.abs(b - yearNum));
+  return years.length > 0 ? yearMap.get(years[0]) : entityById.get(entityId);
 }
 
 const monthlyEntities: EntityRow[] = [];
 for (const [entityId, months] of entityMonths) {
-  const base = entityById.get(entityId);
-  if (!base) continue;
   for (const ym of months) {
+    const base = getEntityForMonth(entityId, ym);
+    if (!base) continue;
     monthlyEntities.push({
       ...base,
       year: ym
