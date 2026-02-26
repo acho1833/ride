@@ -254,7 +254,7 @@ export class Session {
   id: number;
   entities: Node[];
   entityWeight: number;
-  constraints: any[]; // [[dict]*5], each dict has a key being the weight
+  constraints: SessionConstraints; // [[dict]*5], each dict has a key being the weight
   type: 'contact' | 'idle';
   weight: number;
   indices: number[];
@@ -314,7 +314,7 @@ export class Session {
     return null;
   }
 
-  set(hops: string[][] = [], links: [string, string, number][] = [], constraints: any[] = []): void {
+  set(hops: string[][] = [], links: [string, string, number][] = [], constraints: SessionConstraints = []): void {
     if (hops.length !== 0) this.hops = hops;
     if (links.length !== 0) this.links = links;
     if (constraints.length !== 0) this.constraints = constraints;
@@ -340,10 +340,12 @@ export class Session {
     this.links = links;
   }
 
-  setConstraints(constraints: any[]): void {
+  setConstraints(constraints: SessionConstraints): void {
     this.constraints = constraints;
   }
 }
+
+export type SessionConstraints = (string[] | Record<number, string[]>)[];
 
 // Type definitions for data structures used throughout the pipeline
 

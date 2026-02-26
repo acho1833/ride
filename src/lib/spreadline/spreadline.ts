@@ -12,6 +12,7 @@ import {
   Node,
   Entity,
   Session,
+  SessionConstraints,
   TopologyRow,
   ContentLayoutRow,
   NodeContextRow,
@@ -112,9 +113,13 @@ export class SpreadLine {
    * @param config - Column mapping configuration
    * @param key - Data type: 'topology', 'content', 'node', 'line'
    */
-  load(data: any[], config: Record<string, string>, key: string = 'topology'): void {
+  load(data: Record<string, unknown>[], config: Record<string, string>, key: string = 'topology'): void {
     if (key === 'topology') {
-      this._topo = checkValidity(data, config, ['time', 'source', 'target', 'weight']);
+      this._topo = checkValidity(
+        data as TopologyRow[],
+        config,
+        ['time', 'source', 'target', 'weight']
+      );
       return;
     }
 
@@ -147,7 +152,7 @@ export class SpreadLine {
       const result: ContentLayoutRow[] = [];
 
       for (const row of data) {
-        const newRow: Record<string, any> = {};
+        const newRow: Record<string, unknown> = {};
         for (const [oldKey, value] of Object.entries(row)) {
           const newKey = invConfig[oldKey] || oldKey;
           newRow[newKey] = value;
@@ -164,12 +169,20 @@ export class SpreadLine {
     }
 
     if (key === 'node') {
-      this._node_color = checkValidity(data, config, ['time', 'entity', 'context']);
+      this._node_color = checkValidity(
+        data as unknown as NodeContextRow[],
+        config,
+        ['time', 'entity', 'context']
+      );
       return;
     }
 
     if (key === 'line') {
-      const validated = checkValidity(data, config, ['entity', 'color']);
+      const validated = checkValidity(
+        data as unknown as EntityColorRow[],
+        config,
+        ['entity', 'color']
+      );
       this._line_color = {};
       for (const row of validated) {
         this._line_color[row.entity] = row.color;
@@ -308,7 +321,7 @@ export class SpreadLine {
       let groups = this._groups[timestampLabel] || [];
       groups = groups.map(g => [...g]);
 
-      let constraints: any[];
+      let constraints: SessionConstraints;
       let order: string[][];
 
       if (groups.length !== 0) {
