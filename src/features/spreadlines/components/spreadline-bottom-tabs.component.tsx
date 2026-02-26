@@ -1,5 +1,6 @@
 'use client';
 
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { SpreadlineBottomTab } from '@/features/spreadlines/const';
 
 interface Props {
@@ -9,27 +10,23 @@ interface Props {
 
 const SpreadlineBottomTabsComponent = ({ activeTab, onTabChange }: Props) => {
   return (
-    <div className="border-border bg-background flex shrink-0 items-center gap-0 border-b text-xs">
-      <button
-        className={`px-3 py-1.5 font-medium transition-colors ${
-          activeTab === 'spreadline'
-            ? 'text-primary border-primary border-b-2'
-            : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-        }`}
-        onClick={() => onTabChange('spreadline')}
-      >
-        Spreadline
-      </button>
-      <button
-        className={`px-3 py-1.5 font-medium transition-colors ${
-          activeTab === 'network-timeline'
-            ? 'text-primary border-primary border-b-2'
-            : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-        }`}
-        onClick={() => onTabChange('network-timeline')}
-      >
-        Network Timeline
-      </button>
+    <div className="border-border bg-background shrink-0 border-b">
+      <Tabs value={activeTab} onValueChange={val => onTabChange(val as SpreadlineBottomTab)}>
+        <TabsList className="h-8 rounded-none bg-transparent p-0">
+          <TabsTrigger
+            value="spreadline"
+            className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-1.5 text-xs font-medium"
+          >
+            Spreadline
+          </TabsTrigger>
+          <TabsTrigger
+            value="network-timeline"
+            className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-1.5 text-xs font-medium"
+          >
+            Network Timeline
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
     </div>
   );
 };
