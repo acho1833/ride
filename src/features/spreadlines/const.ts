@@ -118,6 +118,18 @@ export const GRAPH_HOP2_RADIAL_RADIUS = 240;
 /** Strength of the radial force nudge (0-1) */
 export const GRAPH_RADIAL_STRENGTH = 0.3;
 
+/** Force alpha for time-range updates (lower = gentler start) */
+export const GRAPH_UPDATE_ALPHA = 0.3;
+
+/** Alpha decay for time-range updates (lower = more ticks, smoother cooling) */
+export const GRAPH_UPDATE_ALPHA_DECAY = 0.03;
+
+/** Velocity decay for time-range updates (higher = more damping, less overshoot) */
+export const GRAPH_UPDATE_VELOCITY_DECAY = 0.6;
+
+/** Random offset range when spawning new nodes near a neighbor (px) */
+export const GRAPH_NEIGHBOR_SPAWN_OFFSET = 30;
+
 /** D3 transition duration for time-block changes (ms) */
 export const GRAPH_TIME_TRANSITION_MS = 600;
 

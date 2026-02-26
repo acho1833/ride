@@ -26,6 +26,10 @@ import {
   GRAPH_HOP1_RADIAL_RADIUS,
   GRAPH_HOP2_RADIAL_RADIUS,
   GRAPH_RADIAL_STRENGTH,
+  GRAPH_UPDATE_ALPHA,
+  GRAPH_UPDATE_ALPHA_DECAY,
+  GRAPH_UPDATE_VELOCITY_DECAY,
+  GRAPH_NEIGHBOR_SPAWN_OFFSET,
   GRAPH_TIME_TRANSITION_MS,
   GRAPH_LINK_THRESHOLDS,
   GRAPH_LINK_WIDTH_BANDS,
@@ -194,7 +198,6 @@ const SpreadlineGraphComponent = ({
   const simulationRef = useRef<d3.Simulation<SpreadlineGraphNode, SpreadlineGraphLink> | null>(null);
   const nodeLinkMapRef = useRef<Map<string, SVGLineElement[]>>(new Map());
   const nodeRegistryRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-  const settledNodeIdsRef = useRef<Set<string>>(new Set());
 
   // Track whether the main effect has initialized the graph
   const initializedRef = useRef(false);
@@ -405,8 +408,6 @@ const SpreadlineGraphComponent = ({
       if (reg) return { ...n, x: reg.x, y: reg.y };
       return { ...n };
     });
-
-    const settled = settledNodeIdsRef.current;
 
     const links: SpreadlineGraphLink[] = graphData.links.map(l => ({ ...l }));
 
@@ -648,11 +649,6 @@ const SpreadlineGraphComponent = ({
         .attr('y2', d => (d.target as SpreadlineGraphNode).y ?? 0);
       nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
 
-      // Mark all initial nodes as settled
-      for (const n of nodes) {
-        settled.add(n.id);
-      }
-
       // Auto-center on first render
       if (transformRef.current === d3.zoomIdentity) {
         const xExt = d3.extent(nodes, d => d.x) as [number, number];
@@ -666,18 +662,38 @@ const SpreadlineGraphComponent = ({
         }
       }
     } else {
-      // Unsettled nodes (new or interrupted mid-animation) spawn near ego
+      // Build adjacency index for neighbor lookup
+      const nodeById = new Map(nodes.map(nd => [nd.id, nd]));
+      const adjacency = new Map<string, string[]>();
+      for (const l of links) {
+        const sId = typeof l.source === 'string' ? l.source : l.source.id;
+        const tId = typeof l.target === 'string' ? l.target : l.target.id;
+        if (!adjacency.has(sId)) adjacency.set(sId, []);
+        if (!adjacency.has(tId)) adjacency.set(tId, []);
+        adjacency.get(sId)!.push(tId);
+        adjacency.get(tId)!.push(sId);
+      }
+
+      // Smart positioning for truly new nodes (not in previous render)
       for (const n of nodes) {
-        if (!n.isEgo && !settled.has(n.id)) {
-          n.x = spawnX + (Math.random() - 0.5) * 40;
-          n.y = spawnY + (Math.random() - 0.5) * 40;
+        if (n.isEgo || prevNodesMap.has(n.id)) continue;
+        // Find a connected neighbor that already has a position
+        const neighbor = (adjacency.get(n.id) ?? []).map(id => nodeById.get(id)).find(nd => nd?.x != null && nd?.y != null);
+
+        if (neighbor?.x != null && neighbor?.y != null) {
+          n.x = neighbor.x + (Math.random() - 0.5) * GRAPH_NEIGHBOR_SPAWN_OFFSET * 2;
+          n.y = neighbor.y + (Math.random() - 0.5) * GRAPH_NEIGHBOR_SPAWN_OFFSET * 2;
+        } else {
+          n.x = spawnX + (Math.random() - 0.5) * GRAPH_NEIGHBOR_SPAWN_OFFSET * 2;
+          n.y = spawnY + (Math.random() - 0.5) * GRAPH_NEIGHBOR_SPAWN_OFFSET * 2;
         }
       }
 
       // Animated simulation — settled nodes keep positions, unsettled get full forces
       simulation
-        .alpha(0.5)
-        .alphaDecay(0.05)
+        .alpha(GRAPH_UPDATE_ALPHA)
+        .alphaDecay(GRAPH_UPDATE_ALPHA_DECAY)
+        .velocityDecay(GRAPH_UPDATE_VELOCITY_DECAY)
         .on('tick', () => {
           linkMerged
             .attr('x1', d => (d.source as SpreadlineGraphNode).x ?? 0)
@@ -687,9 +703,8 @@ const SpreadlineGraphComponent = ({
           nodeMerged.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
         })
         .on('end', () => {
-          // Mark all current nodes as settled and update registry
+          // Save final positions to registry
           for (const n of nodes) {
-            settled.add(n.id);
             if (n.x != null && n.y != null) {
               registry.set(n.id, { x: n.x, y: n.y });
             }
