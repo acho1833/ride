@@ -12,7 +12,8 @@
  *  - Hop-aware force layout: shorter links for hop-1, longer for hop-2, radial nudge, collision prevention
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useGraphZoom } from '@/features/spreadlines/hooks/useGraphZoom';
 import * as d3 from 'd3';
 import { Button } from '@/components/ui/button';
 import { Plus, Minus, Maximize } from 'lucide-react';
@@ -176,9 +177,8 @@ const SpreadlineGraphComponent = ({
   onLinkDoubleClick,
   onEntityPin
 }: Props) => {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const { svgRef, zoomRef, transformRef, handleZoomIn, handleZoomOut, handleZoomToFit } = useGraphZoom();
   const containerRef = useRef<HTMLDivElement>(null);
-  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const nodesRef = useRef<SpreadlineGraphNode[]>([]);
   const linksRef = useRef<SpreadlineGraphLink[]>([]);
   const prevHighlightRef = useRef<{
@@ -187,7 +187,6 @@ const SpreadlineGraphComponent = ({
     targetNodeIds: Set<string>;
     intermediateIds: Set<string>;
   } | null>(null);
-  const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
   // Dimensions stored as ref so resize doesn't trigger effect re-runs.
   // dimensionsReady fires once to kick off the initial render.
   const dimensionsRef = useRef<{ width: number; height: number } | null>(null);
@@ -929,48 +928,6 @@ const SpreadlineGraphComponent = ({
       });
   }, [pinnedEntityNames, rawData, selectedTimes, filteredEntityNames]);
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // Zoom Controls
-  // ═══════════════════════════════════════════════════════════════════════
-  const handleZoomIn = useCallback(() => {
-    if (!svgRef.current || !zoomRef.current) return;
-    d3.select(svgRef.current).transition().duration(GRAPH_CONFIG.zoomAnimationMs).call(zoomRef.current.scaleBy, GRAPH_CONFIG.zoomStep);
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    if (!svgRef.current || !zoomRef.current) return;
-    d3.select(svgRef.current)
-      .transition()
-      .duration(GRAPH_CONFIG.zoomAnimationMs)
-      .call(zoomRef.current.scaleBy, 1 / GRAPH_CONFIG.zoomStep);
-  }, []);
-
-  const handleZoomToFit = useCallback(() => {
-    if (!svgRef.current || !zoomRef.current || !dimensionsRef.current) return;
-
-    const nodes = nodesRef.current;
-    if (nodes.length === 0) return;
-
-    const { width, height } = dimensionsRef.current;
-    const padding = GRAPH_CONFIG.fitPadding;
-    const xExtent = d3.extent(nodes, d => d.x) as [number, number];
-    const yExtent = d3.extent(nodes, d => d.y) as [number, number];
-
-    const graphWidth = xExtent[1] - xExtent[0] + GRAPH_CONFIG.nodeRadius * 4;
-    const graphHeight = yExtent[1] - yExtent[0] + GRAPH_CONFIG.nodeRadius * 4;
-    const graphCenterX = (xExtent[0] + xExtent[1]) / 2;
-    const graphCenterY = (yExtent[0] + yExtent[1]) / 2;
-
-    const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight, 1);
-    const fitTranslateX = width / 2 - graphCenterX * scale;
-    const fitTranslateY = height / 2 - graphCenterY * scale;
-
-    d3.select(svgRef.current)
-      .transition()
-      .duration(GRAPH_CONFIG.zoomAnimationMs)
-      .call(zoomRef.current.transform, d3.zoomIdentity.translate(fitTranslateX, fitTranslateY).scale(scale));
-  }, []);
-
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden select-none">
       {!rawData ? (
@@ -992,7 +949,12 @@ const SpreadlineGraphComponent = ({
             <Button variant="outline" size="icon" onClick={handleZoomOut} title="Zoom Out">
               <Minus className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={handleZoomToFit} title="Zoom to Fit">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => dimensionsRef.current && handleZoomToFit(nodesRef.current, dimensionsRef.current)}
+              title="Zoom to Fit"
+            >
               <Maximize className="h-4 w-4" />
             </Button>
           </div>
