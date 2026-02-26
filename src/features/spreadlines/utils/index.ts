@@ -36,6 +36,57 @@ export interface SpreadlineGraphLink extends SimulationLinkDatum<SpreadlineGraph
   years: string[];
 }
 
+/** Deduplicate topology entries into aggregated links, filtering by valid node IDs */
+export function deduplicateLinks(
+  entries: { sourceId: string; targetId: string; time: string; weight: number }[],
+  nodeIds: Set<string>
+): SpreadlineGraphLink[] {
+  const linkMap = new Map<
+    string,
+    { source: string; target: string; weight: number; paperCount: number; years: Set<string> }
+  >();
+
+  for (const entry of entries) {
+    if (!nodeIds.has(entry.sourceId) || !nodeIds.has(entry.targetId)) continue;
+    const key = [entry.sourceId, entry.targetId].sort().join('::');
+    const existing = linkMap.get(key);
+    if (existing) {
+      existing.weight += entry.weight;
+      existing.paperCount += 1;
+      existing.years.add(entry.time);
+    } else {
+      const [source, target] = key.split('::');
+      linkMap.set(key, {
+        source,
+        target,
+        weight: entry.weight,
+        paperCount: 1,
+        years: new Set([entry.time])
+      });
+    }
+  }
+
+  return Array.from(linkMap.values()).map(l => ({
+    source: l.source,
+    target: l.target,
+    weight: l.weight,
+    paperCount: l.paperCount,
+    years: Array.from(l.years).sort()
+  }));
+}
+
+/** Compute total citations per node from aggregated links */
+function computeNodeCitations(links: SpreadlineGraphLink[]): Map<string, number> {
+  const citations = new Map<string, number>();
+  for (const link of links) {
+    const s = typeof link.source === 'string' ? link.source : link.source.id;
+    const t = typeof link.target === 'string' ? link.target : link.target.id;
+    citations.set(s, (citations.get(s) ?? 0) + link.weight);
+    citations.set(t, (citations.get(t) ?? 0) + link.weight);
+  }
+  return citations;
+}
+
 /**
  * Transform spreadline raw data into graph nodes and links.
  *
@@ -51,29 +102,9 @@ export function transformSpreadlineToGraph(rawData: {
   topology: { sourceId: string; targetId: string; time: string; weight: number }[];
 }): { nodes: SpreadlineGraphNode[]; links: SpreadlineGraphLink[] } {
   const collabCounts = new Map<string, number>();
-  const linkMap = new Map<string, { source: string; target: string; weight: number; paperCount: number; years: Set<string> }>();
-
   for (const entry of rawData.topology) {
     collabCounts.set(entry.sourceId, (collabCounts.get(entry.sourceId) ?? 0) + 1);
     collabCounts.set(entry.targetId, (collabCounts.get(entry.targetId) ?? 0) + 1);
-
-    const key = [entry.sourceId, entry.targetId].sort().join('::');
-    const existing = linkMap.get(key);
-    if (existing) {
-      existing.weight += entry.weight;
-      existing.paperCount += 1;
-      existing.years.add(entry.time);
-    } else {
-      const [source, target] = key.split('::');
-      linkMap.set(key, { source, target, weight: entry.weight, paperCount: 1, years: new Set([entry.time]) });
-    }
-  }
-
-  // Compute totalCitations per node from aggregated link weights
-  const nodeCitations = new Map<string, number>();
-  for (const link of linkMap.values()) {
-    nodeCitations.set(link.source, (nodeCitations.get(link.source) ?? 0) + link.weight);
-    nodeCitations.set(link.target, (nodeCitations.get(link.target) ?? 0) + link.weight);
   }
 
   const egoNode: SpreadlineGraphNode = {
@@ -89,15 +120,18 @@ export function transformSpreadlineToGraph(rawData: {
     name: entity.name,
     isEgo: false,
     collaborationCount: collabCounts.get(id) ?? 0,
-    totalCitations: nodeCitations.get(id) ?? 0
+    totalCitations: 0
   }));
 
   const nodes = [egoNode, ...entityNodes];
   const nodeIds = new Set(nodes.map(n => n.id));
+  const links = deduplicateLinks(rawData.topology, nodeIds);
+  const nodeCitations = computeNodeCitations(links);
 
-  const links: SpreadlineGraphLink[] = Array.from(linkMap.values())
-    .filter(l => nodeIds.has(l.source) && nodeIds.has(l.target))
-    .map(l => ({ source: l.source, target: l.target, weight: l.weight, paperCount: l.paperCount, years: Array.from(l.years).sort() }));
+  // Apply totalCitations to nodes (ego stays 0)
+  for (const node of entityNodes) {
+    node.totalCitations = nodeCitations.get(node.id) ?? 0;
+  }
 
   return { nodes, links };
 }
@@ -171,39 +205,12 @@ export function transformSpreadlineToGraphByTime(
   }
 
   // 5. Build links (deduplicated within this time block, with aggregation)
-  const linkMap = new Map<string, { source: string; target: string; weight: number; paperCount: number; years: Set<string> }>();
   const nodeIds = new Set(nodes.map(n => n.id));
-  for (const entry of timeTopology) {
-    if (!nodeIds.has(entry.sourceId) || !nodeIds.has(entry.targetId)) continue;
-    const key = [entry.sourceId, entry.targetId].sort().join('::');
-    const existing = linkMap.get(key);
-    if (existing) {
-      existing.weight += entry.weight;
-      existing.paperCount += 1;
-      existing.years.add(entry.time);
-    } else {
-      const [source, target] = key.split('::');
-      linkMap.set(key, { source, target, weight: entry.weight, paperCount: 1, years: new Set([entry.time]) });
-    }
-  }
-
-  // Compute totalCitations per node from aggregated link weights
-  const nodeCitations = new Map<string, number>();
-  for (const link of linkMap.values()) {
-    nodeCitations.set(link.source, (nodeCitations.get(link.source) ?? 0) + link.weight);
-    nodeCitations.set(link.target, (nodeCitations.get(link.target) ?? 0) + link.weight);
-  }
+  const links = deduplicateLinks(timeTopology, nodeIds);
+  const nodeCitations = computeNodeCitations(links);
   for (const node of nodes) {
     node.totalCitations = node.isEgo ? 0 : (nodeCitations.get(node.id) ?? 0);
   }
-
-  const links: SpreadlineGraphLink[] = Array.from(linkMap.values()).map(l => ({
-    source: l.source,
-    target: l.target,
-    weight: l.weight,
-    paperCount: l.paperCount,
-    years: Array.from(l.years).sort()
-  }));
 
   return { nodes, links };
 }
@@ -288,39 +295,12 @@ export function transformSpreadlineToGraphByTimes(
   }
 
   // 5. Build links (deduplicated across all times in range, with aggregation)
-  const linkMap = new Map<string, { source: string; target: string; weight: number; paperCount: number; years: Set<string> }>();
   const nodeIds = new Set(nodes.map(n => n.id));
-  for (const entry of rangeTopology) {
-    if (!nodeIds.has(entry.sourceId) || !nodeIds.has(entry.targetId)) continue;
-    const key = [entry.sourceId, entry.targetId].sort().join('::');
-    const existing = linkMap.get(key);
-    if (existing) {
-      existing.weight += entry.weight;
-      existing.paperCount += 1;
-      existing.years.add(entry.time);
-    } else {
-      const [source, target] = key.split('::');
-      linkMap.set(key, { source, target, weight: entry.weight, paperCount: 1, years: new Set([entry.time]) });
-    }
-  }
-
-  // Compute totalCitations per node from aggregated link weights
-  const nodeCitations = new Map<string, number>();
-  for (const link of linkMap.values()) {
-    nodeCitations.set(link.source, (nodeCitations.get(link.source) ?? 0) + link.weight);
-    nodeCitations.set(link.target, (nodeCitations.get(link.target) ?? 0) + link.weight);
-  }
+  const links = deduplicateLinks(rangeTopology, nodeIds);
+  const nodeCitations = computeNodeCitations(links);
   for (const node of nodes) {
     node.totalCitations = node.isEgo ? 0 : (nodeCitations.get(node.id) ?? 0);
   }
-
-  const links: SpreadlineGraphLink[] = Array.from(linkMap.values()).map(l => ({
-    source: l.source,
-    target: l.target,
-    weight: l.weight,
-    paperCount: l.paperCount,
-    years: Array.from(l.years).sort()
-  }));
 
   return { nodes, links };
 }

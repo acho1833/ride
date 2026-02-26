@@ -1,4 +1,5 @@
 import {
+  deduplicateLinks,
   transformSpreadlineToGraph,
   transformSpreadlineToGraphByTime,
   transformSpreadlineToGraphByTimes,
@@ -124,5 +125,39 @@ describe('transformSpreadlineToTimeline', () => {
     const result = transformSpreadlineToTimeline(makeRawDataWithCitations());
     const ego = result.find(e => e.isEgo)!;
     expect(ego.timeBlocks.length).toBeGreaterThan(0);
+  });
+});
+
+describe('deduplicateLinks', () => {
+  it('merges links with the same source-target pair', () => {
+    const entries = [
+      { sourceId: 'a', targetId: 'b', time: '2020', weight: 1 },
+      { sourceId: 'a', targetId: 'b', time: '2021', weight: 2 },
+      { sourceId: 'b', targetId: 'a', time: '2022', weight: 3 }
+    ];
+    const nodeIds = new Set(['a', 'b']);
+    const links = deduplicateLinks(entries, nodeIds);
+
+    expect(links).toHaveLength(1);
+    expect(links[0].weight).toBe(6);
+    expect(links[0].paperCount).toBe(3);
+    expect(links[0].years).toEqual(['2020', '2021', '2022']);
+  });
+
+  it('filters out links where source or target is not in nodeIds', () => {
+    const entries = [
+      { sourceId: 'a', targetId: 'b', time: '2020', weight: 1 },
+      { sourceId: 'a', targetId: 'c', time: '2020', weight: 1 }
+    ];
+    const nodeIds = new Set(['a', 'b']);
+    const links = deduplicateLinks(entries, nodeIds);
+
+    expect(links).toHaveLength(1);
+    expect(links[0].source).toBe('a');
+    expect(links[0].target).toBe('b');
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(deduplicateLinks([], new Set())).toEqual([]);
   });
 });
