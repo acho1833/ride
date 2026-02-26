@@ -67,6 +67,16 @@ describe('transformSpreadlineToGraphByTimes', () => {
   });
 });
 
+describe('collaborationCount', () => {
+  it('counts topology entries involving each entity in a single time block', () => {
+    const { nodes } = transformSpreadlineToGraphByTime(makeRawData(), '2020');
+    const a1 = nodes.find(n => n.id === 'a1');
+    expect(a1!.collaborationCount).toBe(1); // Only 1 entry in 2020 involving a1
+    const a2 = nodes.find(n => n.id === 'a2');
+    expect(a2!.collaborationCount).toBe(1); // Only 1 entry in 2020 involving a2
+  });
+});
+
 const makeRawDataWithCitations = () => ({
   egoId: 'ego',
   egoName: 'Ego Author',

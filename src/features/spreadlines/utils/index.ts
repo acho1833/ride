@@ -173,6 +173,13 @@ export function transformSpreadlineToGraphByTime(
   for (const id of groups[0] ?? []) hopMap.set(id, { hop: 2, category: 'external' });
   for (const id of groups[4] ?? []) hopMap.set(id, { hop: 2, category: 'internal' });
 
+  // Build collaboration count map (O(n) instead of O(n*m))
+  const collabCounts = new Map<string, number>();
+  for (const entry of timeTopology) {
+    collabCounts.set(entry.sourceId, (collabCounts.get(entry.sourceId) ?? 0) + 1);
+    collabCounts.set(entry.targetId, (collabCounts.get(entry.targetId) ?? 0) + 1);
+  }
+
   // 4. Build nodes
   const nodes: SpreadlineGraphNode[] = [];
 
@@ -197,7 +204,7 @@ export function transformSpreadlineToGraphByTime(
       id,
       name: entity.name,
       isEgo: false,
-      collaborationCount: timeTopology.filter(t => t.sourceId === id || t.targetId === id).length,
+      collaborationCount: collabCounts.get(id) ?? 0,
       totalCitations: 0,
       hopDistance: info.hop,
       category: info.category
@@ -266,6 +273,13 @@ export function transformSpreadlineToGraphByTimes(
     }
   }
 
+  // Build collaboration count map (O(n) instead of O(n*m))
+  const collabCounts = new Map<string, number>();
+  for (const entry of rangeTopology) {
+    collabCounts.set(entry.sourceId, (collabCounts.get(entry.sourceId) ?? 0) + 1);
+    collabCounts.set(entry.targetId, (collabCounts.get(entry.targetId) ?? 0) + 1);
+  }
+
   // 4. Build nodes
   const nodes: SpreadlineGraphNode[] = [];
   nodes.push({
@@ -287,7 +301,7 @@ export function transformSpreadlineToGraphByTimes(
       id,
       name: entity.name,
       isEgo: false,
-      collaborationCount: rangeTopology.filter(t => t.sourceId === id || t.targetId === id).length,
+      collaborationCount: collabCounts.get(id) ?? 0,
       totalCitations: 0,
       hopDistance: info.hop,
       category: info.category
