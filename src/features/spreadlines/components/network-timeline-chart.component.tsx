@@ -16,13 +16,9 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import * as d3 from 'd3';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import {
-  SPREADLINE_RELATION_TYPE_OPTIONS,
-  SPREADLINE_GRANULARITY_OPTIONS,
   SPREADLINE_FREQUENCY_COLORS,
   SPREADLINE_FREQUENCY_THRESHOLDS,
   NETWORK_TIMELINE_ROW_HEIGHT,
@@ -40,6 +36,7 @@ import type { SpreadlineRawData } from '@/features/spreadlines/components/spread
 import { transformSpreadlineToTimeline } from '@/features/spreadlines/utils';
 import type { TimelineEntity } from '@/features/spreadlines/utils';
 import { setDragCursor, clearDragCursor } from '@/features/spreadlines/utils/drag-cursor';
+import SpreadlineToolbarComponent from '@/features/spreadlines/components/spreadline-toolbar.component';
 
 
 /** D3 threshold scale: citation count -> heatmap fill color */
@@ -458,82 +455,26 @@ const NetworkTimelineChartComponent = ({
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="bg-background border-border flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-xs">
-        <span className="text-muted-foreground whitespace-nowrap">
-          <span className="hidden min-[1400px]:inline">
-            {blocksFiltered.length} entities{inTimeRangeNames ? ` (${inTimeRangeNames.size} in range)` : ''} | {timeBlocks.length} blocks
-            {rawData ? ' | ' : ''}
+      <SpreadlineToolbarComponent
+        infoSlot={
+          <span className="text-muted-foreground whitespace-nowrap">
+            <span className="hidden min-[1400px]:inline">
+              {blocksFiltered.length} entities{inTimeRangeNames ? ` (${inTimeRangeNames.size} in range)` : ''} | {timeBlocks.length} blocks
+              {rawData ? ' | ' : ''}
+            </span>
+            {rawData ? `Ego: ${rawData.egoName}` : ''}
           </span>
-          {rawData ? `Ego: ${rawData.egoName}` : ''}
-        </span>
-
-        <div className="bg-border h-4 w-px" />
-
-        {/* Frequency heatmap legend */}
-        <span className="text-muted-foreground font-medium">Frequencies</span>
-        <div className="relative">
-          <div className="flex">
-            {SPREADLINE_FREQUENCY_COLORS.map((color, i) => (
-              <span key={i} className="border-border inline-block h-2.5 w-6 border" style={{ backgroundColor: color }} />
-            ))}
-          </div>
-          <div className="text-muted-foreground absolute flex text-[9px]">
-            {SPREADLINE_FREQUENCY_THRESHOLDS.map((t, i) => (
-              <span key={t} className="absolute -translate-x-1/2" style={{ left: (i + 1) * 24 }}>
-                {i === SPREADLINE_FREQUENCY_THRESHOLDS.length - 1 ? `${t}+` : t}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Blocks filter slider */}
-        <div className="flex items-center gap-2">
-          <Slider min={1} max={maxLifespan} value={[blocksFilter]} onValueChange={([val]) => onBlocksFilterChange(val)} className="w-20" />
-          <span className="text-foreground w-4 font-medium">{blocksFilter}</span>
-          <label className="text-muted-foreground">Blocks</label>
-        </div>
-
-        {/* Relation type dropdown */}
-        <Select value={relationTypes[0]} onValueChange={val => onRelationTypesChange([val])}>
-          <SelectTrigger className="ml-auto h-7 w-auto gap-1 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SPREADLINE_RELATION_TYPE_OPTIONS.map(type => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Granularity dropdown */}
-        <Select value={granularity} onValueChange={val => onGranularityChange(val as SpreadlineGranularity)}>
-          <SelectTrigger className="h-7 w-auto gap-1 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SPREADLINE_GRANULARITY_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Clear pins */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 gap-1 px-2 text-xs"
-          disabled={pinnedEntityNames.length === 0}
-          onClick={() => onEntityPin?.([])}
-        >
-          <X className="h-3 w-3" />
-          Clear
-        </Button>
-      </div>
+        }
+        maxLifespan={maxLifespan}
+        blocksFilter={blocksFilter}
+        onBlocksFilterChange={onBlocksFilterChange}
+        relationTypes={relationTypes}
+        onRelationTypesChange={onRelationTypesChange}
+        granularity={granularity}
+        onGranularityChange={onGranularityChange}
+        pinnedCount={pinnedEntityNames.length}
+        onClearPins={() => onEntityPin?.([])}
+      />
 
       {/* Scrollable chart area */}
       <div ref={containerRef} className="relative min-h-0 flex-1 overflow-y-auto">

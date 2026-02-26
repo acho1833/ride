@@ -9,28 +9,23 @@
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Minus, Plus, Maximize, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Minus, Plus, Maximize, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SpreadLineData, SpreadLineConfig } from '@/lib/spreadline-viz/spreadline-types';
 import SpreadLineChart from '@/lib/spreadline-viz/spreadline-chart';
 import type { SpreadLineChartHandle } from '@/lib/spreadline-viz/spreadline-chart';
 import { SpreadLine } from '@/lib/spreadline';
 import {
-  SPREADLINE_RELATION_TYPE_OPTIONS,
   SPREADLINE_MIN_WIDTH_PER_TIMESTAMP,
   SPREADLINE_CHART_HEIGHT,
   SPREADLINE_CATEGORY_COLORS,
   SPREADLINE_SQUEEZE_SAME_CATEGORY,
   SPREADLINE_MINIMIZE,
-  SPREADLINE_GRANULARITY_OPTIONS,
   SPREADLINE_TIME_CONFIG,
-  SPREADLINE_FREQUENCY_COLORS,
-  SPREADLINE_FREQUENCY_THRESHOLDS,
   type SpreadlineGranularity
 } from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
+import SpreadlineToolbarComponent from '@/features/spreadlines/components/spreadline-toolbar.component';
 
 export interface SpreadlineRawData {
   egoId: string;
@@ -263,131 +258,95 @@ const SpreadlineComponent = ({
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="bg-background border-border flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-xs">
-        <span className="text-muted-foreground whitespace-nowrap">
-          <span className="hidden min-[1400px]:inline">
-            {computedData.storylines.length} entities | {computedData.blocks.length} blocks |{' '}
+      <SpreadlineToolbarComponent
+        infoSlot={
+          <span className="text-muted-foreground whitespace-nowrap">
+            <span className="hidden min-[1400px]:inline">
+              {computedData.storylines.length} entities | {computedData.blocks.length} blocks |{' '}
+            </span>
+            Ego: {computedData.ego}
           </span>
-          Ego: {computedData.ego}
-        </span>
-        {splitByAffiliation && (
+        }
+        extraSlot={
           <>
-            <div className="bg-border h-4 w-px" />
-            {Object.entries(SPREADLINE_CATEGORY_COLORS).map(([category, color]) => (
-              <button
-                key={category}
-                className="flex items-center gap-1.5 transition-opacity hover:opacity-100"
-                style={{ opacity: hiddenColors.has(color) ? 0.3 : 0.9 }}
-                onClick={() => {
-                  chartRef.current?.toggleLineVisibility(color);
-                  setHiddenColors(prev => {
-                    const next = new Set(prev);
-                    if (next.has(color)) next.delete(color);
-                    else next.add(color);
-                    return next;
-                  });
-                }}
-              >
-                <span
-                  className="inline-block h-3 w-3 rounded-sm border"
-                  style={{
-                    backgroundColor: hiddenColors.has(color) ? 'transparent' : color,
-                    borderColor: color
-                  }}
+            {splitByAffiliation && (
+              <>
+                <div className="bg-border h-4 w-px" />
+                {Object.entries(SPREADLINE_CATEGORY_COLORS).map(([category, color]) => (
+                  <button
+                    key={category}
+                    className="flex items-center gap-1.5 transition-opacity hover:opacity-100"
+                    style={{ opacity: hiddenColors.has(color) ? 0.3 : 0.9 }}
+                    onClick={() => {
+                      chartRef.current?.toggleLineVisibility(color);
+                      setHiddenColors(prev => {
+                        const next = new Set(prev);
+                        if (next.has(color)) next.delete(color);
+                        else next.add(color);
+                        return next;
+                      });
+                    }}
+                  >
+                    <span
+                      className="inline-block h-3 w-3 rounded-sm border"
+                      style={{
+                        backgroundColor: hiddenColors.has(color) ? 'transparent' : color,
+                        borderColor: color
+                      }}
+                    />
+                    <span className="capitalize">{category}</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {splitByAffiliation && (
+              <div className="flex items-center gap-1.5">
+                <Checkbox
+                  id="crossing-only"
+                  checked={crossingOnly}
+                  onCheckedChange={checked => setCrossingOnly(checked === true)}
                 />
-                <span className="capitalize">{category}</span>
-              </button>
-            ))}
-            <div className="bg-border h-4 w-px" />
-            <span className="text-muted-foreground font-medium">Frequencies</span>
-            <div className="relative">
-              <div className="flex">
-                {SPREADLINE_FREQUENCY_COLORS.map((color, i) => (
-                  <span key={i} className="border-border inline-block h-2.5 w-6 border" style={{ backgroundColor: color }} />
-                ))}
+                <label htmlFor="crossing-only" className="text-muted-foreground cursor-pointer">
+                  Crossing only
+                </label>
               </div>
-              <div className="text-muted-foreground absolute flex text-[9px]">
-                {SPREADLINE_FREQUENCY_THRESHOLDS.map((t, i) => (
-                  <span key={t} className="absolute -translate-x-1/2" style={{ left: (i + 1) * 24 }}>
-                    {i === SPREADLINE_FREQUENCY_THRESHOLDS.length - 1 ? `${t}+` : t}
-                  </span>
-                ))}
-              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id="split-affiliation"
+                checked={splitByAffiliation}
+                onCheckedChange={checked => onSplitByAffiliationChange(checked === true)}
+              />
+              <label htmlFor="split-affiliation" className="text-muted-foreground cursor-pointer">
+                Split by affiliation
+              </label>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id="show-labels"
+                checked={labelsVisible}
+                onCheckedChange={checked => {
+                  chartRef.current?.toggleLabels();
+                  setLabelsVisible(checked === true);
+                }}
+              />
+              <label htmlFor="show-labels" className="text-muted-foreground cursor-pointer">
+                Show labels
+              </label>
             </div>
           </>
-        )}
-        <div className="flex items-center gap-2">
-          <Slider min={1} max={maxLifespan} value={[blocksFilter]} onValueChange={([val]) => onBlocksFilterChange(val)} className="w-20" />
-          <span className="text-foreground w-4 font-medium">{blocksFilter}</span>
-          <label className="text-muted-foreground">Blocks</label>
-        </div>
-        {splitByAffiliation && (
-          <div className="flex items-center gap-1.5">
-            <Checkbox id="crossing-only" checked={crossingOnly} onCheckedChange={checked => setCrossingOnly(checked === true)} />
-            <label htmlFor="crossing-only" className="text-muted-foreground cursor-pointer">
-              Crossing only
-            </label>
-          </div>
-        )}
-        <div className="flex items-center gap-1.5">
-          <Checkbox
-            id="split-affiliation"
-            checked={splitByAffiliation}
-            onCheckedChange={checked => onSplitByAffiliationChange(checked === true)}
-          />
-          <label htmlFor="split-affiliation" className="text-muted-foreground cursor-pointer">
-            Split by affiliation
-          </label>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Checkbox
-            id="show-labels"
-            checked={labelsVisible}
-            onCheckedChange={checked => {
-              chartRef.current?.toggleLabels();
-              setLabelsVisible(checked === true);
-            }}
-          />
-          <label htmlFor="show-labels" className="text-muted-foreground cursor-pointer">
-            Show labels
-          </label>
-        </div>
-        <Select value={relationTypes[0]} onValueChange={val => onRelationTypesChange([val])}>
-          <SelectTrigger className="ml-auto h-7 w-auto gap-1 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SPREADLINE_RELATION_TYPE_OPTIONS.map(type => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={granularity} onValueChange={val => onGranularityChange(val as SpreadlineGranularity)}>
-          <SelectTrigger className="h-7 w-auto gap-1 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SPREADLINE_GRANULARITY_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 gap-1 px-2 text-xs"
-          disabled={pinnedEntityNames.length === 0}
-          onClick={() => chartRef.current?.clearPins()}
-        >
-          <X className="h-3 w-3" />
-          Clear
-        </Button>
-      </div>
+        }
+        showFrequencyLegend={splitByAffiliation}
+        maxLifespan={maxLifespan}
+        blocksFilter={blocksFilter}
+        onBlocksFilterChange={onBlocksFilterChange}
+        relationTypes={relationTypes}
+        onRelationTypesChange={onRelationTypesChange}
+        granularity={granularity}
+        onGranularityChange={onGranularityChange}
+        pinnedCount={pinnedEntityNames.length}
+        onClearPins={() => chartRef.current?.clearPins()}
+      />
 
       {/* Chart with d3-zoom */}
       <div className="relative min-h-0 flex-1">
