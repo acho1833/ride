@@ -126,7 +126,16 @@ const getRadialRadius = (d: SpreadlineGraphNode): number => {
 };
 
 /** Module-level cache: preserves node positions across unmount/remount (e.g. split-and-move) */
+const NODE_POSITION_CACHE_MAX = 10;
 const nodePositionCache = new Map<string, Map<string, { x: number; y: number }>>();
+
+function setNodePositionCache(key: string, value: Map<string, { x: number; y: number }>) {
+  if (nodePositionCache.size >= NODE_POSITION_CACHE_MAX) {
+    const firstKey = nodePositionCache.keys().next().value;
+    if (firstKey !== undefined) nodePositionCache.delete(firstKey);
+  }
+  nodePositionCache.set(key, value);
+}
 
 interface Props {
   rawData: {
@@ -192,7 +201,7 @@ const SpreadlineGraphComponent = ({
     return () => {
       const egoId = rawDataRef.current?.egoId;
       if (egoId) {
-        nodePositionCache.set(egoId, new Map(nodeRegistryRef.current));
+        setNodePositionCache(egoId, new Map(nodeRegistryRef.current));
       }
     };
   }, []);

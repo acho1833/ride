@@ -42,7 +42,16 @@ interface SpreadlineTabCache {
 }
 
 /** Module-level cache: preserves tab state across unmount/remount (e.g. split-and-move) */
+const TAB_STATE_CACHE_MAX = 10;
 const tabStateCache = new Map<string, SpreadlineTabCache>();
+
+function setTabStateCache(key: string, value: SpreadlineTabCache) {
+  if (tabStateCache.size >= TAB_STATE_CACHE_MAX) {
+    const firstKey = tabStateCache.keys().next().value;
+    if (firstKey !== undefined) tabStateCache.delete(firstKey);
+  }
+  tabStateCache.set(key, value);
+}
 
 interface Props {
   fileId: string;
@@ -63,7 +72,7 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
 
   // Sync state to cache so it survives unmount/remount
   useEffect(() => {
-    tabStateCache.set(fileId, {
+    setTabStateCache(fileId, {
       selectedRange,
       pinnedEntityNames,
       relationTypes,
