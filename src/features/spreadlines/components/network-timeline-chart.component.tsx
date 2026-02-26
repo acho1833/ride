@@ -19,6 +19,7 @@ import * as d3 from 'd3';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import {
   SPREADLINE_RELATION_TYPE_OPTIONS,
   SPREADLINE_GRANULARITY_OPTIONS,
@@ -488,14 +489,7 @@ const NetworkTimelineChartComponent = ({
 
         {/* Blocks filter slider */}
         <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min="1"
-            max={maxLifespan}
-            value={blocksFilter}
-            onChange={e => onBlocksFilterChange(Number(e.target.value))}
-            className="w-20 accent-current"
-          />
+          <Slider min={1} max={maxLifespan} value={[blocksFilter]} onValueChange={([val]) => onBlocksFilterChange(val)} className="w-20" />
           <span className="text-foreground w-4 font-medium">{blocksFilter}</span>
           <label className="text-muted-foreground">Blocks</label>
         </div>

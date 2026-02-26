@@ -30,6 +30,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 
 export interface SpreadlineRawData {
   egoId: string;
@@ -317,14 +318,7 @@ const SpreadlineComponent = ({
           </>
         )}
         <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min="1"
-            max={maxLifespan}
-            value={blocksFilter}
-            onChange={e => onBlocksFilterChange(Number(e.target.value))}
-            className="w-20 accent-current"
-          />
+          <Slider min={1} max={maxLifespan} value={[blocksFilter]} onValueChange={([val]) => onBlocksFilterChange(val)} className="w-20" />
           <span className="text-foreground w-4 font-medium">{blocksFilter}</span>
           <label className="text-muted-foreground">Blocks</label>
         </div>
