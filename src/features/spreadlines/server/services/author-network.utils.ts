@@ -3,7 +3,7 @@ import 'server-only';
 import type { RelationRow } from './csv.utils';
 import type { TopologyEntry, LineCategoryValue } from './spreadline-data.service';
 
-interface EntityRow {
+export interface EntityRow {
   id: string;
   year: string;
   name: string;

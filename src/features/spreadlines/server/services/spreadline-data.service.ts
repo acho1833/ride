@@ -3,15 +3,7 @@ import 'server-only';
 import path from 'path';
 import { ORPCError } from '@orpc/server';
 import { loadCSV, type RelationRow } from './csv.utils';
-import { constructAuthorNetwork, INTERNAL, EXTERNAL } from './author-network.utils';
-
-interface EntityRow {
-  id: string;
-  year: string;
-  name: string;
-  citationcount: number;
-  affiliation: string;
-}
+import { constructAuthorNetwork, INTERNAL, EXTERNAL, type EntityRow } from './author-network.utils';
 
 interface CitationRow {
   paperID: string;
