@@ -510,10 +510,16 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       if (!file) return state;
 
       // Remove from source
+      const fileIndex = fromLocation.group.files.findIndex(f => f.id === fileId);
       const newFromFiles = fromLocation.group.files.filter(f => f.id !== fileId);
       let newFromActiveId = fromLocation.group.activeFileId;
       if (fromLocation.group.activeFileId === fileId) {
-        newFromActiveId = newFromFiles.length > 0 ? newFromFiles[0].id : null;
+        if (newFromFiles.length > 0) {
+          const nextIndex = Math.min(fileIndex, newFromFiles.length - 1);
+          newFromActiveId = newFromFiles[nextIndex].id;
+        } else {
+          newFromActiveId = null;
+        }
       }
 
       // Add to target at specified index or end
@@ -578,10 +584,16 @@ export const createOpenFilesSlice: StateCreator<OpenFilesSlice, [], [], OpenFile
       const { yGroupLimit, xGroupLimit } = EDITOR_CONFIG;
 
       // Remove file from source
+      const fileIndex = fromLocation.group.files.findIndex(f => f.id === fileId);
       const newFromFiles = fromLocation.group.files.filter(f => f.id !== fileId);
       let newFromActiveId = fromLocation.group.activeFileId;
       if (fromLocation.group.activeFileId === fileId) {
-        newFromActiveId = newFromFiles.length > 0 ? newFromFiles[0].id : null;
+        if (newFromFiles.length > 0) {
+          const nextIndex = Math.min(fileIndex, newFromFiles.length - 1);
+          newFromActiveId = newFromFiles[nextIndex].id;
+        } else {
+          newFromActiveId = null;
+        }
       }
 
       // Track target group ID for lastFocusedGroupId
