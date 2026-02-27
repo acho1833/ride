@@ -38,7 +38,6 @@ import type { TimelineEntity } from '@/features/spreadlines/utils';
 import { setDragCursor, clearDragCursor } from '@/features/spreadlines/utils/drag-cursor';
 import SpreadlineToolbarComponent from '@/features/spreadlines/components/spreadline-toolbar.component';
 
-
 /** D3 threshold scale: citation count -> heatmap fill color */
 const citationColorScale = d3.scaleThreshold<number, string>().domain(SPREADLINE_FREQUENCY_THRESHOLDS).range(SPREADLINE_FREQUENCY_COLORS);
 

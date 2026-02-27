@@ -13,11 +13,7 @@ describe('SpreadLine', () => {
     it('loads topology data', () => {
       const sl = new SpreadLine();
       expect(() =>
-        sl.load(
-          makeTopologyData(),
-          { source: 'source', target: 'target', time: 'time', weight: 'weight' },
-          'topology'
-        )
+        sl.load(makeTopologyData(), { source: 'source', target: 'target', time: 'time', weight: 'weight' }, 'topology')
       ).not.toThrow();
     });
 
@@ -40,11 +36,7 @@ describe('SpreadLine', () => {
   describe('center', () => {
     it('constructs egocentric network from topology', () => {
       const sl = new SpreadLine();
-      sl.load(
-        makeTopologyData(),
-        { source: 'source', target: 'target', time: 'time', weight: 'weight' },
-        'topology'
-      );
+      sl.load(makeTopologyData(), { source: 'source', target: 'target', time: 'time', weight: 'weight' }, 'topology');
       sl.center('Ego', ['2020', '2021'], 'year', '%Y');
 
       expect(sl.ego).toBe('Ego');
@@ -58,11 +50,7 @@ describe('SpreadLine', () => {
   describe('fit (full pipeline)', () => {
     it('produces a valid SpreadLineResult', () => {
       const sl = new SpreadLine();
-      sl.load(
-        makeTopologyData(),
-        { source: 'source', target: 'target', time: 'time', weight: 'weight' },
-        'topology'
-      );
+      sl.load(makeTopologyData(), { source: 'source', target: 'target', time: 'time', weight: 'weight' }, 'topology');
       sl.center('Ego', ['2020', '2021'], 'year', '%Y');
       sl.configure({ squeezeSameCategory: false, minimize: 'wiggles' });
 

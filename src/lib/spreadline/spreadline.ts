@@ -115,11 +115,7 @@ export class SpreadLine {
    */
   load(data: Record<string, unknown>[], config: Record<string, string>, key: string = 'topology'): void {
     if (key === 'topology') {
-      this._topo = checkValidity(
-        data as TopologyRow[],
-        config,
-        ['time', 'source', 'target', 'weight']
-      );
+      this._topo = checkValidity(data as TopologyRow[], config, ['time', 'source', 'target', 'weight']);
       return;
     }
 
@@ -169,20 +165,12 @@ export class SpreadLine {
     }
 
     if (key === 'node') {
-      this._node_color = checkValidity(
-        data as unknown as NodeContextRow[],
-        config,
-        ['time', 'entity', 'context']
-      );
+      this._node_color = checkValidity(data as unknown as NodeContextRow[], config, ['time', 'entity', 'context']);
       return;
     }
 
     if (key === 'line') {
-      const validated = checkValidity(
-        data as unknown as EntityColorRow[],
-        config,
-        ['entity', 'color']
-      );
+      const validated = checkValidity(data as unknown as EntityColorRow[], config, ['entity', 'color']);
       this._line_color = {};
       for (const row of validated) {
         this._line_color[row.entity] = row.color;

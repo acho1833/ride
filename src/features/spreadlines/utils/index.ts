@@ -41,10 +41,7 @@ export function deduplicateLinks(
   entries: { sourceId: string; targetId: string; time: string; weight: number }[],
   nodeIds: Set<string>
 ): SpreadlineGraphLink[] {
-  const linkMap = new Map<
-    string,
-    { source: string; target: string; weight: number; paperCount: number; years: Set<string> }
-  >();
+  const linkMap = new Map<string, { source: string; target: string; weight: number; paperCount: number; years: Set<string> }>();
 
   for (const entry of entries) {
     if (!nodeIds.has(entry.sourceId) || !nodeIds.has(entry.targetId)) continue;

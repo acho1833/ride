@@ -76,13 +76,7 @@ const SpreadlineToolbarComponent = ({
       {extraSlot}
 
       <div className="flex items-center gap-2">
-        <Slider
-          min={1}
-          max={maxLifespan}
-          value={[blocksFilter]}
-          onValueChange={([val]) => onBlocksFilterChange(val)}
-          className="w-20"
-        />
+        <Slider min={1} max={maxLifespan} value={[blocksFilter]} onValueChange={([val]) => onBlocksFilterChange(val)} className="w-20" />
         <span className="text-foreground w-4 font-medium">{blocksFilter}</span>
         <label className="text-muted-foreground">Blocks</label>
       </div>
@@ -113,13 +107,7 @@ const SpreadlineToolbarComponent = ({
         </SelectContent>
       </Select>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 gap-1 px-2 text-xs"
-        disabled={pinnedCount === 0}
-        onClick={onClearPins}
-      >
+      <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs" disabled={pinnedCount === 0} onClick={onClearPins}>
         <X className="h-3 w-3" />
         Clear
       </Button>

@@ -301,11 +301,7 @@ const SpreadlineComponent = ({
             )}
             {splitByAffiliation && (
               <div className="flex items-center gap-1.5">
-                <Checkbox
-                  id="crossing-only"
-                  checked={crossingOnly}
-                  onCheckedChange={checked => setCrossingOnly(checked === true)}
-                />
+                <Checkbox id="crossing-only" checked={crossingOnly} onCheckedChange={checked => setCrossingOnly(checked === true)} />
                 <label htmlFor="crossing-only" className="text-muted-foreground cursor-pointer">
                   Crossing only
                 </label>

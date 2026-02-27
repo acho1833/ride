@@ -124,7 +124,6 @@ interface SpreadLineChartProps {
   pinnedEntityNames?: string[];
 }
 
-
 const ZOOM_SCALE_EXTENT: [number, number] = [0.1, 10];
 const ZOOM_STEP = 1.3;
 const ZOOM_TRANSITION_MS = 300;
