@@ -7,6 +7,7 @@ import { getEntityIconClass } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { ENTITY_ICON_CONFIG } from '@/const';
 import { GRAPH_CONFIG } from '@/features/workspace/const';
+import EntityCardContentComponent from '../overrides/entity-card-content.component';
 
 // Module-level variable to track the currently dragging entity ID.
 // Only one drag operation can happen at a time, so this is safe.
@@ -118,8 +119,8 @@ const EntityCardComponent = ({ entity, className, onClick, draggable = true, var
           <span className="min-w-0 truncate font-medium">{entity.labelNormalized}</span>
         </div>
 
-        {/* Content area (for future details) */}
-        <div className="min-h-12" />
+        {/* Content area — rendered by overrides/entity-card-content.component */}
+        <EntityCardContentComponent entity={entity} />
       </Card>
 
       {/* Hidden drag image: primary blue square with white border (matches graph nodes) */}

@@ -4,11 +4,16 @@
 # Sync from Upstream Repository
 #
 # Pulls files from upstream repo and overlays them into current repo.
+# Files in overrides/ directories are treated specially:
+#   - Never overwritten if they already exist (preserves downstream customizations)
+#   - Seeded from upstream if missing (ensures code compiles after new features are added)
+#   - Use --reset-overrides to force-copy all upstream overrides (discard customizations)
 #
 # Usage:
 #   ./sync-from-upstream.sh                              # Sync from matching upstream branch
 #   ./sync-from-upstream.sh --commit                     # Sync + commit + push
 #   ./sync-from-upstream.sh --branch feature-x           # Override upstream branch
+#   ./sync-from-upstream.sh --reset-overrides            # Force-reset all overrides/ files to upstream defaults
 #   ./sync-from-upstream.sh abc123f                      # Sync to specific commit
 #   ./sync-from-upstream.sh abc123f --commit             # Sync to specific commit + commit + push
 #
@@ -43,6 +48,7 @@ EXCLUDE=(
 # Parse arguments
 COMMIT_REF="HEAD"
 DO_COMMIT=false
+RESET_OVERRIDES=false
 UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 while [[ $# -gt 0 ]]; do
@@ -54,6 +60,10 @@ while [[ $# -gt 0 ]]; do
     --branch)
       UPSTREAM_BRANCH="$2"
       shift 2
+      ;;
+    --reset-overrides)
+      RESET_OVERRIDES=true
+      shift
       ;;
     *)
       COMMIT_REF="$1"
@@ -128,13 +138,27 @@ main() {
   EXCLUDE_ARGS=$(build_exclude_args)
 
   log_info "Copying files..."
-  eval rsync -av --quiet $EXCLUDE_ARGS "$TEMP_DIR/" "./"
+  # Pass 1: sync all files, skipping overrides/ directories entirely
+  eval rsync -av --quiet $EXCLUDE_ARGS --exclude="**/overrides/" "$TEMP_DIR/" "./"
+
+  # Pass 2: seed overrides/ files — copy only if missing (or force with --reset-overrides)
+  log_info "Seeding overrides..."
+  SEEDED_OVERRIDES=()
+  while IFS= read -r src_file; do
+    rel_path="${src_file#$TEMP_DIR/}"
+    dest_file="./$rel_path"
+    if [ ! -f "$dest_file" ] || [ "$RESET_OVERRIDES" = true ]; then
+      mkdir -p "$(dirname "$dest_file")"
+      cp "$src_file" "$dest_file"
+      SEEDED_OVERRIDES+=("$rel_path")
+    fi
+  done < <(find "$TEMP_DIR" -path "*/overrides/*" -type f)
 
   # Check for changes (modified, added, untracked)
   MODIFIED=$(git diff --name-only 2>/dev/null)
   UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null)
 
-  if [ -z "$MODIFIED" ] && [ -z "$UNTRACKED" ]; then
+  if [ -z "$MODIFIED" ] && [ -z "$UNTRACKED" ] && [ ${#SEEDED_OVERRIDES[@]} -eq 0 ]; then
     log_warn "No changes to sync."
   else
     echo ""
@@ -155,6 +179,14 @@ main() {
       echo -e "${GREEN}Added:${NC}"
       echo "$UNTRACKED" | while read -r file; do
         echo "  A  $file"
+      done
+    fi
+
+    # Show seeded overrides
+    if [ ${#SEEDED_OVERRIDES[@]} -gt 0 ]; then
+      echo -e "${GREEN}Seeded overrides:${NC}"
+      for file in "${SEEDED_OVERRIDES[@]}"; do
+        echo "  O  $file"
       done
     fi
 
