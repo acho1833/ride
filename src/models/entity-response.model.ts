@@ -9,6 +9,8 @@ export interface EntityResponse {
   id: string;
   labelNormalized: string;
   type: string;
+  /** Dynamic extended properties from the external API (optional, varies by entity type) */
+  attributes?: Record<string, unknown>;
   /** Related entities - flat array from external API (only on getById) */
   relatedEntities?: RelatedEntityResponse[];
 }
@@ -28,7 +30,8 @@ export interface RelatedEntityResponse {
 const entityResponseBaseSchema = z.object({
   id: z.string(),
   labelNormalized: z.string(),
-  type: z.string()
+  type: z.string(),
+  attributes: z.record(z.string(), z.unknown()).optional()
 });
 
 /** Schema for related entity response from external API */

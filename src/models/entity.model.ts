@@ -10,6 +10,11 @@ export type Entity = {
   labelNormalized: string;
   type: string;
   /**
+   * Dynamic extended properties from the external API.
+   * Keys and values vary by entity type and downstream project.
+   */
+  attributes?: Record<string, unknown>;
+  /**
    * Related entities map - only populated when fetching single entity details.
    * Key is the grouping field (entity type or predicate), value is array of related entities.
    */
@@ -30,6 +35,7 @@ const entitySchemaBase = z.object({
   id: z.string(),
   labelNormalized: z.string(),
   type: z.string(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
   x: z.number().optional(),
   y: z.number().optional()
 });
@@ -50,10 +56,11 @@ export const entitySchema = entitySchemaBase.extend({
  * Note: x/y coordinates are only set internally when entities are positioned in D3 graph,
  * they are never returned from the external API.
  */
-export function toEntity(response: { id: string; labelNormalized: string; type: string }): Entity {
+export function toEntity(response: { id: string; labelNormalized: string; type: string; attributes?: Record<string, unknown> }): Entity {
   return {
     id: response.id,
     labelNormalized: response.labelNormalized,
-    type: response.type
+    type: response.type,
+    ...(response.attributes ? { attributes: response.attributes } : {})
   };
 }

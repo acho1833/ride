@@ -4,6 +4,16 @@ import { getDb } from '@/lib/mock-db';
 import type { EntityResponse, RelatedEntityResponse } from '@/models/entity-response.model';
 import { EntitySearchParams, EntitySearchMockResponse } from '../../types';
 
+/** Fake attributes injected per entity type to demonstrate the extensible attributes pattern */
+const MOCK_ATTRIBUTES: Record<string, Record<string, unknown>> = {
+  Person: { dateOfBirth: '1985-03-12', nationality: 'US' },
+  Organization: { industry: 'Technology', registeredAddress: 'Mountain View, CA' }
+};
+
+function getMockAttributes(type: string): Record<string, unknown> | undefined {
+  return MOCK_ATTRIBUTES[type];
+}
+
 /**
  * Simulates external API search endpoint.
  * - Filters by name: supports trailing wildcard (*) for prefix match, otherwise contains match
@@ -55,7 +65,12 @@ export async function searchEntities(params: EntitySearchParams): Promise<Entity
   const { totalCount } = db.prepare(countQuery).get(...queryParams) as { totalCount: number };
 
   return {
-    entities: entities.map(e => ({ id: e.id, labelNormalized: e.labelNormalized, type: e.type })),
+    entities: entities.map(e => ({
+      id: e.id,
+      labelNormalized: e.labelNormalized,
+      type: e.type,
+      attributes: getMockAttributes(e.type)
+    })),
     totalCount,
     pageNumber: params.pageNumber,
     pageSize: params.pageSize
@@ -112,6 +127,7 @@ export async function getEntityById(id: string): Promise<EntityResponse | null> 
     id: entity.id,
     labelNormalized: entity.labelNormalized,
     type: entity.type,
+    attributes: getMockAttributes(entity.type),
     relatedEntities: relatedEntities.length > 0 ? relatedEntities : undefined
   };
 }

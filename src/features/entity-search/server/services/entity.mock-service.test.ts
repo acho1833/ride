@@ -185,4 +185,46 @@ describe('entity.mock-service', () => {
       expect(types.length).toBeGreaterThanOrEqual(2);
     });
   });
+
+  describe('attributes', () => {
+    it('searchEntities includes attributes for Person entities', async () => {
+      const result = await searchEntities({
+        name: '',
+        types: ['Person'],
+        sortDirection: 'asc',
+        pageSize: 5,
+        pageNumber: 1
+      });
+
+      for (const entity of result.entities) {
+        expect(entity.attributes).toBeDefined();
+        expect(entity.attributes).toHaveProperty('dateOfBirth');
+        expect(entity.attributes).toHaveProperty('nationality');
+      }
+    });
+
+    it('searchEntities includes attributes for Organization entities', async () => {
+      const result = await searchEntities({
+        name: '',
+        types: ['Organization'],
+        sortDirection: 'asc',
+        pageSize: 5,
+        pageNumber: 1
+      });
+
+      for (const entity of result.entities) {
+        expect(entity.attributes).toBeDefined();
+        expect(entity.attributes).toHaveProperty('industry');
+        expect(entity.attributes).toHaveProperty('registeredAddress');
+      }
+    });
+
+    it('getEntityById includes attributes for the entity', async () => {
+      const result = await getEntityById('google-hq');
+
+      expect(result).not.toBeNull();
+      expect(result!.attributes).toBeDefined();
+      expect(result!.attributes).toHaveProperty('industry');
+    });
+  });
 });

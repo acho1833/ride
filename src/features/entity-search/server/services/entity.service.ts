@@ -1,86 +1,42 @@
 import 'server-only';
 
 import { ORPCError } from '@orpc/server';
-import { toEntity, type Entity, type RelatedEntity } from '@/models/entity.model';
-import type { EntityResponse } from '@/models/entity-response.model';
+import type { Entity } from '@/models/entity.model';
+import { apiClient } from '@/lib/http/overrides/api-client';
 import { EntitySearchParams, EntitySearchResponse } from '../../types';
-import * as mockService from './entity.mock-service';
+import { ENTITY_ENDPOINTS } from '../../const';
 
 /**
- * Search entities - calls mock service and converts response to Entity model.
- * This service layer acts as the boundary between external API and our app.
- * Errors are handled by global error middleware in src/lib/orpc/index.ts
+ * Search entities via the external API.
+ * Returns paginated Entity results including dynamic attributes.
  */
 export async function searchEntities(params: EntitySearchParams): Promise<EntitySearchResponse> {
-  const mockResponse = await mockService.searchEntities(params);
-  return {
-    entities: mockResponse.entities.map(toEntity),
-    totalCount: mockResponse.totalCount,
-    pageNumber: mockResponse.pageNumber,
-    pageSize: mockResponse.pageSize
-  };
+  return apiClient.post<EntitySearchResponse>(ENTITY_ENDPOINTS.SEARCH, params);
 }
 
 /**
- * Get available entity types from external API.
- * Errors are handled by global error middleware in src/lib/orpc/index.ts
+ * Get available entity types from the external API.
  */
 export async function getEntityTypes(): Promise<string[]> {
-  return mockService.getEntityTypes();
+  return apiClient.get<string[]>(ENTITY_ENDPOINTS.TYPES);
 }
 
 /**
- * Transforms flat relatedEntities array from external API to grouped structure.
- * @param response - Entity response from external API with flat relatedEntities array
- * @param groupBy - How to group: 'type' groups by entity type, 'predicate' groups by relationship type
- * @returns Grouped relatedEntities map
- */
-function groupRelatedEntities(response: EntityResponse, groupBy: 'type' | 'predicate'): Record<string, RelatedEntity[]> | undefined {
-  if (!response.relatedEntities || response.relatedEntities.length === 0) {
-    return undefined;
-  }
-
-  const grouped: Record<string, RelatedEntity[]> = {};
-
-  for (const rel of response.relatedEntities) {
-    // Determine grouping key: entity type or relationship type (predicate)
-    const key = groupBy === 'type' ? rel.entity.type : rel.type;
-
-    if (!grouped[key]) {
-      grouped[key] = [];
-    }
-
-    // Transform to RelatedEntity: map rel.type to predicate
-    grouped[key].push({
-      id: rel.entity.id,
-      labelNormalized: rel.entity.labelNormalized,
-      type: rel.entity.type,
-      predicate: rel.type
-    });
-  }
-
-  return grouped;
-}
-
-/**
- * Get entity by ID with related entities.
- * Transforms external API response (flat array) to grouped structure.
+ * Get entity by ID with grouped related entities from the external API.
  * @param id - Entity ID to fetch
  * @param groupBy - How to group related entities: 'type' or 'predicate'
  */
 export async function getEntityById(id: string, groupBy: 'type' | 'predicate'): Promise<Entity> {
-  const response = await mockService.getEntityById(id);
-  if (!response) {
-    throw new ORPCError('NOT_FOUND', {
-      message: 'Entity not found',
-      data: { id }
-    });
+  try {
+    return await apiClient.get<Entity>(ENTITY_ENDPOINTS.GET_BY_ID(id), { params: { groupBy } });
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 404) {
+      throw new ORPCError('NOT_FOUND', {
+        message: 'Entity not found',
+        data: { id }
+      });
+    }
+    throw err;
   }
-
-  return {
-    id: response.id,
-    labelNormalized: response.labelNormalized,
-    type: response.type,
-    relatedEntities: groupRelatedEntities(response, groupBy)
-  };
 }
