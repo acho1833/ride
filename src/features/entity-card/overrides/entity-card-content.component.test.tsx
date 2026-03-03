@@ -13,19 +13,13 @@ describe('EntityCardContentComponent', () => {
   });
 
   it('renders nothing when attributes is an empty object', () => {
-    const { container } = render(
-      <EntityCardContentComponent entity={{ ...baseEntity, attributes: {} }} />
-    );
+    const { container } = render(<EntityCardContentComponent entity={{ ...baseEntity, attributes: {} }} />);
 
     expect(container.firstChild).toBeNull();
   });
 
   it('renders a row for each attribute', () => {
-    render(
-      <EntityCardContentComponent
-        entity={{ ...baseEntity, attributes: { dateOfBirth: '1985-03-12', nationality: 'US' } }}
-      />
-    );
+    render(<EntityCardContentComponent entity={{ ...baseEntity, attributes: { dateOfBirth: '1985-03-12', nationality: 'US' } }} />);
 
     expect(screen.getByText('dateOfBirth:')).toBeInTheDocument();
     expect(screen.getByText('1985-03-12')).toBeInTheDocument();
@@ -34,11 +28,7 @@ describe('EntityCardContentComponent', () => {
   });
 
   it('converts non-string attribute values to strings', () => {
-    render(
-      <EntityCardContentComponent
-        entity={{ ...baseEntity, attributes: { count: 42, active: true } }}
-      />
-    );
+    render(<EntityCardContentComponent entity={{ ...baseEntity, attributes: { count: 42, active: true } }} />);
 
     expect(screen.getByText('42')).toBeInTheDocument();
     expect(screen.getByText('true')).toBeInTheDocument();
