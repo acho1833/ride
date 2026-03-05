@@ -1,4 +1,4 @@
-id,name,year,citationcount,affiliation
+id,name,year,relationshipcount,affiliation
 p0227,Ben Shneiderman,1971,11,"State University of New York at Farmingdale, Farmingdale, New York"
 p0227,Ben Shneiderman,1973,102,"State University of New York at Stony Brook, Stony Brook, L. I., New York"
 p0227,Ben Shneiderman,1992,2227,Department of Computer Science|Human-Computer Interaction Laboratory|University of Maryland

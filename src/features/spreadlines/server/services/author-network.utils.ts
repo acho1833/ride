@@ -8,7 +8,7 @@ export interface EntityRow {
   id: string;
   year: string;
   name: string;
-  citationcount: number;
+  relationshipcount: number;
   affiliation: string;
 }
 

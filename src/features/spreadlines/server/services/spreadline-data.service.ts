@@ -9,7 +9,7 @@ interface CitationRow {
   paperID: string;
   year: number;
   entityId: string;
-  citationcount: number;
+  relationshipcount: number;
 }
 
 // ── Public response types ───────────────────────────────────────────
@@ -141,7 +141,7 @@ export async function getSpreadlineRawData(params: {
       const eid = row.entityId;
       const time = String(row.year);
       if (!citationsByEntity[eid]) citationsByEntity[eid] = {};
-      citationsByEntity[eid][time] = (citationsByEntity[eid][time] || 0) + row.citationcount;
+      citationsByEntity[eid][time] = (citationsByEntity[eid][time] || 0) + row.relationshipcount;
     }
   }
 

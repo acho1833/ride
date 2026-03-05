@@ -13,7 +13,7 @@ describe('csv.utils', () => {
         id: string;
         name: string;
         year: number;
-        citationcount: number;
+        relationshipcount: number;
         affiliation: string;
       }>(filePath);
 
@@ -24,11 +24,11 @@ describe('csv.utils', () => {
       expect(first).toHaveProperty('id');
       expect(first).toHaveProperty('name');
       expect(first).toHaveProperty('year');
-      expect(first).toHaveProperty('citationcount');
+      expect(first).toHaveProperty('relationshipcount');
       expect(first).toHaveProperty('affiliation');
 
       // dynamicTyping should parse numbers
-      expect(typeof first.citationcount).toBe('number');
+      expect(typeof first.relationshipcount).toBe('number');
     });
 
     it('throws on non-existent file', async () => {

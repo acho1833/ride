@@ -98,10 +98,10 @@ describe('constructAuthorNetwork', () => {
   ];
 
   const allEntities: EntityRow[] = [
-    { id: 'ego', year: '2020', name: 'Ego', citationcount: 10, affiliation: 'University of Washington' },
-    { id: 'h1', year: '2020', name: 'Hop1', citationcount: 5, affiliation: 'University of Washington' },
-    { id: 'h2', year: '2020', name: 'Hop2', citationcount: 3, affiliation: 'MIT' },
-    { id: 'h3', year: '2020', name: 'Hop3', citationcount: 1, affiliation: 'Stanford' }
+    { id: 'ego', year: '2020', name: 'Ego', relationshipcount: 10, affiliation: 'University of Washington' },
+    { id: 'h1', year: '2020', name: 'Hop1', relationshipcount: 5, affiliation: 'University of Washington' },
+    { id: 'h2', year: '2020', name: 'Hop2', relationshipcount: 3, affiliation: 'MIT' },
+    { id: 'h3', year: '2020', name: 'Hop3', relationshipcount: 1, affiliation: 'Stanford' }
   ];
 
   it('with hopLimit=2, does NOT include hop-3 entity in topology or groups', () => {

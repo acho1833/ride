@@ -9,7 +9,7 @@ export interface RelationRow {
   targetId: string;
   id: string;
   type: string;
-  citationcount?: number;
+  relationshipcount?: number;
 }
 
 /** In-memory cache: file path -> parsed rows */

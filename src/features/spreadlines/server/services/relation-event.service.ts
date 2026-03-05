@@ -29,7 +29,7 @@ export async function getRelationEvents(sourceId: string, targetId: string): Pro
     sourceId: r.sourceId,
     targetId: r.targetId,
     type: r.type,
-    citationCount: r.citationcount ?? 0
+    citationCount: r.relationshipcount ?? 0
   }));
 
   events.sort((a, b) => b.year.localeCompare(a.year));

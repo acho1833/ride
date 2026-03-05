@@ -1,4 +1,4 @@
-entityId,year,citationcount,affiliation,paperID
+entityId,year,relationshipcount,affiliation,paperID
 p0227,1971,11,"State University of New York at Farmingdale, Farmingdale, New York",0
 p0227,1973,102,"Stony Brook University, Stony Brook, NY",2
 p0227,1992,2227,Department of Computer Science|Human-Computer Interaction Laboratory|University of Maryland,53e9b11db7602d9703b9ef40
