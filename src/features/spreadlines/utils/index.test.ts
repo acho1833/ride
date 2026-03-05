@@ -9,10 +9,10 @@ import {
 
 const makeRawData = () => ({
   egoId: 'ego',
-  egoName: 'Ego Author',
+  egoName: 'Ego Entity',
   entities: {
-    a1: { name: 'Author A', category: 'internal' },
-    a2: { name: 'Author B', category: 'external' }
+    a1: { name: 'Entity A', category: 'internal' },
+    a2: { name: 'Entity B', category: 'external' }
   },
   topology: [
     { sourceId: 'ego', targetId: 'a1', time: '2020', weight: 1 },
@@ -80,10 +80,10 @@ describe('collaborationCount', () => {
 
 const makeRawDataWithCitations = () => ({
   egoId: 'ego',
-  egoName: 'Ego Author',
+  egoName: 'Ego Entity',
   entities: {
-    a1: { name: 'Author A', category: 'internal', relationships: { '2020': 100, '2021': 200 } },
-    a2: { name: 'Author B', category: 'external', relationships: { '2020': 50 } }
+    a1: { name: 'Entity A', category: 'internal', relationships: { '2020': 100, '2021': 200 } },
+    a2: { name: 'Entity B', category: 'external', relationships: { '2020': 50 } }
   },
   topology: [
     { sourceId: 'ego', targetId: 'a1', time: '2020', weight: 1 },
@@ -101,21 +101,21 @@ const makeRawDataWithCitations = () => ({
 describe('transformSpreadlineToTimeline', () => {
   it('returns ego entity first regardless of activity count', () => {
     const result = transformSpreadlineToTimeline(makeRawDataWithCitations());
-    expect(result[0].name).toBe('Ego Author');
+    expect(result[0].name).toBe('Ego Entity');
     expect(result[0].isEgo).toBe(true);
   });
 
   it('sorts non-ego entities by total activity count descending', () => {
     const result = transformSpreadlineToTimeline(makeRawDataWithCitations());
     const nonEgo = result.filter(e => !e.isEgo);
-    expect(nonEgo[0].name).toBe('Author A');
-    expect(nonEgo[1].name).toBe('Author B');
+    expect(nonEgo[0].name).toBe('Entity A');
+    expect(nonEgo[1].name).toBe('Entity B');
     expect(nonEgo[0].totalActivity).toBeGreaterThanOrEqual(nonEgo[1].totalActivity);
   });
 
   it('computes timeBlocks with relationship counts per entity', () => {
     const result = transformSpreadlineToTimeline(makeRawDataWithCitations());
-    const a1 = result.find(e => e.name === 'Author A')!;
+    const a1 = result.find(e => e.name === 'Entity A')!;
     expect(a1.timeBlocks).toEqual(
       expect.arrayContaining([
         { time: '2020', relationshipCount: 100 },
@@ -126,9 +126,9 @@ describe('transformSpreadlineToTimeline', () => {
 
   it('computes lifespan as number of distinct active time blocks', () => {
     const result = transformSpreadlineToTimeline(makeRawDataWithCitations());
-    const a1 = result.find(e => e.name === 'Author A')!;
+    const a1 = result.find(e => e.name === 'Entity A')!;
     expect(a1.lifespan).toBe(2);
-    const a2 = result.find(e => e.name === 'Author B')!;
+    const a2 = result.find(e => e.name === 'Entity B')!;
     expect(a2.lifespan).toBe(2);
   });
 
