@@ -56,9 +56,11 @@ function haveDifferentIdentity(session: Session | null, oneEntity: string, other
   let result = 'same';
   if (identity !== otherIdentity) result = 'different';
 
-  if ([identity, otherIdentity].includes(2)) {
+  // Ego is always at the center index of the hops array
+  const egoIdx = Math.floor(session.hops.length / 2);
+  if ([identity, otherIdentity].includes(egoIdx)) {
     if (Math.abs(identity - otherIdentity) === 1) result = 'ego 1-level';
-    if (Math.abs(identity - otherIdentity) === 2) result = 'ego 2-level';
+    if (Math.abs(identity - otherIdentity) >= 2) result = 'ego 2-level';
   }
 
   return result;

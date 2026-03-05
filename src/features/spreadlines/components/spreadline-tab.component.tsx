@@ -21,6 +21,7 @@ import {
   SPREADLINE_DEFAULT_YEAR_RANGE,
   SPREADLINE_DEFAULT_GRANULARITY,
   SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION,
+  SPREADLINE_DEFAULT_HOP_LIMIT,
   SPREADLINE_PAGE_SIZE,
   type SpreadlineGranularity,
   type SpreadlineBottomTab
@@ -39,6 +40,7 @@ interface SpreadlineTabCache {
   pageIndex: number;
   blocksFilter: number;
   activeBottomTab: SpreadlineBottomTab;
+  hopLimit: number;
 }
 
 /** Module-level cache: preserves tab state across unmount/remount (e.g. split-and-move) */
@@ -69,6 +71,7 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
   const [blocksFilter, setBlocksFilter] = useState(cached?.blocksFilter ?? 1);
   const [filteredEntityNames, setFilteredEntityNames] = useState<string[] | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<SpreadlineBottomTab>(cached?.activeBottomTab ?? 'spreadline');
+  const [hopLimit, setHopLimit] = useState(cached?.hopLimit ?? SPREADLINE_DEFAULT_HOP_LIMIT);
 
   // Sync state to cache so it survives unmount/remount
   useEffect(() => {
@@ -80,9 +83,21 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
       splitByAffiliation,
       pageIndex,
       blocksFilter,
-      activeBottomTab
+      activeBottomTab,
+      hopLimit
     });
-  }, [fileId, selectedRange, pinnedEntityNames, relationTypes, granularity, splitByAffiliation, pageIndex, blocksFilter, activeBottomTab]);
+  }, [
+    fileId,
+    selectedRange,
+    pinnedEntityNames,
+    relationTypes,
+    granularity,
+    splitByAffiliation,
+    pageIndex,
+    blocksFilter,
+    activeBottomTab,
+    hopLimit
+  ]);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
     egoId: SPREADLINE_DEFAULT_EGO_ID,
@@ -91,7 +106,8 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
     granularity,
     splitByAffiliation,
     pageIndex,
-    pageSize: SPREADLINE_PAGE_SIZE
+    pageSize: SPREADLINE_PAGE_SIZE,
+    hopLimit
   });
 
   const timeBlocks = rawData?.timeBlocks ?? [];
@@ -196,6 +212,8 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
                   blocksFilter={blocksFilter}
                   onBlocksFilterChange={setBlocksFilter}
                   onFilteredEntityNamesChange={setFilteredEntityNames}
+                  hopLimit={hopLimit}
+                  onHopLimitChange={setHopLimit}
                 />
               ) : (
                 <NetworkTimelineChartComponent

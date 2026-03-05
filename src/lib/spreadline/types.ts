@@ -451,8 +451,8 @@ export interface BlockResult {
   moveX: number;
   topPosY: number;
   hopSections: {
-    top: HopSectionInfo | null;
-    bottom: HopSectionInfo | null;
+    tops: HopSectionInfo[];
+    bottoms: HopSectionInfo[];
   };
 }
 

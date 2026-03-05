@@ -59,6 +59,21 @@ export const SPREADLINE_DEFAULT_GRANULARITY: SpreadlineGranularity = 'yearly';
 /** Default split by affiliation (internal/external distinction) */
 export const SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION = true;
 
+/** Default hop limit for ego-network BFS */
+export const SPREADLINE_DEFAULT_HOP_LIMIT = 2;
+
+/** Maximum configurable hop limit */
+export const SPREADLINE_MAX_HOP_LIMIT = 5;
+
+/** Hop limit dropdown options */
+export const SPREADLINE_HOP_LIMIT_OPTIONS = [
+  { label: '1 hop', value: 1 },
+  { label: '2 hops', value: 2 },
+  { label: '3 hops', value: 3 },
+  { label: '4 hops', value: 4 },
+  { label: '5 hops', value: 5 }
+] as const;
+
 /** Number of blocks per page for pagination */
 export const SPREADLINE_PAGE_SIZE = 20;
 

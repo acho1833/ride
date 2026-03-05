@@ -227,8 +227,11 @@ export class SpreadLine {
       return rowTime >= startTime && rowTime <= endTime;
     });
 
-    // Construct egocentric network
-    const network = constructEgocentricNetwork(ego, topoWithinTime);
+    // Construct egocentric network.
+    // When groups are provided, the caller already filtered to the correct hop range,
+    // so skip the library's internal 2-hop BFS which would discard hop-3+ entities.
+    const hasGroups = Object.keys(groups).length > 0;
+    const network = hasGroups ? topoWithinTime : constructEgocentricNetwork(ego, topoWithinTime);
     this._constructEntities(network);
 
     // Build sessions
@@ -314,13 +317,16 @@ export class SpreadLine {
 
       if (groups.length !== 0) {
         order = groups;
-        constraints = [
-          groups[0],
-          groups[1].length !== 0 ? { 1: groups[1] } : {},
-          groups[2],
-          groups[3].length !== 0 ? { 1: groups[3] } : {},
-          groups[4]
-        ];
+        // Build constraints dynamically for N groups.
+        // Hop-1 groups (directly adjacent to ego) use weight-keyed objects;
+        // all other groups (ego + outer hops) are plain arrays.
+        const egoIdx = Math.floor(groups.length / 2);
+        constraints = groups.map((g, i) => {
+          if (i === egoIdx - 1 || i === egoIdx + 1) {
+            return g.length !== 0 ? ({ 1: g } as Record<number, string[]>) : g;
+          }
+          return g;
+        });
       } else {
         [constraints, order] = findWithinConstraints(entries, this.ego, this._line_color);
       }

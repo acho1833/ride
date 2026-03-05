@@ -6,7 +6,7 @@
  * blocks, labels, and inline labels.
  */
 
-import { Path, Session, SpreadLineResult, StorylineResult, BlockResult, PointResult } from './types';
+import { Path, Session, SpreadLineResult, StorylineResult, BlockResult, PointResult, HopSectionInfo } from './types';
 import { full2D, nanMin, nanMax } from './helpers';
 import type { SpreadLine } from './spreadline';
 import type { ContextResult } from './contextualize';
@@ -114,133 +114,153 @@ function computeBlock(points: PointResult[], hops: number[][], blockWidth: numbe
 
   const offset = 0.005;
 
-  // Get points by hop level
-  const topHops = points.filter(p => hops[0].includes(p.id));
-  const main = points.filter(p => hops[1].includes(p.id) || hops[2].includes(p.id) || hops[3].includes(p.id));
-  const bottomHops = points.filter(p => hops[4].includes(p.id));
+  // Get points by hop level — dynamic for N-hop layouts
+  const egoIdx = Math.floor(hops.length / 2);
+  const mainIds = new Set([...(hops[egoIdx - 1] || []), ...(hops[egoIdx] || []), ...(hops[egoIdx + 1] || [])]);
+  const main = points.filter(p => mainIds.has(p.id));
 
   const mainExtents = getExtents(main, p => p.posY);
   if (mainExtents.length === 0) return [result, width];
 
   const [topMain, bottomMain] = mainExtents;
 
-  // Initialize separate section paths
-  result.topHop = null;
-  result.bottomHop = null;
+  // Compute extents for each hop level above main (outermost first)
+  interface SectionData {
+    topY: number;
+    bottomY: number;
+  }
+  const topSections: SectionData[] = [];
+  for (let i = 0; i < egoIdx - 1; i++) {
+    const ids = new Set(hops[i]);
+    if (ids.size === 0) continue;
+    const sectionPoints = points.filter(p => ids.has(p.id));
+    if (sectionPoints.length === 0) continue;
+    const ext = getExtents(sectionPoints, p => p.posY);
+    if (ext.length !== 2) continue;
+    topSections.push({ topY: ext[0].posY, bottomY: ext[1].posY });
+  }
 
-  // Build paths for top 2-hop section (if exists)
-  const topHopExtents = hops[0].length > 0 ? getExtents(topHops, p => p.posY) : [];
+  // Compute extents for each hop level below main (innermost first)
+  const bottomSections: SectionData[] = [];
+  for (let i = egoIdx + 2; i < hops.length; i++) {
+    const ids = new Set(hops[i]);
+    if (ids.size === 0) continue;
+    const sectionPoints = points.filter(p => ids.has(p.id));
+    if (sectionPoints.length === 0) continue;
+    const ext = getExtents(sectionPoints, p => p.posY);
+    if (ext.length !== 2) continue;
+    bottomSections.push({ topY: ext[0].posY, bottomY: ext[1].posY });
+  }
 
-  if (hops[0].length > 0 && topHopExtents.length === 2) {
-    const [topTopHop, bottomTopHop] = topHopExtents;
+  // Build top hop section paths (outermost to innermost, chained with pinch transitions)
+  result.topHops = [];
+  for (let i = 0; i < topSections.length; i++) {
+    const sec = topSections[i];
+    const isOutermost = i === 0;
+    const nextTopY = i < topSections.length - 1 ? topSections[i + 1].topY : topMain.posY;
 
-    // Top arc (semicircle at top of 2-hop section)
     const topArcLeft = new Path();
     const topArcRight = new Path();
-    topArcLeft.arc(posX, topTopHop.posY, radius, Math.PI * (1.5 + offset), Math.PI, 1);
-    topArcRight.arc(posX, topTopHop.posY, radius, Math.PI * (1.5 - offset), 0);
+    if (isOutermost) {
+      topArcLeft.arc(posX, sec.topY, radius, Math.PI * (1.5 + offset), Math.PI, 1);
+      topArcRight.arc(posX, sec.topY, radius, Math.PI * (1.5 - offset), 0);
+    }
 
-    // Line (vertical portion of 2-hop section)
-    const lineLeft = `M${posX - radius},${topTopHop.posY} L${posX - radius},${bottomTopHop.posY}`;
-    const lineRight = `M${posX + radius},${topTopHop.posY} L${posX + radius},${bottomTopHop.posY}`;
+    const lineLeft = `M${posX - radius},${sec.topY} L${posX - radius},${sec.bottomY}`;
+    const lineRight = `M${posX + radius},${sec.topY} L${posX + radius},${sec.bottomY}`;
 
-    // Bottom arc (transition from 2-hop to main)
     const bottomArcLeft = new Path();
     const bottomArcRight = new Path();
     bottomArcLeft
-      .arc(posX, bottomTopHop.posY, radius, Math.PI, Math.PI * (1 - portion + offset), 1)
-      .arc(posX, topMain.posY, radius, Math.PI * (1 + portion), Math.PI, 1);
-    bottomArcRight
-      .arc(posX, bottomTopHop.posY, radius, 0, Math.PI * (portion + offset))
-      .arc(posX, topMain.posY, radius, -Math.PI * portion, 0);
+      .arc(posX, sec.bottomY, radius, Math.PI, Math.PI * (1 - portion + offset), 1)
+      .arc(posX, nextTopY, radius, Math.PI * (1 + portion), Math.PI, 1);
+    bottomArcRight.arc(posX, sec.bottomY, radius, 0, Math.PI * (portion + offset)).arc(posX, nextTopY, radius, -Math.PI * portion, 0);
 
-    result.topHop = {
+    result.topHops.push({
       topArcLeft: topArcLeft.toString(),
       topArcRight: topArcRight.toString(),
       lineLeft,
       lineRight,
       bottomArcLeft: bottomArcLeft.toString(),
       bottomArcRight: bottomArcRight.toString(),
-      // Store Y coordinates for animation
-      topY: topTopHop.posY,
-      bottomY: bottomTopHop.posY,
-      mainY: topMain.posY,
-      lineHeight: bottomTopHop.posY - topTopHop.posY
-    };
+      topY: sec.topY,
+      bottomY: sec.bottomY,
+      mainY: nextTopY,
+      lineHeight: sec.bottomY - sec.topY
+    });
   }
 
-  // Build paths for bottom 2-hop section (if exists)
-  const bottomHopExtents = hops[4].length > 0 ? getExtents(bottomHops, p => p.posY) : [];
+  // Build bottom hop section paths (innermost to outermost, chained with pinch transitions)
+  result.bottomHops = [];
+  for (let i = 0; i < bottomSections.length; i++) {
+    const sec = bottomSections[i];
+    const isOutermost = i === bottomSections.length - 1;
+    const prevBottomY = i === 0 ? bottomMain.posY : bottomSections[i - 1].bottomY;
 
-  if (hops[4].length > 0 && bottomHopExtents.length === 2) {
-    const [topBottomHop, bottomBottomHop] = bottomHopExtents;
-
-    // Top arc (transition from main to 2-hop)
     const topArcLeft = new Path();
     const topArcRight = new Path();
-    topArcLeft
-      .arc(posX, bottomMain.posY, radius, Math.PI, Math.PI * (1 - portion + offset), 1)
-      .arc(posX, topBottomHop.posY, radius, Math.PI * (1 + portion), Math.PI, 1);
-    topArcRight
-      .arc(posX, bottomMain.posY, radius, 0, Math.PI * (portion + offset))
-      .arc(posX, topBottomHop.posY, radius, -Math.PI * portion, 0);
+    if (i === 0) {
+      // Innermost: pinch from main
+      topArcLeft
+        .arc(posX, prevBottomY, radius, Math.PI, Math.PI * (1 - portion + offset), 1)
+        .arc(posX, sec.topY, radius, Math.PI * (1 + portion), Math.PI, 1);
+      topArcRight.arc(posX, prevBottomY, radius, 0, Math.PI * (portion + offset)).arc(posX, sec.topY, radius, -Math.PI * portion, 0);
+    }
+    // Non-innermost: topArc empty (previous section's bottomArc handles the connection)
 
-    // Line (vertical portion of 2-hop section)
-    const lineLeft = `M${posX - radius},${topBottomHop.posY} L${posX - radius},${bottomBottomHop.posY}`;
-    const lineRight = `M${posX + radius},${topBottomHop.posY} L${posX + radius},${bottomBottomHop.posY}`;
+    const lineLeft = `M${posX - radius},${sec.topY} L${posX - radius},${sec.bottomY}`;
+    const lineRight = `M${posX + radius},${sec.topY} L${posX + radius},${sec.bottomY}`;
 
-    // Bottom arc (semicircle at bottom of 2-hop section)
     const bottomArcLeft = new Path();
     const bottomArcRight = new Path();
-    bottomArcLeft.arc(posX, bottomBottomHop.posY, radius, Math.PI, Math.PI * (0.5 - offset), 1);
-    bottomArcRight.arc(posX, bottomBottomHop.posY, radius, 0, Math.PI * (0.5 + offset));
+    if (isOutermost) {
+      bottomArcLeft.arc(posX, sec.bottomY, radius, Math.PI, Math.PI * (0.5 - offset), 1);
+      bottomArcRight.arc(posX, sec.bottomY, radius, 0, Math.PI * (0.5 + offset));
+    } else {
+      const nextTopY = bottomSections[i + 1].topY;
+      bottomArcLeft
+        .arc(posX, sec.bottomY, radius, Math.PI, Math.PI * (1 - portion + offset), 1)
+        .arc(posX, nextTopY, radius, Math.PI * (1 + portion), Math.PI, 1);
+      bottomArcRight.arc(posX, sec.bottomY, radius, 0, Math.PI * (portion + offset)).arc(posX, nextTopY, radius, -Math.PI * portion, 0);
+    }
 
-    result.bottomHop = {
+    result.bottomHops.push({
       topArcLeft: topArcLeft.toString(),
       topArcRight: topArcRight.toString(),
       lineLeft,
       lineRight,
       bottomArcLeft: bottomArcLeft.toString(),
       bottomArcRight: bottomArcRight.toString(),
-      // Store Y coordinates for animation
-      topY: topBottomHop.posY,
-      bottomY: bottomBottomHop.posY,
-      mainY: bottomMain.posY,
-      lineHeight: bottomBottomHop.posY - topBottomHop.posY
-    };
+      topY: sec.topY,
+      bottomY: sec.bottomY,
+      mainY: prevBottomY,
+      lineHeight: sec.bottomY - sec.topY
+    });
   }
 
   // Build main section arcs (always present)
   const mainLeftArc = new Path();
   const mainRightArc = new Path();
 
-  // Top of main section
-  if (hops[0].length === 0 || topHopExtents.length !== 2) {
-    // No top hops - draw semicircle at top
+  if (topSections.length === 0) {
     mainLeftArc.arc(posX, topMain.posY, radius, Math.PI * (1.5 + offset), Math.PI, 1);
     mainRightArc.arc(posX, topMain.posY, radius, Math.PI * (1.5 - offset), 0);
   }
-  // If top hops exist, the main section starts where topHop.bottomArc ends
 
-  // Vertical line through main section (from topMain to bottomMain)
-  if (hops[0].length === 0 || topHopExtents.length !== 2) {
+  if (topSections.length === 0) {
     mainLeftArc.lineTo(posX - radius, bottomMain.posY);
     mainRightArc.lineTo(posX + radius, bottomMain.posY);
   } else {
-    // Start from topMain (where topHop ends)
     mainLeftArc.moveTo(posX - radius, topMain.posY);
     mainRightArc.moveTo(posX + radius, topMain.posY);
     mainLeftArc.lineTo(posX - radius, bottomMain.posY);
     mainRightArc.lineTo(posX + radius, bottomMain.posY);
   }
 
-  // Bottom of main section
-  if (hops[4].length === 0 || bottomHopExtents.length !== 2) {
-    // No bottom hops - draw semicircle at bottom
+  if (bottomSections.length === 0) {
     mainLeftArc.arc(posX, bottomMain.posY, radius, Math.PI, Math.PI * (0.5 - offset), 1);
     mainRightArc.arc(posX, bottomMain.posY, radius, 0, Math.PI * (0.5 + offset));
   }
-  // If bottom hops exist, the main section ends where bottomHop.topArc starts
 
   result.left = mainLeftArc.toString();
   result.right = mainRightArc.toString();
@@ -639,37 +659,45 @@ class Renderer {
         return [sourcePoint?.id || 0, targetPoint?.id || 0];
       });
 
-      // Calculate hop sections info for collapse/expand UI
-      const topHopIds = hops[0] || [];
-      const bottomHopIds = hops[4] || [];
+      // Calculate hop sections info for collapse/expand UI (one per hop level)
+      const hopsEgoIdx = Math.floor(hops.length / 2);
 
-      const topHopPoints = points.filter(p => topHopIds.includes(p.id));
-      const bottomHopPoints = points.filter(p => bottomHopIds.includes(p.id));
-
-      const hopSections = {
-        top:
-          topHopPoints.length > 0
-            ? {
-                nodeCount: topHopPoints.length,
-                centerY: (Math.min(...topHopPoints.map(p => p.posY)) + Math.max(...topHopPoints.map(p => p.posY))) / 2,
-                nodeIds: topHopPoints.map(p => p.id),
-                names: topHopPoints.map(p => p.name),
-                minY: Math.min(...topHopPoints.map(p => p.posY)),
-                maxY: Math.max(...topHopPoints.map(p => p.posY))
-              }
-            : null,
-        bottom:
-          bottomHopPoints.length > 0
-            ? {
-                nodeCount: bottomHopPoints.length,
-                centerY: (Math.min(...bottomHopPoints.map(p => p.posY)) + Math.max(...bottomHopPoints.map(p => p.posY))) / 2,
-                nodeIds: bottomHopPoints.map(p => p.id),
-                names: bottomHopPoints.map(p => p.name),
-                minY: Math.min(...bottomHopPoints.map(p => p.posY)),
-                maxY: Math.max(...bottomHopPoints.map(p => p.posY))
-              }
-            : null
+      const hopSections: { tops: HopSectionInfo[]; bottoms: HopSectionInfo[] } = {
+        tops: [],
+        bottoms: []
       };
+
+      // Top hop sections (one per hop level above main)
+      for (let hi = 0; hi < hopsEgoIdx - 1; hi++) {
+        const ids = new Set(hops[hi]);
+        const hopPts = points.filter(p => ids.has(p.id));
+        if (hopPts.length > 0) {
+          hopSections.tops.push({
+            nodeCount: hopPts.length,
+            centerY: (Math.min(...hopPts.map(p => p.posY)) + Math.max(...hopPts.map(p => p.posY))) / 2,
+            nodeIds: hopPts.map(p => p.id),
+            names: hopPts.map(p => p.name),
+            minY: Math.min(...hopPts.map(p => p.posY)),
+            maxY: Math.max(...hopPts.map(p => p.posY))
+          });
+        }
+      }
+
+      // Bottom hop sections (one per hop level below main)
+      for (let hi = hopsEgoIdx + 2; hi < hops.length; hi++) {
+        const ids = new Set(hops[hi]);
+        const hopPts = points.filter(p => ids.has(p.id));
+        if (hopPts.length > 0) {
+          hopSections.bottoms.push({
+            nodeCount: hopPts.length,
+            centerY: (Math.min(...hopPts.map(p => p.posY)) + Math.max(...hopPts.map(p => p.posY))) / 2,
+            nodeIds: hopPts.map(p => p.id),
+            names: hopPts.map(p => p.name),
+            minY: Math.min(...hopPts.map(p => p.posY)),
+            maxY: Math.max(...hopPts.map(p => p.posY))
+          });
+        }
+      }
 
       blockRender.push({
         id: blockRender.length,

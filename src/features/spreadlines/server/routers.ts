@@ -49,7 +49,8 @@ export const spreadlineRouter = appProcedure.router({
         granularity: z.enum(['yearly', 'monthly']).default('yearly'),
         splitByAffiliation: z.boolean().default(true),
         pageIndex: z.number().default(0),
-        pageSize: z.number().default(20)
+        pageSize: z.number().default(20),
+        hopLimit: z.number().min(1).max(5).default(2)
       })
     )
     .output(spreadlineRawDataResponseSchema)

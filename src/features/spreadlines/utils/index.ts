@@ -14,8 +14,8 @@ export interface SpreadlineGraphNode extends SimulationNodeDatum {
   collaborationCount: number;
   /** Sum of citation weights across all links involving this node */
   totalCitations: number;
-  /** Hop distance from ego: 0 = ego, 1 = direct, 2 = indirect */
-  hopDistance?: 0 | 1 | 2;
+  /** Hop distance from ego: 0 = ego, 1 = direct, 2+ = indirect */
+  hopDistance?: number;
   /** Entity category: internal (same affiliation) or external */
   category?: 'internal' | 'external' | 'ego';
   x?: number;
@@ -134,11 +134,33 @@ export function transformSpreadlineToGraph(rawData: {
 }
 
 /**
+ * Parse dynamic groups array into a hop map.
+ *
+ * Groups have `2*N+1` slots: [ext-N..ext-1, ego, int-1..int-N].
+ * Ego index = N = Math.floor(groups.length / 2).
+ */
+function parseGroupsToHopMap(groups: string[][], egoId: string): Map<string, { hop: number; category: 'internal' | 'external' | 'ego' }> {
+  const hopMap = new Map<string, { hop: number; category: 'internal' | 'external' | 'ego' }>();
+  hopMap.set(egoId, { hop: 0, category: 'ego' });
+  const egoIdx = Math.floor(groups.length / 2);
+
+  for (let i = 0; i < groups.length; i++) {
+    if (i === egoIdx) continue;
+    const hopDist = Math.abs(i - egoIdx);
+    const category: 'internal' | 'external' = i > egoIdx ? 'internal' : 'external';
+    for (const id of groups[i] ?? []) {
+      hopMap.set(id, { hop: hopDist, category });
+    }
+  }
+
+  return hopMap;
+}
+
+/**
  * Transform spreadline raw data into graph nodes and links for a SINGLE time block.
  *
- * Uses `groups[time]` to determine hop distance per entity:
- *   Index 0 = external 2-hop, Index 1 = external 1-hop,
- *   Index 2 = ego, Index 3 = internal 1-hop, Index 4 = internal 2-hop
+ * Uses `groups[time]` to determine hop distance per entity.
+ * Groups are dynamic-length: `2*N+1` slots where N is the hop limit.
  */
 export function transformSpreadlineToGraphByTime(
   rawData: {
@@ -161,14 +183,9 @@ export function transformSpreadlineToGraphByTime(
     activeIds.add(entry.targetId);
   }
 
-  // 3. Determine hop distance from groups[time]
-  const groups = rawData.groups[time] ?? [[], [], [], [], []];
-  const hopMap = new Map<string, { hop: 0 | 1 | 2; category: 'internal' | 'external' | 'ego' }>();
-  hopMap.set(rawData.egoId, { hop: 0, category: 'ego' });
-  for (const id of groups[1] ?? []) hopMap.set(id, { hop: 1, category: 'external' });
-  for (const id of groups[3] ?? []) hopMap.set(id, { hop: 1, category: 'internal' });
-  for (const id of groups[0] ?? []) hopMap.set(id, { hop: 2, category: 'external' });
-  for (const id of groups[4] ?? []) hopMap.set(id, { hop: 2, category: 'internal' });
+  // 3. Determine hop distance from groups[time] (dynamic group size)
+  const groups = rawData.groups[time] ?? [];
+  const hopMap = parseGroupsToHopMap(groups, rawData.egoId);
 
   // Build collaboration count map (O(n) instead of O(n*m))
   const collabCounts = new Map<string, number>();
@@ -192,11 +209,12 @@ export function transformSpreadlineToGraphByTime(
   });
 
   // Entity nodes (only active ones)
+  const maxHop = Math.floor(groups.length / 2) || 2;
   for (const id of activeIds) {
     if (id === rawData.egoId) continue;
     const entity = rawData.entities[id];
     if (!entity) continue;
-    const info = hopMap.get(id) ?? { hop: 2, category: 'external' as const };
+    const info = hopMap.get(id) ?? { hop: maxHop, category: 'external' as const };
     nodes.push({
       id,
       name: entity.name,
@@ -250,22 +268,18 @@ export function transformSpreadlineToGraphByTimes(
     activeIds.add(entry.targetId);
   }
 
-  // 3. Build hop map — use closest (minimum) hop across all times
-  const hopMap = new Map<string, { hop: 0 | 1 | 2; category: 'internal' | 'external' | 'ego' }>();
+  // 3. Build hop map — use closest (minimum) hop across all times (dynamic group size)
+  const hopMap = new Map<string, { hop: number; category: 'internal' | 'external' | 'ego' }>();
   hopMap.set(rawData.egoId, { hop: 0, category: 'ego' });
 
   for (const time of times) {
-    const groups = rawData.groups[time] ?? [[], [], [], [], []];
-    const timeHops: [string, 0 | 1 | 2, 'internal' | 'external'][] = [
-      ...(groups[1] ?? []).map(id => [id, 1 as const, 'external' as const] as [string, 1, 'external']),
-      ...(groups[3] ?? []).map(id => [id, 1 as const, 'internal' as const] as [string, 1, 'internal']),
-      ...(groups[0] ?? []).map(id => [id, 2 as const, 'external' as const] as [string, 2, 'external']),
-      ...(groups[4] ?? []).map(id => [id, 2 as const, 'internal' as const] as [string, 2, 'internal'])
-    ];
-    for (const [id, hop, category] of timeHops) {
+    const groups = rawData.groups[time] ?? [];
+    const timeHopMap = parseGroupsToHopMap(groups, rawData.egoId);
+    for (const [id, info] of timeHopMap) {
+      if (id === rawData.egoId) continue;
       const existing = hopMap.get(id);
-      if (!existing || hop < existing.hop) {
-        hopMap.set(id, { hop, category });
+      if (!existing || info.hop < existing.hop) {
+        hopMap.set(id, info);
       }
     }
   }
@@ -293,7 +307,10 @@ export function transformSpreadlineToGraphByTimes(
     if (id === rawData.egoId) continue;
     const entity = rawData.entities[id];
     if (!entity) continue;
-    const info = hopMap.get(id) ?? { hop: 2, category: 'external' as const };
+    // Determine max hop from any available group for fallback
+    const sampleGroups = Object.values(rawData.groups)[0] ?? [];
+    const maxHop = Math.floor(sampleGroups.length / 2) || 2;
+    const info = hopMap.get(id) ?? { hop: maxHop, category: 'external' as const };
     nodes.push({
       id,
       name: entity.name,

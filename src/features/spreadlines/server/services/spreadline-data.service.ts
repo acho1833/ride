@@ -58,8 +58,18 @@ export async function getSpreadlineRawData(params: {
   splitByAffiliation?: boolean;
   pageIndex?: number;
   pageSize?: number;
+  hopLimit?: number;
 }): Promise<SpreadlineRawDataResponse> {
-  const { egoId, relationTypes, yearRange, granularity = 'yearly', splitByAffiliation = true, pageIndex = 0, pageSize = 20 } = params;
+  const {
+    egoId,
+    relationTypes,
+    yearRange,
+    granularity = 'yearly',
+    splitByAffiliation = true,
+    pageIndex = 0,
+    pageSize = 20,
+    hopLimit = 2
+  } = params;
   const dataDir = DATASET_DIRS[granularity] ?? DATASET_DIRS.yearly;
   const basePath = path.join(process.cwd(), dataDir);
 
@@ -100,7 +110,7 @@ export async function getSpreadlineRawData(params: {
     });
   }
 
-  const { topology, categoryMap, groups, network } = constructAuthorNetwork(egoId, relations, allEntities);
+  const { topology, categoryMap, groups, network } = constructAuthorNetwork(egoId, relations, allEntities, hopLimit);
 
   // When splitByAffiliation is disabled, merge external entities into internal groups
   if (!splitByAffiliation) {
@@ -108,13 +118,16 @@ export async function getSpreadlineRawData(params: {
     for (const eid of Object.keys(categoryMap)) {
       categoryMap[eid] = INTERNAL;
     }
-    // Move external groups into internal: groups[0] -> groups[4], groups[1] -> groups[3]
+    // Move external groups into internal: ext-K -> int-K (mirror across ego index)
+    const egoIdx = hopLimit;
     for (const g of Object.values(groups)) {
-      if (g.length === 5) {
-        g[3].push(...g[1]); // ext-1hop -> int-1hop
-        g[4].push(...g[0]); // ext-2hop -> int-2hop
-        g[1] = [];
-        g[0] = [];
+      if (g.length === 2 * hopLimit + 1) {
+        for (let k = 1; k <= hopLimit; k++) {
+          const extIdx = egoIdx - k; // external hop-K
+          const intIdx = egoIdx + k; // internal hop-K
+          g[intIdx].push(...g[extIdx]);
+          g[extIdx] = [];
+        }
       }
     }
   }

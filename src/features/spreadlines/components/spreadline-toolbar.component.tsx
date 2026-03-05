@@ -9,6 +9,7 @@ import {
   SPREADLINE_GRANULARITY_OPTIONS,
   SPREADLINE_FREQUENCY_COLORS,
   SPREADLINE_FREQUENCY_THRESHOLDS,
+  SPREADLINE_HOP_LIMIT_OPTIONS,
   type SpreadlineGranularity
 } from '@/features/spreadlines/const';
 
@@ -29,6 +30,9 @@ interface Props {
   /** Granularity */
   granularity: SpreadlineGranularity;
   onGranularityChange: (granularity: SpreadlineGranularity) => void;
+  /** Hop limit */
+  hopLimit?: number;
+  onHopLimitChange?: (value: number) => void;
   /** Pinned entity clear */
   pinnedCount: number;
   onClearPins: () => void;
@@ -45,6 +49,8 @@ const SpreadlineToolbarComponent = ({
   onRelationTypesChange,
   granularity,
   onGranularityChange,
+  hopLimit,
+  onHopLimitChange,
   pinnedCount,
   onClearPins
 }: Props) => {
@@ -71,6 +77,21 @@ const SpreadlineToolbarComponent = ({
             </div>
           </div>
         </>
+      )}
+
+      {hopLimit !== undefined && onHopLimitChange && (
+        <Select value={String(hopLimit)} onValueChange={val => onHopLimitChange(Number(val))}>
+          <SelectTrigger className="h-7 w-auto gap-1 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SPREADLINE_HOP_LIMIT_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={String(opt.value)}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
 
       {extraSlot}

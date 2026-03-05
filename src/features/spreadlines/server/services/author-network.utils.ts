@@ -13,7 +13,7 @@ export interface EntityRow {
 
 export const INTERNAL: LineCategoryValue = 'internal';
 export const EXTERNAL: LineCategoryValue = 'external';
-const HOP_LIMIT = 2;
+export const DEFAULT_HOP_LIMIT = 2;
 
 export function remapJHAffiliation(affiliation: string | null | undefined): string {
   if (!affiliation || typeof affiliation !== 'string') {
@@ -35,10 +35,16 @@ export function remapJHAffiliation(affiliation: string | null | undefined): stri
 }
 
 /**
- * Construct ego-centric network via 2-hop BFS per time slice.
+ * Construct ego-centric network via N-hop BFS per time slice.
+ * Returns filtered relations and hop distances per entity per time block.
  */
-export function constructEgoNetworks(data: RelationRow[], egoId: string): RelationRow[] {
+export function constructEgoNetworks(
+  data: RelationRow[],
+  egoId: string,
+  hopLimit: number = DEFAULT_HOP_LIMIT
+): { relations: RelationRow[]; hopDistances: Record<string, Map<string, number>> } {
   const indices = new Set<number>();
+  const hopDistances: Record<string, Map<string, number>> = {};
 
   // Group by time
   const byTime: Record<string, { row: RelationRow; idx: number }[]> = {};
@@ -48,11 +54,14 @@ export function constructEgoNetworks(data: RelationRow[], egoId: string): Relati
     byTime[time].push({ row, idx });
   });
 
-  for (const entries of Object.values(byTime)) {
+  for (const [time, entries] of Object.entries(byTime)) {
+    const distMap = new Map<string, number>();
+    distMap.set(egoId, 0);
     let waitlist = new Set<string>([egoId]);
+    const visited = new Set<string>([egoId]);
     let hop = 1;
 
-    while (waitlist.size > 0 && hop <= HOP_LIMIT) {
+    while (waitlist.size > 0 && hop <= hopLimit) {
       const nextWaitlist: string[] = [];
 
       for (const each of waitlist) {
@@ -64,6 +73,13 @@ export function constructEgoNetworks(data: RelationRow[], egoId: string): Relati
         sources.forEach(e => indices.add(e.idx));
         targets.forEach(e => indices.add(e.idx));
 
+        for (const c of candidates) {
+          if (!visited.has(c)) {
+            distMap.set(c, hop);
+            visited.add(c);
+          }
+        }
+
         nextWaitlist.push(...candidates);
       }
 
@@ -72,18 +88,26 @@ export function constructEgoNetworks(data: RelationRow[], egoId: string): Relati
       waitlist = nextSet;
       hop++;
     }
+
+    hopDistances[time] = distMap;
   }
 
-  return data.filter((_, idx) => indices.has(idx));
+  return { relations: data.filter((_, idx) => indices.has(idx)), hopDistances };
 }
 
 /**
- * Build author network with category assignments and group assignments.
+ * Build author network with category assignments and dynamic group assignments.
+ *
+ * Groups array has `2*hopLimit + 1` slots:
+ *   [0..hopLimit-1] = external hops (farthest to nearest)
+ *   [hopLimit]      = ego
+ *   [hopLimit+1..2*hopLimit] = internal hops (nearest to farthest)
  */
 export function constructAuthorNetwork(
   egoId: string,
   relations: RelationRow[],
-  allEntities: EntityRow[]
+  allEntities: EntityRow[],
+  hopLimit: number = DEFAULT_HOP_LIMIT
 ): {
   topology: TopologyEntry[];
   categoryMap: Record<string, LineCategoryValue>;
@@ -108,28 +132,33 @@ export function constructAuthorNetwork(
   // Filter relations to years where ego exists
   relations = relations.filter(r => years.includes(r.year));
 
-  // 2-hop ego network
-  let network = constructEgoNetworks(relations, egoId);
+  // N-hop ego network with BFS distances
+  const { relations: egoRelations, hopDistances } = constructEgoNetworks(relations, egoId, hopLimit);
+  let network = egoRelations;
 
-  // Keep only papers involving ego
-  const byPaper: Record<string, RelationRow[]> = {};
-  network.forEach(row => {
-    if (!byPaper[row.id]) byPaper[row.id] = [];
-    byPaper[row.id].push(row);
-  });
-
-  const validRows: RelationRow[] = [];
-  for (const group of Object.values(byPaper)) {
-    const nodes = new Set<string>();
-    group.forEach(row => {
-      nodes.add(row.sourceId);
-      nodes.add(row.targetId);
+  // For 1-2 hop networks, keep only papers involving ego (original behavior).
+  // For higher hops, the BFS already scopes relations correctly—hop-3+ papers
+  // connect non-ego entities and must be preserved.
+  if (hopLimit <= 2) {
+    const byPaper: Record<string, RelationRow[]> = {};
+    network.forEach(row => {
+      if (!byPaper[row.id]) byPaper[row.id] = [];
+      byPaper[row.id].push(row);
     });
-    if (nodes.has(egoId)) {
-      validRows.push(...group);
+
+    const validRows: RelationRow[] = [];
+    for (const group of Object.values(byPaper)) {
+      const nodes = new Set<string>();
+      group.forEach(row => {
+        nodes.add(row.sourceId);
+        nodes.add(row.targetId);
+      });
+      if (nodes.has(egoId)) {
+        validRows.push(...group);
+      }
     }
+    network = validRows;
   }
-  network = validRows;
 
   // Helper: affiliations for entity in a year
   const getAffiliations = (entityId: string, year: string): string[] => {
@@ -137,80 +166,75 @@ export function constructAuthorNetwork(
     return [...new Set(entries.map(e => remapJHAffiliation(e.affiliation)))];
   };
 
+  const groupSize = 2 * hopLimit + 1;
+  const egoIdx = hopLimit; // ego is always at the center index
+
   const colorAssign: Record<string, Record<string, LineCategoryValue>> = {};
   const groupAssign: Record<string, Set<string>[]> = {};
 
-  for (const row of network) {
-    const firstAuthor = row.sourceId;
-    const author = row.targetId;
-    const year = row.year;
-    const egoAffiliations = getAffiliations(egoId, year);
+  // Collect all entity IDs from the network
+  const networkEntityIds = new Set<string>();
+  network.forEach(row => {
+    networkEntityIds.add(row.sourceId);
+    networkEntityIds.add(row.targetId);
+  });
 
+  // Assign entities to groups using BFS hop distances
+  for (const year of years) {
     if (!groupAssign[year]) {
-      groupAssign[year] = [new Set(), new Set(), new Set([egoId]), new Set(), new Set()];
+      const groups: Set<string>[] = Array.from({ length: groupSize }, () => new Set());
+      groups[egoIdx].add(egoId);
+      groupAssign[year] = groups;
     }
     if (!colorAssign[year]) {
       colorAssign[year] = {};
     }
 
-    if (author === egoId) {
-      const affiliations = getAffiliations(firstAuthor, year);
-      const intersection = affiliations.filter(a => egoAffiliations.includes(a));
-      const category = intersection.length > 0 ? INTERNAL : EXTERNAL;
+    const distMap = hopDistances[year];
+    if (!distMap) continue;
 
-      if (intersection.length > 0) {
-        groupAssign[year][3].add(firstAuthor);
-      } else {
-        groupAssign[year][1].add(firstAuthor);
-      }
+    const egoAffiliations = getAffiliations(egoId, year);
 
-      if (!colorAssign[year][firstAuthor]) {
-        colorAssign[year][firstAuthor] = category;
-      }
-    } else {
-      const affiliations = getAffiliations(author, year);
-      const intersection = affiliations.filter(a => egoAffiliations.includes(a));
-      const category = intersection.length > 0 ? INTERNAL : EXTERNAL;
+    for (const eid of networkEntityIds) {
+      if (eid === egoId) continue;
+      const hopDist = distMap.get(eid);
+      if (hopDist === undefined || hopDist === 0 || hopDist > hopLimit) continue;
 
-      if (category === INTERNAL) {
-        groupAssign[year][4].add(author);
-      } else {
-        groupAssign[year][0].add(author);
-      }
+      const affiliations = getAffiliations(eid, year);
+      const isInternal = affiliations.some(a => egoAffiliations.includes(a));
+      const category: LineCategoryValue = isInternal ? INTERNAL : EXTERNAL;
 
-      if (!colorAssign[year][author]) {
-        colorAssign[year][author] = category;
+      // Internal → right of ego (egoIdx + hopDist), External → left of ego (egoIdx - hopDist)
+      const groupIdx = isInternal ? egoIdx + hopDist : egoIdx - hopDist;
+      groupAssign[year][groupIdx].add(eid);
+
+      if (!colorAssign[year][eid]) {
+        colorAssign[year][eid] = category;
       }
     }
   }
 
-  // Handle overlaps and sort groups
+  // Handle overlaps: if entity appears in multiple groups, keep closest to ego
   const finalGroups: Record<string, string[][]> = {};
 
   for (const [year, groups] of Object.entries(groupAssign)) {
-    const pairIndices: [number, number][] = [];
-    for (let i = 0; i < groups.length; i++) {
-      for (let j = i + 1; j < groups.length; j++) {
-        if (i !== 2 && j !== 2) {
-          pairIndices.push([i, j]);
+    // Resolve overlaps: prefer closer groups (smaller distance from ego)
+    const seen = new Set<string>();
+    const orderedIndices = [egoIdx];
+    for (let d = 1; d <= hopLimit; d++) {
+      orderedIndices.push(egoIdx + d, egoIdx - d);
+    }
+    for (const idx of orderedIndices) {
+      for (const eid of groups[idx]) {
+        if (seen.has(eid) && eid !== egoId) {
+          groups[idx].delete(eid);
+        } else {
+          seen.add(eid);
         }
       }
     }
 
-    for (const [firstIdx, secondIdx] of pairIndices) {
-      const pair0 = groups[firstIdx];
-      const pair1 = groups[secondIdx];
-      const intersection = new Set([...pair0].filter(x => pair1.has(x)));
-
-      if (intersection.size > 0) {
-        if ([0, 4].includes(firstIdx)) {
-          intersection.forEach(x => groups[firstIdx].delete(x));
-        } else if ([0, 4].includes(secondIdx)) {
-          intersection.forEach(x => groups[secondIdx].delete(x));
-        }
-      }
-    }
-
+    // Sort each group
     const newGroups: string[][] = [];
     for (let idx = 0; idx < groups.length; idx++) {
       const group = groups[idx];
@@ -220,7 +244,7 @@ export function constructAuthorNetwork(
       }
 
       const groupArray = [...group];
-      const toBeReverse = idx >= 2;
+      const toBeReverse = idx >= egoIdx;
 
       groupArray.sort((a, b) => {
         const aCount = new Set(network.filter(r => r.sourceId === a || r.targetId === a).map(r => r.id)).size;
@@ -240,13 +264,7 @@ export function constructAuthorNetwork(
 
   // Build category map (entity ID -> category)
   const categoryMap: Record<string, LineCategoryValue> = {};
-  const entityIds = new Set<string>();
-  network.forEach(row => {
-    entityIds.add(row.sourceId);
-    entityIds.add(row.targetId);
-  });
-
-  for (const eid of entityIds) {
+  for (const eid of networkEntityIds) {
     for (const year of years) {
       const category = colorAssign[year]?.[eid];
       if (category) {

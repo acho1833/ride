@@ -23,9 +23,7 @@ import {
   SPREADLINE_EXTERNAL_COLOR,
   SPREADLINE_SELECTED_COLOR,
   GRAPH_HOP1_LINK_DISTANCE,
-  GRAPH_HOP2_LINK_DISTANCE,
   GRAPH_HOP1_RADIAL_RADIUS,
-  GRAPH_HOP2_RADIAL_RADIUS,
   GRAPH_RADIAL_STRENGTH,
   GRAPH_UPDATE_ALPHA,
   GRAPH_UPDATE_ALPHA_DECAY,
@@ -108,21 +106,19 @@ const appendNodeVisuals = (selection: d3.Selection<SVGGElement, SpreadlineGraphN
     .text(d => d.name);
 };
 
-/** Compute hop-aware link distance for a single link */
+/** Compute hop-aware link distance for a single link (linear scaling) */
 const getHopLinkDistance = (link: SpreadlineGraphLink): number => {
   const source = link.source as SpreadlineGraphNode;
   const target = link.target as SpreadlineGraphNode;
   const srcHop = source.hopDistance ?? 0;
   const tgtHop = target.hopDistance ?? 0;
   const maxHop = Math.max(srcHop, tgtHop);
-  return maxHop >= 2 ? GRAPH_HOP2_LINK_DISTANCE : GRAPH_HOP1_LINK_DISTANCE;
+  return Math.max(1, maxHop) * GRAPH_HOP1_LINK_DISTANCE;
 };
 
-/** Get radial radius for a node's hop distance */
+/** Get radial radius for a node's hop distance (linear scaling) */
 const getRadialRadius = (d: SpreadlineGraphNode): number => {
-  if (d.hopDistance === 0) return 0;
-  if (d.hopDistance === 1) return GRAPH_HOP1_RADIAL_RADIUS;
-  return GRAPH_HOP2_RADIAL_RADIUS;
+  return (d.hopDistance ?? 0) * GRAPH_HOP1_RADIAL_RADIUS;
 };
 
 /** Module-level cache: preserves node positions across unmount/remount (e.g. split-and-move) */

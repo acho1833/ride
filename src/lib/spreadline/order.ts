@@ -106,41 +106,27 @@ function constrainedCrossingReduction(currentSessions: Session[], nextSessions: 
       continue;
     }
 
-    const [topTwoHops, sourceGroup, , targetGroup, bottomTwoHops] = constraints;
+    // Process each constraint group dynamically (supports N-hop layouts).
+    // Each constraint is either a plain string[] (barycenter sort) or
+    // a Record<number, string[]> (weight-keyed groups for hop-1 neighbors).
+    let sweepRange: [number, number] = [0, 0];
 
-    // Sort top 2-hop neighbors
-    let sweepRange: [number, number] = [0, (topTwoHops as string[]).length];
-    if ((topTwoHops as string[]).length > 1) {
-      withinSort(topTwoHops as string[], session, currNodes, sweepRange);
-    }
-
-    // Sort source groups (by weight)
-    if (typeof sourceGroup === 'object' && sourceGroup !== null && !Array.isArray(sourceGroup)) {
-      for (const [weight, group] of Object.entries(sourceGroup as Record<number, string[]>)) {
-        sweepRange = [sweepRange[1], sweepRange[1] + group.length];
-        if (group.length > 1) {
-          withinSort(group, session, currNodes, sweepRange);
+    for (const constraint of constraints) {
+      if (Array.isArray(constraint)) {
+        // Plain array: outer hops or ego — barycenter sort
+        sweepRange = [sweepRange[1], sweepRange[1] + constraint.length];
+        if (constraint.length > 1) {
+          withinSort(constraint, session, currNodes, sweepRange);
+        }
+      } else if (typeof constraint === 'object' && constraint !== null) {
+        // Weight-keyed object: hop-1 neighbors — sort within each weight group
+        for (const [, group] of Object.entries(constraint as Record<number, string[]>)) {
+          sweepRange = [sweepRange[1], sweepRange[1] + group.length];
+          if (group.length > 1) {
+            withinSort(group, session, currNodes, sweepRange);
+          }
         }
       }
-    }
-
-    // Skip ego (single element)
-    sweepRange = [sweepRange[1], sweepRange[1] + 1];
-
-    // Sort target groups (by weight)
-    if (typeof targetGroup === 'object' && targetGroup !== null && !Array.isArray(targetGroup)) {
-      for (const [weight, group] of Object.entries(targetGroup as Record<number, string[]>)) {
-        sweepRange = [sweepRange[1], sweepRange[1] + group.length];
-        if (group.length > 1) {
-          withinSort(group, session, currNodes, sweepRange);
-        }
-      }
-    }
-
-    // Sort bottom 2-hop neighbors
-    sweepRange = [sweepRange[1], sweepRange[1] + (bottomTwoHops as string[]).length];
-    if ((bottomTwoHops as string[]).length > 1) {
-      withinSort(bottomTwoHops as string[], session, currNodes, sweepRange);
     }
 
     result.push(session);

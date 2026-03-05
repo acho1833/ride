@@ -65,12 +65,12 @@ export interface Block {
     top: string;
     bottom: string;
     button?: string;
-    topHop?: HopSectionPaths | null;
-    bottomHop?: HopSectionPaths | null;
+    topHops?: HopSectionPaths[];
+    bottomHops?: HopSectionPaths[];
   };
   hopSections: {
-    top: HopSectionInfo | null;
-    bottom: HopSectionInfo | null;
+    tops: HopSectionInfo[];
+    bottoms: HopSectionInfo[];
   };
 }
 

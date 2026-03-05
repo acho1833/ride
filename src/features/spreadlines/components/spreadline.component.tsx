@@ -56,6 +56,8 @@ interface Props {
   blocksFilter: number;
   onBlocksFilterChange: (value: number) => void;
   onFilteredEntityNamesChange?: (names: string[]) => void;
+  hopLimit: number;
+  onHopLimitChange: (value: number) => void;
 }
 
 const SpreadlineComponent = ({
@@ -76,7 +78,9 @@ const SpreadlineComponent = ({
   onPageChange,
   blocksFilter,
   onBlocksFilterChange,
-  onFilteredEntityNamesChange
+  onFilteredEntityNamesChange,
+  hopLimit,
+  onHopLimitChange
 }: Props) => {
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
   const [computing, setComputing] = useState(false);
@@ -152,14 +156,20 @@ const SpreadlineComponent = ({
           spreadline.load(nodeContextData, { time: 'time', entity: 'entity', context: 'context' }, 'node');
         }
 
-        // Convert group IDs to names — include empty groups for padded time blocks
+        // Convert group IDs to names. Groups have 2*hopLimit+1 slots;
+        // the library now handles N-group layouts dynamically.
+        const groupSize = rawData.groups[Object.keys(rawData.groups)[0]]?.length ?? 5;
+        const egoGroupIdx = Math.floor(groupSize / 2);
+
         const namedGroups: Record<string, string[][]> = {};
         for (const [time, groups] of Object.entries(rawData.groups)) {
           namedGroups[time] = groups.map(group => group.map(id => nameOf(id)));
         }
         for (const time of rawData.timeBlocks) {
           if (!namedGroups[time]) {
-            namedGroups[time] = [[], [], [egoName], [], []];
+            const emptyGroups: string[][] = Array.from({ length: groupSize }, () => []);
+            emptyGroups[egoGroupIdx] = [egoName];
+            namedGroups[time] = emptyGroups;
           }
         }
 
@@ -187,7 +197,7 @@ const SpreadlineComponent = ({
     }
 
     computeLayout();
-  }, [rawData, granularity]);
+  }, [rawData, granularity, hopLimit]);
 
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
 
@@ -340,6 +350,8 @@ const SpreadlineComponent = ({
         onRelationTypesChange={onRelationTypesChange}
         granularity={granularity}
         onGranularityChange={onGranularityChange}
+        hopLimit={hopLimit}
+        onHopLimitChange={onHopLimitChange}
         pinnedCount={pinnedEntityNames.length}
         onClearPins={() => chartRef.current?.clearPins()}
       />

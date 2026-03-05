@@ -10,6 +10,7 @@ export const useSpreadlineRawDataQuery = (params: {
   splitByAffiliation?: boolean;
   pageIndex?: number;
   pageSize?: number;
+  hopLimit?: number;
 }) => {
   return useQuery(orpc.spreadline.getRawData.queryOptions({ input: params }));
 };
