@@ -3,7 +3,7 @@ import 'server-only';
 import path from 'path';
 import { ORPCError } from '@orpc/server';
 import { loadCSV, type RelationRow } from './csv.utils';
-import { constructAuthorNetwork, INTERNAL, EXTERNAL, type EntityRow } from './author-network.utils';
+import { constructEntityNetwork, INTERNAL, EXTERNAL, type EntityRow } from './entity-network.utils';
 
 interface RelationshipRow {
   paperID: string;
@@ -110,7 +110,7 @@ export async function getSpreadlineRawData(params: {
     });
   }
 
-  const { topology, categoryMap, groups, network } = constructAuthorNetwork(egoId, relations, allEntities, hopLimit);
+  const { topology, categoryMap, groups, network } = constructEntityNetwork(egoId, relations, allEntities, hopLimit);
 
   // When splitByAffiliation is disabled, merge external entities into internal groups
   if (!splitByAffiliation) {

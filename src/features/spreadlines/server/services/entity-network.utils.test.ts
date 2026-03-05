@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { remapJHAffiliation, constructEgoNetworks, constructAuthorNetwork, type EntityRow } from './author-network.utils';
+import { remapJHAffiliation, constructEgoNetworks, constructEntityNetwork, type EntityRow } from './entity-network.utils';
 import type { RelationRow } from './csv.utils';
 
 describe('remapJHAffiliation', () => {
@@ -89,7 +89,7 @@ describe('constructEgoNetworks', () => {
   });
 });
 
-describe('constructAuthorNetwork', () => {
+describe('constructEntityNetwork', () => {
   // Chain: ego -> h1 (hop1) -> h2 (hop2) -> h3 (hop3)
   const relations: RelationRow[] = [
     { year: '2020', sourceId: 'ego', targetId: 'h1', id: 'p1', type: 'Co-co-author' },
@@ -105,7 +105,7 @@ describe('constructAuthorNetwork', () => {
   ];
 
   it('with hopLimit=2, does NOT include hop-3 entity in topology or groups', () => {
-    const result = constructAuthorNetwork('ego', relations, allEntities, 2);
+    const result = constructEntityNetwork('ego', relations, allEntities, 2);
 
     // Topology should not include the h2->h3 relation
     const topoIds = result.topology.map(t => `${t.sourceId}->${t.targetId}`);
@@ -117,7 +117,7 @@ describe('constructAuthorNetwork', () => {
   });
 
   it('with hopLimit=3, includes hop-3 entity in topology AND groups', () => {
-    const result = constructAuthorNetwork('ego', relations, allEntities, 3);
+    const result = constructEntityNetwork('ego', relations, allEntities, 3);
 
     // Topology MUST include the h2->h3 relation
     const topoIds = result.topology.map(t => `${t.sourceId}->${t.targetId}`);

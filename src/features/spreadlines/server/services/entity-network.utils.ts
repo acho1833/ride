@@ -93,14 +93,14 @@ export function constructEgoNetworks(
 }
 
 /**
- * Build author network with category assignments and dynamic group assignments.
+ * Build entity network with category assignments and dynamic group assignments.
  *
  * Groups array has `2*hopLimit + 1` slots:
  *   [0..hopLimit-1] = external hops (farthest to nearest)
  *   [hopLimit]      = ego
  *   [hopLimit+1..2*hopLimit] = internal hops (nearest to farthest)
  */
-export function constructAuthorNetwork(
+export function constructEntityNetwork(
   egoId: string,
   relations: RelationRow[],
   allEntities: EntityRow[],
