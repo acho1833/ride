@@ -231,6 +231,19 @@ export function constructAuthorNetwork(
       }
     }
 
+    // Pre-compute distinct paper counts per entity
+    const entityPapers = new Map<string, Set<string>>();
+    for (const r of network) {
+      if (!entityPapers.has(r.sourceId)) entityPapers.set(r.sourceId, new Set());
+      if (!entityPapers.has(r.targetId)) entityPapers.set(r.targetId, new Set());
+      entityPapers.get(r.sourceId)!.add(r.id);
+      entityPapers.get(r.targetId)!.add(r.id);
+    }
+    const paperCounts = new Map<string, number>();
+    for (const [eid, papers] of entityPapers) {
+      paperCounts.set(eid, papers.size);
+    }
+
     // Sort each group
     const newGroups: string[][] = [];
     for (let idx = 0; idx < groups.length; idx++) {
@@ -244,8 +257,8 @@ export function constructAuthorNetwork(
       const toBeReverse = idx >= egoIdx;
 
       groupArray.sort((a, b) => {
-        const aCount = new Set(network.filter(r => r.sourceId === a || r.targetId === a).map(r => r.id)).size;
-        const bCount = new Set(network.filter(r => r.sourceId === b || r.targetId === b).map(r => r.id)).size;
+        const aCount = paperCounts.get(a) || 0;
+        const bCount = paperCounts.get(b) || 0;
 
         if (aCount !== bCount) {
           return toBeReverse ? bCount - aCount : aCount - bCount;
