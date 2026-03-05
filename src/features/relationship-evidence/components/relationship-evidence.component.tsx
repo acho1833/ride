@@ -74,7 +74,7 @@ const RelationshipEvidenceComponent = ({ metadata }: Props) => {
 
   const yearFilter = (table.getColumn('year')?.getFilterValue() as [string, string]) ?? ['', ''];
   const filteredRows = table.getFilteredRowModel().rows;
-  const totalCitations = filteredRows.reduce((sum, row) => sum + (row.original.citationCount ?? 0), 0);
+  const totalRelationships = filteredRows.reduce((sum, row) => sum + (row.original.relationshipCount ?? 0), 0);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
@@ -84,7 +84,7 @@ const RelationshipEvidenceComponent = ({ metadata }: Props) => {
           {sourceName} &harr; {targetName}
         </h2>
         <p className="text-muted-foreground text-sm">
-          {filteredRows.length} events &middot; {totalCitations.toLocaleString()} total citations
+          {filteredRows.length} events &middot; {totalRelationships.toLocaleString()} total relationships
         </p>
       </div>
 
@@ -134,8 +134,8 @@ const RelationshipEvidenceComponent = ({ metadata }: Props) => {
           <Input
             className="h-8 w-28 text-sm"
             placeholder="Filter..."
-            value={(table.getColumn('citationCount')?.getFilterValue() as string) ?? ''}
-            onChange={e => table.getColumn('citationCount')?.setFilterValue(e.target.value)}
+            value={(table.getColumn('relationshipCount')?.getFilterValue() as string) ?? ''}
+            onChange={e => table.getColumn('relationshipCount')?.setFilterValue(e.target.value)}
           />
         </div>
       </div>

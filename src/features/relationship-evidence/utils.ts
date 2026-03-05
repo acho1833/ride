@@ -19,7 +19,7 @@ export const columns = [
     cell: info => info.getValue(),
     filterFn: 'includesString'
   }),
-  columnHelper.accessor('citationCount', {
+  columnHelper.accessor('relationshipCount', {
     header: 'Citations',
     cell: info => info.getValue(),
     filterFn: 'includesString'
