@@ -202,7 +202,7 @@ main() {
       echo ""
       log_info "Committing changes..."
       git add .
-      git commit -m "$COMMIT_MSG"
+      git commit -m "commit"
 
       CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
       log_info "Pushing to origin $CURRENT_BRANCH..."

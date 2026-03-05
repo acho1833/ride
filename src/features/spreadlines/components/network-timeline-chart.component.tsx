@@ -39,7 +39,10 @@ import { setDragCursor, clearDragCursor } from '@/features/spreadlines/utils/dra
 import SpreadlineToolbarComponent from '@/features/spreadlines/components/spreadline-toolbar.component';
 
 /** D3 threshold scale: relationship count -> heatmap fill color */
-const relationshipColorScale = d3.scaleThreshold<number, string>().domain(SPREADLINE_FREQUENCY_THRESHOLDS).range(SPREADLINE_FREQUENCY_COLORS);
+const relationshipColorScale = d3
+  .scaleThreshold<number, string>()
+  .domain(SPREADLINE_FREQUENCY_THRESHOLDS)
+  .range(SPREADLINE_FREQUENCY_COLORS);
 
 interface Props {
   rawData: SpreadlineRawData | null;
