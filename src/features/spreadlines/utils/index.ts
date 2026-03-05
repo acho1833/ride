@@ -28,9 +28,9 @@ export interface SpreadlineGraphNode extends SimulationNodeDatum {
 export interface SpreadlineGraphLink extends SimulationLinkDatum<SpreadlineGraphNode> {
   source: string | SpreadlineGraphNode;
   target: string | SpreadlineGraphNode;
-  /** Aggregated citation count across all co-authored papers */
+  /** Aggregated citation count across all shared relationships */
   weight: number;
-  /** Number of distinct co-authored papers */
+  /** Number of distinct shared relationships */
   paperCount: number;
   /** Years in which the collaboration occurred */
   years: string[];

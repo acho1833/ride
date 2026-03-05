@@ -187,7 +187,7 @@ const SpreadlineComponent = ({
         const dynamicWidth = rawData.timeBlocks.length * SPREADLINE_MIN_WIDTH_PER_TIMESTAMP;
 
         const result = spreadline.fit(dynamicWidth, SPREADLINE_CHART_HEIGHT);
-        setComputedData({ ...result, mode: 'author', reference: [] } as SpreadLineData);
+        setComputedData({ ...result, mode: 'entity', reference: [] } as SpreadLineData);
       } catch (err) {
         console.error('SpreadLine layout error:', err);
         setComputeError(err instanceof Error ? err.message : 'Layout computation failed');

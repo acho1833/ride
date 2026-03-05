@@ -2,7 +2,7 @@
  * Spreadline Feature Constants
  */
 
-/** Default ego entity ID for the vis-author dataset (Jeffrey Heer) */
+/** Default ego entity ID for the vis-author demo dataset (Jeffrey Heer) */
 export const SPREADLINE_DEFAULT_EGO_ID = 'p1199';
 
 /** Available relation types for the dropdown */

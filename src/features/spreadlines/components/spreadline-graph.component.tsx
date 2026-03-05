@@ -3,7 +3,7 @@
 /**
  * Spreadline Graph Component
  *
- * D3.js force-directed graph for the spreadline co-authorship network.
+ * D3.js force-directed graph for the spreadline entity network.
  * React renders the outer container only; D3 owns all SVG rendering.
  *
  * Architecture:
@@ -56,16 +56,16 @@ const getNodeRadius = (d: SpreadlineGraphNode): number => (d.isEgo ? GRAPH_CONFI
 /** Get the icon size for a node (ego is larger) */
 const getNodeIconSize = (d: SpreadlineGraphNode): number => (d.isEgo ? GRAPH_CONFIG.iconSize * EGO_SCALE : GRAPH_CONFIG.iconSize);
 
-/** D3 threshold scale: citation count → link stroke color */
+/** D3 threshold scale: relationship count → link stroke color */
 const linkColorScale = d3.scaleThreshold<number, string>().domain(GRAPH_LINK_THRESHOLDS).range(GRAPH_LINK_COLORS);
 
-/** D3 threshold scale: citation count → link stroke width */
+/** D3 threshold scale: relationship count → link stroke width */
 const linkWidthScale = d3.scaleThreshold<number, number>().domain(GRAPH_LINK_THRESHOLDS).range(GRAPH_LINK_WIDTH_BANDS);
 
-/** Get link stroke color from citation weight */
+/** Get link stroke color from relationship weight */
 const getLinkColor = (d: SpreadlineGraphLink): string => linkColorScale(d.weight);
 
-/** Get link stroke width from citation weight */
+/** Get link stroke width from relationship weight */
 const getLinkWidth = (d: SpreadlineGraphLink): number => linkWidthScale(d.weight);
 
 /** Append visual elements (rect, icon, label) to a node <g> selection */
