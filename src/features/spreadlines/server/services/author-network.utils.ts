@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { RelationRow } from './csv.utils';
 import type { TopologyEntry, LineCategoryValue } from './spreadline-data.service';
+import { SPREADLINE_DEFAULT_HOP_LIMIT } from '@/features/spreadlines/const';
 
 export interface EntityRow {
   id: string;
@@ -13,7 +14,6 @@ export interface EntityRow {
 
 export const INTERNAL: LineCategoryValue = 'internal';
 export const EXTERNAL: LineCategoryValue = 'external';
-export const DEFAULT_HOP_LIMIT = 2;
 
 export function remapJHAffiliation(affiliation: string | null | undefined): string {
   if (!affiliation || typeof affiliation !== 'string') {
@@ -41,7 +41,7 @@ export function remapJHAffiliation(affiliation: string | null | undefined): stri
 export function constructEgoNetworks(
   data: RelationRow[],
   egoId: string,
-  hopLimit: number = DEFAULT_HOP_LIMIT
+  hopLimit: number = SPREADLINE_DEFAULT_HOP_LIMIT
 ): { relations: RelationRow[]; hopDistances: Record<string, Map<string, number>> } {
   const indices = new Set<number>();
   const hopDistances: Record<string, Map<string, number>> = {};
@@ -104,7 +104,7 @@ export function constructAuthorNetwork(
   egoId: string,
   relations: RelationRow[],
   allEntities: EntityRow[],
-  hopLimit: number = DEFAULT_HOP_LIMIT
+  hopLimit: number = SPREADLINE_DEFAULT_HOP_LIMIT
 ): {
   topology: TopologyEntry[];
   categoryMap: Record<string, LineCategoryValue>;
