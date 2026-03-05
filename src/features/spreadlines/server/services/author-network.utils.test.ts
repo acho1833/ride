@@ -70,6 +70,23 @@ describe('constructEgoNetworks', () => {
     expect(dist.get('c')).toBe(3);
     expect(dist.has('d')).toBe(false); // beyond hop limit
   });
+
+  it('with hopLimit=4, includes up to hop-4 and tracks distances correctly', () => {
+    const { relations, hopDistances } = constructEgoNetworks(chainData, 'ego', 4);
+
+    const ids = relations.map(r => r.id);
+    expect(ids).toContain('p1');
+    expect(ids).toContain('p2');
+    expect(ids).toContain('p3');
+    expect(ids).toContain('p4');
+
+    const dist = hopDistances['2020'];
+    expect(dist.get('ego')).toBe(0);
+    expect(dist.get('a')).toBe(1);
+    expect(dist.get('b')).toBe(2);
+    expect(dist.get('c')).toBe(3);
+    expect(dist.get('d')).toBe(4);
+  });
 });
 
 describe('constructAuthorNetwork', () => {

@@ -77,15 +77,12 @@ export function constructEgoNetworks(
           if (!visited.has(c)) {
             distMap.set(c, hop);
             visited.add(c);
+            nextWaitlist.push(c);
           }
         }
-
-        nextWaitlist.push(...candidates);
       }
 
-      const nextSet = new Set(nextWaitlist);
-      for (const w of waitlist) nextSet.delete(w);
-      waitlist = nextSet;
+      waitlist = new Set(nextWaitlist);
       hop++;
     }
 
