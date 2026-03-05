@@ -531,6 +531,7 @@ export class SpreadLinesVisualizer {
           .filter(d => !!(d.hopSections?.tops?.length && d.outline.topHops?.length))
           .append('g')
           .attr('class', d => `hop-collapse-group hop-collapse-top-${d.id}`)
+          .style('display', 'none') // disabled until collapse animation is properly implemented
           .attr('transform', d => {
             const topHop = d.outline.topHops![0]; // outermost
             const radius = this.data.blockWidth / 2;
@@ -637,6 +638,7 @@ export class SpreadLinesVisualizer {
           .filter(d => !!(d.hopSections?.bottoms?.length && d.outline.bottomHops?.length))
           .append('g')
           .attr('class', d => `hop-collapse-group hop-collapse-bottom-${d.id}`)
+          .style('display', 'none') // disabled until collapse animation is properly implemented
           .attr('transform', d => {
             const bottomHop = d.outline.bottomHops![d.outline.bottomHops!.length - 1]; // outermost
             const radius = this.data.blockWidth / 2;
