@@ -65,14 +65,11 @@ export const SPREADLINE_DEFAULT_HOP_LIMIT = 2;
 /** Maximum configurable hop limit */
 export const SPREADLINE_MAX_HOP_LIMIT = 5;
 
-/** Hop limit dropdown options */
-export const SPREADLINE_HOP_LIMIT_OPTIONS = [
-  { label: '1 hop', value: 1 },
-  { label: '2 hops', value: 2 },
-  { label: '3 hops', value: 3 },
-  { label: '4 hops', value: 4 },
-  { label: '5 hops', value: 5 }
-] as const;
+/** Hop limit dropdown options (generated from SPREADLINE_MAX_HOP_LIMIT) */
+export const SPREADLINE_HOP_LIMIT_OPTIONS = Array.from({ length: SPREADLINE_MAX_HOP_LIMIT }, (_, i) => ({
+  label: `${i + 1} hop${i > 0 ? 's' : ''}`,
+  value: i + 1
+}));
 
 /** Number of blocks per page for pagination */
 export const SPREADLINE_PAGE_SIZE = 20;
