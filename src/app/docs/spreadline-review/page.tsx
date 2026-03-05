@@ -1,68 +1,64 @@
 'use client';
 
-import MermaidDiagram from './mermaid-diagram';
+import LayoutShell from './layout-shell';
+import { Section, SubSection } from './section';
+import { Grid, GridCard, DataTable, CodeBlock, Analogy, IC } from './doc-components';
 import { Collapsible, Tabs, Step, Callout } from './interactive';
+import MermaidDiagram from './mermaid-diagram';
+import type { NavItem } from './sidebar-nav';
+
+/* ── Navigation Items ──────────────────────────────────────────────── */
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'what-is-spreadline', label: 'What is SpreadLine?', number: 1, color: 'blue' },
+  { id: 'glossary', label: 'Glossary', number: 2, color: 'cyan' },
+  { id: 'data-model', label: 'Data Model', number: 3, color: 'green' },
+  { id: 'server-architecture', label: 'Server Architecture', number: 4, color: 'purple' },
+  { id: 'api-specification', label: 'API Specification', number: 5, color: 'indigo' },
+  { id: 'client-architecture', label: 'Client Architecture', number: 6, color: 'amber' },
+  { id: 'layout-engine', label: 'Layout Engine', number: 7, color: 'rose' },
+  { id: 'd3-visualization', label: 'D3 Visualization', number: 8, color: 'emerald' },
+  { id: 'configuration', label: 'Configuration', number: 9, color: 'orange' },
+  { id: 'directory-structure', label: 'Directory Structure', number: 10, color: 'teal' },
+  { id: 'data-flow', label: 'Data Flow', number: 11, color: 'violet' },
+  { id: 'migration-guide', label: 'Migration Guide', number: 12, color: 'sky' },
+  { id: 'faq', label: 'FAQ', number: 13, color: 'fuchsia' }
+];
+
+/* ── Page ──────────────────────────────────────────────────────────── */
 
 export default function SpreadlineReviewPage() {
   return (
-    <div className="bg-background text-foreground min-h-screen">
-      <div className="mx-auto max-w-5xl p-8">
-        {/* ── Header ─────────────────────────────────────────────── */}
-        <header className="mb-12 text-center">
-          <h1 className="mb-4 text-4xl font-bold">SpreadLine Technical Design Document</h1>
-          <p className="text-muted-foreground text-lg">
-            A complete, self-contained guide for understanding and migrating the SpreadLine ego-network visualization system.
-          </p>
-          <div className="bg-muted mt-4 inline-block rounded-lg px-4 py-2 text-sm">
-            Audience: Developers migrating SpreadLine to another Next.js + TypeScript project
-          </div>
-        </header>
+    <LayoutShell
+      title="SpreadLine TDD"
+      subtitle="Technical Design Document for Ego-Network Visualization"
+      badge="v1.0"
+      navItems={NAV_ITEMS}
+    >
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 1: What is SpreadLine?                                */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="what-is-spreadline"
+        number={1}
+        title="What is SpreadLine?"
+        color="blue"
+        subtitle="An interactive visualization for exploring ego-centric dynamic networks"
+      >
+        <p className="text-muted-foreground">
+          <strong>SpreadLine</strong> is a system that lets you explore how one person (or entity) connects to others over time. It answers
+          the question:{' '}
+          <em>&quot;Given one person, who did they interact with, when, and how are those people connected to each other?&quot;</em>
+        </p>
 
-        {/* ── Table of Contents ───────────────────────────────────── */}
-        <nav className="bg-card mb-12 rounded-lg p-6">
-          <h2 className="mb-4 text-xl font-semibold">Table of Contents</h2>
-          <ol className="text-muted-foreground grid gap-2 md:grid-cols-2">
-            {[
-              ['what-is-spreadline', '1. What is SpreadLine?'],
-              ['glossary', '2. Glossary'],
-              ['data-model', '3. Data Model'],
-              ['server-architecture', '4. Server-Side Architecture'],
-              ['api-specification', '5. API Specification'],
-              ['client-architecture', '6. Client-Side Architecture'],
-              ['layout-engine', '7. SpreadLine Layout Engine'],
-              ['d3-visualization', '8. D3 Visualization Layer'],
-              ['configuration', '9. Configuration & Constants'],
-              ['directory-structure', '10. Directory Structure'],
-              ['data-flow', '11. Data Flow'],
-              ['migration-guide', '12. Migration Guide (Step-by-Step)'],
-              ['faq', '13. FAQ']
-            ].map(([id, label]) => (
-              <li key={id}>
-                <a href={`#${id}`} className="hover:text-primary transition-colors">
-                  {label}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
+        <Analogy>
+          Imagine you&apos;re the main character in a TV show. SpreadLine shows you who appeared in scenes with you (your direct
+          connections), who those people talked to (indirect connections), and how the cast changed across seasons (time). The
+          &quot;ego&quot; is you &mdash; the camera follows you.
+        </Analogy>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 1: What is SpreadLine?                           */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="what-is-spreadline" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">1. What is SpreadLine?</h2>
-
-          <div className="bg-card space-y-4 rounded-lg p-6">
-            <p className="text-muted-foreground">
-              <strong>SpreadLine</strong> is an interactive visualization system for exploring <em>ego-centric dynamic networks</em>. Think
-              of it as a tool that answers the question:{' '}
-              <em>
-                &quot;Given one person (the ego), who did they interact with, when, and how are those people connected to each other?&quot;
-              </em>
-            </p>
-
-            <MermaidDiagram
-              chart={`
+        <MermaidDiagram
+          chart={`
 graph LR
   subgraph "The Big Picture"
     A["Raw CSV Data<br/>(relations, entities)"] --> B["Server<br/>(BFS + Grouping)"]
@@ -72,38 +68,29 @@ graph LR
     D --> F["Storyline Chart<br/>(SpreadLine layout)"]
     D --> G["Network Timeline<br/>(dots + lines)"]
   end
-              `}
-              caption="High-level system overview: CSV data flows through the server, gets transformed on the client, and renders in three visualization modes"
-            />
+          `}
+          caption="High-level system overview: CSV data flows through the server, gets transformed on the client, and renders in three visualization modes"
+        />
 
-            <h3 className="mt-4 text-lg font-semibold">The Three Core Concepts</h3>
-            <div className="mt-2 grid gap-4 md:grid-cols-3">
-              <div className="bg-muted/50 rounded-lg border p-4">
-                <h4 className="text-primary mb-2 font-semibold">Ego-centric</h4>
-                <p className="text-muted-foreground text-sm">
-                  Everything revolves around one central entity (the &quot;ego&quot;). All other entities are defined by their relationship
-                  distance from the ego (1 hop = direct, 2 hops = friend-of-a-friend).
-                </p>
-              </div>
-              <div className="bg-muted/50 rounded-lg border p-4">
-                <h4 className="text-primary mb-2 font-semibold">Dynamic</h4>
-                <p className="text-muted-foreground text-sm">
-                  The network changes over time. Entities appear, disappear, and their connections shift across time periods (years or
-                  months).
-                </p>
-              </div>
-              <div className="bg-muted/50 rounded-lg border p-4">
-                <h4 className="text-primary mb-2 font-semibold">Network</h4>
-                <p className="text-muted-foreground text-sm">
-                  Entities are connected via relationships (e.g., co-authorship). Each relationship has a time, a source, a target, and a
-                  weight.
-                </p>
-              </div>
-            </div>
+        <SubSection title="The Three Core Concepts">
+          <Grid cols={3}>
+            <GridCard title="Ego-Centric" icon="*" accent="border-l-blue-500">
+              Everything revolves around one central entity (the &quot;ego&quot;). Other entities are defined by their distance: 1 hop =
+              direct connection, 2 hops = friend-of-a-friend.
+            </GridCard>
+            <GridCard title="Dynamic" icon="*" accent="border-l-green-500">
+              The network changes over time. Entities appear, disappear, and their connections shift across time periods (years or months).
+            </GridCard>
+            <GridCard title="Network" icon="*" accent="border-l-purple-500">
+              Entities are connected via relationships (e.g., co-authorship). Each relationship has a time, a source, a target, and a
+              weight.
+            </GridCard>
+          </Grid>
+        </SubSection>
 
-            <h3 className="mt-6 text-lg font-semibold">What the User Sees</h3>
-            <MermaidDiagram
-              chart={`
+        <SubSection title="What the User Sees">
+          <MermaidDiagram
+            chart={`
 graph TB
   subgraph "UI Layout (Resizable Split)"
     direction TB
@@ -117,80 +104,83 @@ graph TB
   end
   G -.-> |"Time scrubber<br/>controls both"| S
   G -.-> |"Pin entities<br/>highlights across"| N
-              `}
-              caption="The UI has two resizable panels. Interactions in one panel (like pinning an entity) update the other."
-            />
+            `}
+            caption="The UI has two resizable panels. Interactions in one panel (like pinning an entity) update the other."
+          />
+        </SubSection>
 
-            <h3 className="mt-4 text-lg font-semibold">Example Dataset</h3>
-            <p className="text-muted-foreground">
-              The current implementation ships with a demo dataset: the <strong>Jeffrey Heer co-authorship network</strong>. Jeffrey Heer
-              (ID: <code className="bg-muted rounded px-1">p1199</code>) is the ego. Other entities are researchers he has co-authored
-              papers with. Relationships are co-authorships. Time ranges from 2002 to 2022, available in both yearly and monthly
-              granularity.
-            </p>
-          </div>
-        </section>
+        <Analogy>
+          Think of the UI like Google Maps with two views: the top panel is like satellite view (nodes floating in space showing
+          connections), and the bottom panel is like street view (a timeline showing how those connections change). Clicking a pin in one
+          view highlights it in the other.
+        </Analogy>
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 2: Glossary                                      */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="glossary" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">2. Glossary</h2>
-          <div className="bg-card rounded-lg p-6">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-2 pr-4 text-left font-semibold">Term</th>
-                    <th className="py-2 text-left font-semibold">Definition</th>
-                  </tr>
-                </thead>
-                <tbody className="text-muted-foreground">
-                  {[
-                    ['Ego', 'The central entity the entire network is built around.'],
-                    ['Entity', 'Any node in the network (a person, organization, etc.).'],
-                    ['Relationship', 'A connection between two entities at a point in time (e.g., co-authorship).'],
-                    [
-                      'Hop Distance',
-                      'How many edges you must traverse to reach an entity from the ego. Hop 1 = directly connected. Hop 2 = connected through one intermediary.'
-                    ],
-                    [
-                      'Time Block',
-                      'A single time period (one year like "2020" or one month like "2020-03"). Each column in the spreadline chart is one time block.'
-                    ],
-                    ['Topology', 'The list of all connections (edges) in the network with source, target, time, and weight.'],
-                    [
-                      'Category',
-                      'Either "internal" (same affiliation as ego) or "external" (different affiliation). Determines line color.'
-                    ],
-                    [
-                      'Groups',
-                      'Per-time-block arrays that define vertical ordering. Has 2*hopLimit + 1 slots: external hops on top, ego in middle, internal hops on bottom.'
-                    ],
-                    ['BFS', 'Breadth-First Search. The algorithm used to discover entities within N hops of the ego.'],
-                    ['Storyline', "A visual line in the spreadline chart representing one entity's path through time."],
-                    ['Pinning', 'Highlighting specific entities across all views (graph + chart) by clicking on them.'],
-                    ['Granularity', 'The time resolution: "yearly" (one column per year) or "monthly" (one column per month).']
-                  ].map(([term, def]) => (
-                    <tr key={term} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-mono whitespace-nowrap">{term}</td>
-                      <td className="py-2">{def}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 2: Glossary                                           */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section id="glossary" number={2} title="Glossary" color="cyan" subtitle="Key terms you'll encounter throughout the codebase">
+        <DataTable
+          headers={['Term', 'Definition', 'Analogy']}
+          rows={[
+            ['Ego', 'The central entity the entire network is built around.', 'The main character in a movie'],
+            ['Entity', 'Any node in the network (a person, organization, etc.).', 'A character in the cast'],
+            ['Relationship', 'A connection between two entities at a point in time.', 'A scene where two characters appear together'],
+            [
+              'Hop Distance',
+              'How many edges to traverse to reach an entity from the ego. Hop 1 = direct, Hop 2 = through one intermediary.',
+              'Degrees of separation (like "6 degrees of Kevin Bacon")'
+            ],
+            [
+              'Time Block',
+              'A single time period (e.g., "2020" or "2020-03"). Each column in the chart is one time block.',
+              'One episode/season of the show'
+            ],
+            [
+              'Topology',
+              'The list of all connections (edges) with source, target, time, and weight.',
+              'The complete script listing every scene between characters'
+            ],
+            [
+              'Category',
+              '"internal" (same affiliation as ego) or "external" (different). Determines line color.',
+              'Same team vs. rival team'
+            ],
+            [
+              'Groups',
+              'Per-time-block arrays that define vertical ordering. Has 2*hopLimit+1 slots.',
+              'Seating chart — who sits above and below the ego'
+            ],
+            [
+              'BFS',
+              'Breadth-First Search. Algorithm to discover entities within N hops.',
+              'Ripples spreading outward when you drop a stone in water'
+            ],
+            ['Storyline', "A visual line representing one entity's path through time.", 'A character arc weaving through episodes'],
+            ['Pinning', 'Highlighting specific entities across all views.', 'Highlighting a character with a marker across all scenes'],
+            ['Granularity', '"yearly" or "monthly" time resolution.', 'Zooming in from season-level to episode-level']
+          ]}
+        />
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 3: Data Model                                    */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="data-model" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">3. Data Model</h2>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 3: Data Model                                         */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="data-model"
+        number={3}
+        title="Data Model"
+        color="green"
+        subtitle="The three CSV files and TypeScript types that drive everything"
+      >
+        <Analogy>
+          Think of the data like a movie database: <strong>relations.csv</strong> lists every scene (who appeared with whom and when),{' '}
+          <strong>entities.csv</strong> lists every actor (with their studio affiliation per year), and <strong>citations.csv</strong> links
+          specific movies to the actors who starred in them.
+        </Analogy>
 
-          <MermaidDiagram
-            chart={`
+        <MermaidDiagram
+          chart={`
 erDiagram
     RELATIONS_CSV {
         string year
@@ -217,65 +207,69 @@ erDiagram
     RELATIONS_CSV ||--o{ ENTITIES_CSV : "sourceId/targetId -> id"
     CITATIONS_CSV }o--|| RELATIONS_CSV : "paperID -> id"
     CITATIONS_CSV }o--|| ENTITIES_CSV : "entityId -> id"
-            `}
-            caption="Entity-relationship diagram showing how the three CSV files relate to each other"
-          />
+          `}
+          caption="Entity-relationship diagram showing how the three CSV files relate to each other"
+        />
 
-          <Tabs
-            tabs={[
-              {
-                label: 'CSV Files',
-                content: (
-                  <div className="space-y-4">
-                    <p className="text-muted-foreground">
-                      All data comes from three CSV files stored in{' '}
-                      <code className="bg-muted rounded px-1">data/spreadline/vis-author2/</code> (yearly) and{' '}
-                      <code className="bg-muted rounded px-1">data/spreadline/vis-author2-monthly/</code> (monthly).
+        <Tabs
+          tabs={[
+            {
+              label: 'CSV Files',
+              content: (
+                <div className="space-y-4">
+                  <p className="text-muted-foreground">
+                    All data comes from three CSV files stored in <IC>data/spreadline/vis-author2/</IC> (yearly) and{' '}
+                    <IC>data/spreadline/vis-author2-monthly/</IC> (monthly).
+                  </p>
+
+                  <Collapsible title="relations.csv" badge="edges" defaultOpen>
+                    <p className="text-muted-foreground mb-2">
+                      Each row is one relationship (edge) between two entities at a point in time. Think of it as: &quot;Person A and Person
+                      B worked together on artifact X in year Y.&quot;
                     </p>
-
-                    <Collapsible title="relations.csv" badge="edges" defaultOpen>
-                      <p className="text-muted-foreground mb-2">
-                        Each row is one relationship (edge) between two entities at a point in time.
-                      </p>
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`year,sourceId,targetId,id,type,citationcount,count
+                    <CodeBlock filename="relations.csv">
+                      {`year,sourceId,targetId,id,type,citationcount,count
 2002,p1199,p0500,paper123,Co-co-author,5,1
 2003,p1199,p0700,paper456,Co-co-author,12,1`}
-                      </pre>
-                    </Collapsible>
+                    </CodeBlock>
+                  </Collapsible>
 
-                    <Collapsible title="entities.csv" badge="nodes">
-                      <p className="text-muted-foreground mb-2">
-                        Each row is an entity at a specific time period (can appear in multiple years with different affiliations).
-                      </p>
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`id,name,year,relationshipcount,affiliation
+                  <Collapsible title="entities.csv" badge="nodes">
+                    <p className="text-muted-foreground mb-2">
+                      Each row is an entity at a specific time period. An entity can appear in multiple years with different affiliations
+                      (e.g., a researcher who changed universities).
+                    </p>
+                    <CodeBlock filename="entities.csv">
+                      {`id,name,year,relationshipcount,affiliation
 p1199,Jeffrey Heer,2005,42,University of California, Berkeley, USA
 p1199,Jeffrey Heer,2010,156,Stanford University, USA`}
-                      </pre>
-                    </Collapsible>
+                    </CodeBlock>
+                  </Collapsible>
 
-                    <Collapsible title="citations.csv" badge="weights">
-                      <p className="text-muted-foreground mb-2">Maps relationship artifacts to entities and their relationship counts.</p>
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`entityId,year,relationshipcount,affiliation,paperID
+                  <Collapsible title="citations.csv" badge="weights">
+                    <p className="text-muted-foreground mb-2">
+                      Maps relationship artifacts to entities and their relationship counts. Used to compute edge weights and entity
+                      metadata.
+                    </p>
+                    <CodeBlock filename="citations.csv">
+                      {`entityId,year,relationshipcount,affiliation,paperID
 p1199,2005,42,University of California,paper123
 p0500,2005,15,Stanford University,paper123`}
-                      </pre>
-                    </Collapsible>
-                  </div>
-                )
-              },
-              {
-                label: 'TypeScript Types',
-                content: (
-                  <div className="space-y-4">
-                    <Collapsible title="SpreadlineRawDataResponse" badge="main response" defaultOpen>
-                      <p className="text-muted-foreground mb-2">
-                        The complete API response. This is THE data structure driving all visualizations.
-                      </p>
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`interface SpreadlineRawDataResponse {
+                    </CodeBlock>
+                  </Collapsible>
+                </div>
+              )
+            },
+            {
+              label: 'TypeScript Types',
+              content: (
+                <div className="space-y-4">
+                  <Collapsible title="SpreadlineRawDataResponse" badge="main response" defaultOpen>
+                    <p className="text-muted-foreground mb-2">
+                      The complete API response. This is THE single data structure that drives all three visualizations.
+                    </p>
+                    <CodeBlock language="TypeScript">
+                      {`interface SpreadlineRawDataResponse {
   egoId: string;                       // Ego entity ID
   egoName: string;                     // Ego display name
   dataset: string;                     // Dataset name (e.g., "vis-author2")
@@ -285,33 +279,33 @@ p0500,2005,15,Stanford University,paper123`}
   totalPages: number;                  // Total pages available
   timeBlocks: string[];                // Time labels for this page only
 }`}
-                      </pre>
-                    </Collapsible>
+                    </CodeBlock>
+                  </Collapsible>
 
-                    <Collapsible title="TopologyEntry" badge="edge">
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`interface TopologyEntry {
+                  <Collapsible title="TopologyEntry" badge="edge">
+                    <CodeBlock language="TypeScript">
+                      {`interface TopologyEntry {
   sourceId: string;  // First entity ID
   targetId: string;  // Second entity ID
   time: string;      // Time period (e.g., "2020")
   weight: number;    // Edge weight (always 1 from BFS, aggregated later)
 }`}
-                      </pre>
-                    </Collapsible>
+                    </CodeBlock>
+                  </Collapsible>
 
-                    <Collapsible title="EntityInfo" badge="node metadata">
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`interface EntityInfo {
+                  <Collapsible title="EntityInfo" badge="node metadata">
+                    <CodeBlock language="TypeScript">
+                      {`interface EntityInfo {
   name: string;                         // Display name
   category: 'internal' | 'external';    // Affiliation category
   relationships: Record<string, number>; // time -> relationship count
 }`}
-                      </pre>
-                    </Collapsible>
+                    </CodeBlock>
+                  </Collapsible>
 
-                    <Collapsible title="RelationEvent" badge="detail view">
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`interface RelationEvent {
+                  <Collapsible title="RelationEvent" badge="detail view">
+                    <CodeBlock language="TypeScript">
+                      {`interface RelationEvent {
   id: string;            // Unique artifact ID (e.g., paper ID)
   year: string;          // Time period
   sourceId: string;      // First entity ID
@@ -319,12 +313,12 @@ p0500,2005,15,Stanford University,paper123`}
   type: string;          // Relationship type
   relationshipCount: number; // Weight
 }`}
-                      </pre>
-                    </Collapsible>
+                    </CodeBlock>
+                  </Collapsible>
 
-                    <Collapsible title="SpreadlineGraphNode & SpreadlineGraphLink" badge="D3 types">
-                      <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                        {`// Used for the force-directed graph
+                  <Collapsible title="SpreadlineGraphNode & SpreadlineGraphLink" badge="D3 types">
+                    <CodeBlock language="TypeScript">
+                      {`// Used for the force-directed graph
 interface SpreadlineGraphNode extends SimulationNodeDatum {
   id: string;
   name: string;
@@ -342,21 +336,28 @@ interface SpreadlineGraphLink extends SimulationLinkDatum<SpreadlineGraphNode> {
   paperCount: number;   // Distinct shared artifacts
   years: string[];      // Time periods
 }`}
-                      </pre>
-                    </Collapsible>
-                  </div>
-                )
-              },
-              {
-                label: 'Groups Structure',
-                content: (
-                  <div>
-                    <p className="text-muted-foreground mb-4">
-                      The <code className="bg-muted rounded px-1">groups</code> field is the most complex part of the response. For each
-                      time block, it contains a 2D array with <code className="bg-muted rounded px-1">2 * hopLimit + 1</code> slots.
-                    </p>
-                    <MermaidDiagram
-                      chart={`
+                    </CodeBlock>
+                  </Collapsible>
+                </div>
+              )
+            },
+            {
+              label: 'Groups Structure',
+              content: (
+                <div>
+                  <p className="text-muted-foreground mb-4">
+                    The <IC>groups</IC> field is the most complex part of the response. For each time block, it contains a 2D array with{' '}
+                    <IC>2 * hopLimit + 1</IC> slots.
+                  </p>
+
+                  <Analogy>
+                    Think of groups like a stadium seating chart. The ego sits in the center row. &quot;External&quot; entities (different
+                    team) sit in the rows above, and &quot;internal&quot; entities (same team) sit below. The farther an entity is connected
+                    (more hops), the farther from center they sit.
+                  </Analogy>
+
+                  <MermaidDiagram
+                    chart={`
 graph TB
   subgraph "groups['2020'] with hopLimit=2 (5 slots)"
     direction TB
@@ -368,39 +369,42 @@ graph TB
     E0 --- E1 --- EGO --- I1 --- I2
   end
                     `}
-                      caption="Visual layout of the groups array. External entities appear above ego, internal below."
-                    />
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <div className="bg-muted/50 rounded-lg border-l-4 p-4" style={{ borderColor: '#166b6b' }}>
-                        <h4 className="font-semibold" style={{ color: '#166b6b' }}>
-                          External (Teal #166b6b)
-                        </h4>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          Different affiliation from ego. Positioned ABOVE ego in the chart.
-                        </p>
-                      </div>
-                      <div className="bg-muted/50 rounded-lg border-l-4 p-4" style={{ borderColor: '#FA9902' }}>
-                        <h4 className="font-semibold" style={{ color: '#FA9902' }}>
-                          Internal (Orange #FA9902)
-                        </h4>
-                        <p className="text-muted-foreground mt-1 text-sm">Same affiliation as ego. Positioned BELOW ego in the chart.</p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-            ]}
-          />
-        </section>
+                    caption="Visual layout of the groups array. External entities appear above ego, internal below."
+                  />
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 4: Server-Side Architecture                      */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="server-architecture" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">4. Server-Side Architecture</h2>
+                  <Grid>
+                    <GridCard title="External (Teal #166b6b)" accent="border-l-teal-600">
+                      Different affiliation from ego. Positioned ABOVE ego in the chart.
+                    </GridCard>
+                    <GridCard title="Internal (Orange #FA9902)" accent="border-l-orange-500">
+                      Same affiliation as ego. Positioned BELOW ego in the chart.
+                    </GridCard>
+                  </Grid>
+                </div>
+              )
+            }
+          ]}
+        />
+      </Section>
 
-          <MermaidDiagram
-            chart={`
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 4: Server-Side Architecture                           */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="server-architecture"
+        number={4}
+        title="Server-Side Architecture"
+        color="purple"
+        subtitle="How raw CSV data gets processed into the API response"
+      >
+        <Analogy>
+          The server is like a chef in a kitchen. Raw ingredients (CSV files) are loaded from the pantry (file system), filtered by recipe
+          (relation types + year range), cooked through BFS (finding who connects to whom), plated into groups (visual arrangement), and
+          served one course at a time (pagination).
+        </Analogy>
+
+        <MermaidDiagram
+          chart={`
 graph TB
     subgraph "Server-Side Pipeline"
         direction TB
@@ -415,28 +419,31 @@ graph TB
         REL --> PAGE["Server-Side Pagination<br/>slice timeBlocks by page"]
         PAGE --> RESP["SpreadlineRawDataResponse"]
     end
-            `}
-            caption="The server-side data pipeline from CSV files to API response"
-          />
+          `}
+          caption="The server-side data pipeline from CSV files to API response"
+        />
 
-          <Callout type="info" title="All server files use import 'server-only'">
-            This is a Next.js safety mechanism. If any client component accidentally imports a server file, the build will fail immediately.
-            Every file in the <code className="bg-muted rounded px-1">server/</code> directory must have it.
-          </Callout>
+        <Callout type="info" title="All server files use import 'server-only'">
+          This is a Next.js safety mechanism. If any client component accidentally imports a server file, the build will fail immediately.
+          Every file in the <IC>server/</IC> directory must have it.
+        </Callout>
 
-          <Tabs
-            tabs={[
-              {
-                label: 'CSV Loading',
-                content: (
-                  <div>
-                    <p className="text-muted-foreground mb-4">
-                      Simple utility that reads CSV files using PapaParse and caches results in a module-level Map. Once loaded, subsequent
-                      calls return cached data instantly.
-                    </p>
-                    <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                      {`// csv.utils.ts - Key function
-import Papa from 'papaparse';
+        <Tabs
+          tabs={[
+            {
+              label: 'CSV Loading',
+              content: (
+                <div>
+                  <p className="text-muted-foreground mb-4">
+                    Simple utility that reads CSV files using PapaParse and caches results in a module-level Map. Once loaded, subsequent
+                    calls return cached data instantly.
+                  </p>
+                  <Analogy>
+                    Like a library that photocopies a book the first time someone borrows it. Every future request gets the photocopy
+                    instantly instead of going back to the shelf.
+                  </Analogy>
+                  <CodeBlock filename="csv.utils.ts">
+                    {`import Papa from 'papaparse';
 
 const csvCache = new Map<string, unknown[]>();
 
@@ -453,16 +460,21 @@ async function loadCSV<T>(filePath: string): Promise<T[]> {
   csvCache.set(filePath, result.data);
   return result.data;
 }`}
-                    </pre>
-                  </div>
-                )
-              },
-              {
-                label: 'BFS Algorithm',
-                content: (
-                  <div>
-                    <MermaidDiagram
-                      chart={`
+                  </CodeBlock>
+                </div>
+              )
+            },
+            {
+              label: 'BFS Algorithm',
+              content: (
+                <div>
+                  <Analogy>
+                    BFS is like dropping a stone in a pond. The first ripple reaches entities 1 hop away (direct connections). The second
+                    ripple reaches 2 hops away (friend-of-a-friend). You stop at the ripple number set by <IC>hopLimit</IC>.
+                  </Analogy>
+
+                  <MermaidDiagram
+                    chart={`
 sequenceDiagram
     participant S as Service
     participant BFS as constructEgoNetworks()
@@ -484,11 +496,11 @@ sequenceDiagram
     G->>G: Sort by paper count
     G-->>S: groups + categoryMap
                     `}
-                      caption="Sequence diagram showing the BFS network construction and group assignment process"
-                    />
-                    <pre className="bg-muted mt-4 overflow-x-auto rounded-lg p-4 text-sm">
-                      {`// Simplified BFS logic from constructEgoNetworks()
-for (const [time, entries] of Object.entries(byTime)) {
+                    caption="Sequence diagram showing BFS network construction and group assignment"
+                  />
+
+                  <CodeBlock filename="entity-network.utils.ts (simplified)">
+                    {`for (const [time, entries] of Object.entries(byTime)) {
   const distMap = new Map();     // entity -> hop distance
   distMap.set(egoId, 0);         // ego is at distance 0
   let waitlist = new Set([egoId]);
@@ -509,19 +521,20 @@ for (const [time, entries] of Object.entries(byTime)) {
     hop++;
   }
 }`}
-                    </pre>
-                  </div>
-                )
-              },
-              {
-                label: 'Data Service',
-                content: (
-                  <div>
-                    <p className="text-muted-foreground mb-4">
-                      The <code className="bg-muted rounded px-1">getSpreadlineRawData()</code> orchestrates everything:
-                    </p>
-                    <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                      {`async function getSpreadlineRawData(params) {
+                  </CodeBlock>
+                </div>
+              )
+            },
+            {
+              label: 'Data Service',
+              content: (
+                <div>
+                  <p className="text-muted-foreground mb-4">
+                    The <IC>getSpreadlineRawData()</IC> function orchestrates the entire pipeline. Think of it as the main recipe that calls
+                    each cooking step in order.
+                  </p>
+                  <CodeBlock filename="spreadline-data.service.ts (simplified)">
+                    {`async function getSpreadlineRawData(params) {
   // 1. Load all three CSV files in parallel
   const [relations, allEntities, relationships] = await Promise.all([
     loadCSV(path.join(basePath, 'relations.csv')),
@@ -543,26 +556,36 @@ for (const [time, entries] of Object.entries(byTime)) {
   return { egoId, egoName, dataset, entities, topology,
            groups, totalPages, timeBlocks };
 }`}
-                    </pre>
-                    <Callout type="tip" title="Pagination">
-                      Time blocks are sorted newest-first, then sliced into pages of 20. If the last page has fewer than 20 blocks,
-                      it&apos;s padded with synthetic earlier time labels to keep column count consistent across pages.
-                    </Callout>
-                  </div>
-                )
-              }
-            ]}
-          />
-        </section>
+                  </CodeBlock>
+                  <Callout type="tip" title="Pagination">
+                    Time blocks are sorted newest-first, then sliced into pages of 20. If the last page has fewer than 20 blocks, it&apos;s
+                    padded with synthetic earlier time labels to keep column count consistent across pages.
+                  </Callout>
+                </div>
+              )
+            }
+          ]}
+        />
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 5: API Specification                             */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="api-specification" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">5. API Specification</h2>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 5: API Specification                                  */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="api-specification"
+        number={5}
+        title="API Specification"
+        color="indigo"
+        subtitle="Two endpoints power the entire visualization"
+      >
+        <Analogy>
+          The API is like a restaurant menu with two items. The first dish (&quot;getRawData&quot;) gives you the full meal &mdash; all the
+          network data for one page of time. The second dish (&quot;getRelationEvents&quot;) is a side order &mdash; details about specific
+          relationships when you click on a connection.
+        </Analogy>
 
-          <MermaidDiagram
-            chart={`
+        <MermaidDiagram
+          chart={`
 sequenceDiagram
     participant C as Client Component
     participant H as React Query Hook
@@ -583,133 +606,65 @@ sequenceDiagram
     A-->>O: Response
     O-->>H: Typed data
     H-->>C: { data, isPending, error }
-            `}
-            caption="Sequence diagram showing the full API request lifecycle from component to service and back"
-          />
+          `}
+          caption="Full API request lifecycle from component to service and back"
+        />
 
-          <Tabs
-            tabs={[
-              {
-                label: 'getRawData',
-                content: (
-                  <div>
-                    <div className="bg-muted mb-4 inline-block rounded px-3 py-1 text-sm">
-                      <code>GET /api/rpc/spreadline/getRawData</code>
-                    </div>
-                    <p className="text-muted-foreground mb-4">
-                      Returns all data needed to render the SpreadLine visualization for one page of time blocks.
-                    </p>
-                    <div className="overflow-x-auto">
-                      <table className="mb-4 w-full text-sm">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="py-2 pr-4 text-left">Parameter</th>
-                            <th className="py-2 pr-4 text-left">Type</th>
-                            <th className="py-2 pr-4 text-left">Default</th>
-                            <th className="py-2 text-left">Description</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-muted-foreground">
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">egoId</td>
-                            <td className="py-2 pr-4">string</td>
-                            <td className="py-2 pr-4">&mdash;</td>
-                            <td className="py-2">Central entity ID</td>
-                          </tr>
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">relationTypes</td>
-                            <td className="py-2 pr-4">string[]</td>
-                            <td className="py-2 pr-4">&mdash;</td>
-                            <td className="py-2">Types to include (e.g., [&quot;Co-co-author&quot;])</td>
-                          </tr>
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">yearRange</td>
-                            <td className="py-2 pr-4">[number, number]</td>
-                            <td className="py-2 pr-4">&mdash;</td>
-                            <td className="py-2">Start and end year</td>
-                          </tr>
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">granularity</td>
-                            <td className="py-2 pr-4">&quot;yearly&quot; | &quot;monthly&quot;</td>
-                            <td className="py-2 pr-4">&quot;yearly&quot;</td>
-                            <td className="py-2">Time resolution</td>
-                          </tr>
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">splitByAffiliation</td>
-                            <td className="py-2 pr-4">boolean</td>
-                            <td className="py-2 pr-4">true</td>
-                            <td className="py-2">Distinguish internal/external</td>
-                          </tr>
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">pageIndex</td>
-                            <td className="py-2 pr-4">number</td>
-                            <td className="py-2 pr-4">0</td>
-                            <td className="py-2">Zero-based page</td>
-                          </tr>
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">pageSize</td>
-                            <td className="py-2 pr-4">number</td>
-                            <td className="py-2 pr-4">20</td>
-                            <td className="py-2">Blocks per page</td>
-                          </tr>
-                          <tr>
-                            <td className="py-2 pr-4 font-mono">hopLimit</td>
-                            <td className="py-2 pr-4">number (1-5)</td>
-                            <td className="py-2 pr-4">2</td>
-                            <td className="py-2">Max BFS depth</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                      {`// Client hook usage
-import { useQuery } from '@tanstack/react-query';
+        <Tabs
+          tabs={[
+            {
+              label: 'getRawData',
+              content: (
+                <div>
+                  <div className="bg-muted mb-4 inline-block rounded px-3 py-1 text-sm">
+                    <code>GET /api/rpc/spreadline/getRawData</code>
+                  </div>
+                  <p className="text-muted-foreground mb-4">
+                    Returns all data needed to render the SpreadLine visualization for one page of time blocks.
+                  </p>
+                  <DataTable
+                    headers={['Parameter', 'Type', 'Default', 'Description']}
+                    rows={[
+                      ['egoId', 'string', '—', 'Central entity ID'],
+                      ['relationTypes', 'string[]', '—', 'Types to include (e.g., ["Co-co-author"])'],
+                      ['yearRange', '[number, number]', '—', 'Start and end year'],
+                      ['granularity', '"yearly" | "monthly"', '"yearly"', 'Time resolution'],
+                      ['splitByAffiliation', 'boolean', 'true', 'Distinguish internal/external'],
+                      ['pageIndex', 'number', '0', 'Zero-based page'],
+                      ['pageSize', 'number', '20', 'Blocks per page'],
+                      ['hopLimit', 'number (1-5)', '2', 'Max BFS depth']
+                    ]}
+                  />
+                  <CodeBlock filename="Hook usage">
+                    {`import { useQuery } from '@tanstack/react-query';
 import { orpc } from '@/lib/orpc/orpc';
 
 export const useSpreadlineRawDataQuery = (params) => {
   return useQuery(orpc.spreadline.getRawData.queryOptions({ input: params }));
 };`}
-                    </pre>
+                  </CodeBlock>
+                </div>
+              )
+            },
+            {
+              label: 'getRelationEvents',
+              content: (
+                <div>
+                  <div className="bg-muted mb-4 inline-block rounded px-3 py-1 text-sm">
+                    <code>GET /api/rpc/spreadline/getRelationEvents</code>
                   </div>
-                )
-              },
-              {
-                label: 'getRelationEvents',
-                content: (
-                  <div>
-                    <div className="bg-muted mb-4 inline-block rounded px-3 py-1 text-sm">
-                      <code>GET /api/rpc/spreadline/getRelationEvents</code>
-                    </div>
-                    <p className="text-muted-foreground mb-4">
-                      Returns individual relationship events between two specific entities. Used when clicking a link in the graph.
-                    </p>
-                    <div className="overflow-x-auto">
-                      <table className="mb-4 w-full text-sm">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="py-2 pr-4 text-left">Parameter</th>
-                            <th className="py-2 pr-4 text-left">Type</th>
-                            <th className="py-2 text-left">Description</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-muted-foreground">
-                          <tr className="border-b">
-                            <td className="py-2 pr-4 font-mono">sourceId</td>
-                            <td className="py-2 pr-4">string</td>
-                            <td className="py-2">First entity ID</td>
-                          </tr>
-                          <tr>
-                            <td className="py-2 pr-4 font-mono">targetId</td>
-                            <td className="py-2 pr-4">string</td>
-                            <td className="py-2">Second entity ID</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-                      {`// Returns: RelationEvent[] (sorted newest-first, limited)
-// Client hook:
-export const useRelationEventsQuery = (sourceId, targetId) => {
+                  <p className="text-muted-foreground mb-4">
+                    Returns individual relationship events between two specific entities. Triggered when clicking a link in the graph.
+                  </p>
+                  <DataTable
+                    headers={['Parameter', 'Type', 'Description']}
+                    rows={[
+                      ['sourceId', 'string', 'First entity ID'],
+                      ['targetId', 'string', 'Second entity ID']
+                    ]}
+                  />
+                  <CodeBlock filename="Hook usage">
+                    {`export const useRelationEventsQuery = (sourceId, targetId) => {
   return useQuery({
     ...orpc.spreadline.getRelationEvents.queryOptions({
       input: { sourceId, targetId }
@@ -717,22 +672,32 @@ export const useRelationEventsQuery = (sourceId, targetId) => {
     enabled: !!sourceId && !!targetId  // Only fetch when both IDs set
   });
 };`}
-                    </pre>
-                  </div>
-                )
-              }
-            ]}
-          />
-        </section>
+                  </CodeBlock>
+                </div>
+              )
+            }
+          ]}
+        />
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 6: Client-Side Architecture                      */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="client-architecture" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">6. Client-Side Architecture</h2>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 6: Client-Side Architecture                           */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="client-architecture"
+        number={6}
+        title="Client-Side Architecture"
+        color="amber"
+        subtitle="Components, state management, and data transformation"
+      >
+        <Analogy>
+          The client side is like a control room with TV monitors. The <IC>SpreadlineTabComponent</IC> is the control panel operator. It
+          receives data from the API, transforms it into the right format for each monitor (force graph, storyline, timeline), and
+          coordinates them &mdash; when you press a button on one monitor, the others respond.
+        </Analogy>
 
-          <MermaidDiagram
-            chart={`
+        <MermaidDiagram
+          chart={`
 graph TB
     TAB["SpreadlineTabComponent<br/>(main container, owns all state)"]
     HOOK["useSpreadlineRawDataQuery()"]
@@ -753,19 +718,17 @@ graph TB
 
     NT --> TOOLBAR2["SpreadlineToolbar"]
     NT --> SCRUB2["SpreadlineScrubber"]
-            `}
-            caption="Component tree showing parent-child relationships. SpreadlineTabComponent owns all state and passes it down via props."
-          />
+          `}
+          caption="Component tree. SpreadlineTabComponent owns all state and passes it down via props."
+        />
 
-          <Collapsible title="State Management Details" defaultOpen>
-            <p className="text-muted-foreground mb-4">
-              All state lives in <code className="bg-muted rounded px-1">SpreadlineTabComponent</code> as React
-              <code className="bg-muted rounded px-1"> useState</code> hooks. A module-level LRU cache (10 entries) preserves state across
-              tab unmount/remount.
-            </p>
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`// Key state managed by SpreadlineTabComponent:
-const [selectedRange, setSelectedRange] = useState<[number, number] | null>([0, 0]);
+        <Collapsible title="State Management Details" defaultOpen>
+          <p className="text-muted-foreground mb-4">
+            All state lives in <IC>SpreadlineTabComponent</IC> as React <IC>useState</IC> hooks. A module-level LRU cache (10 entries)
+            preserves state across tab unmount/remount.
+          </p>
+          <CodeBlock filename="spreadline-tab.component.tsx (key state)">
+            {`const [selectedRange, setSelectedRange] = useState<[number, number] | null>([0, 0]);
 const [pinnedEntityNames, setPinnedEntityNames] = useState<string[]>([]);
 const [relationTypes, setRelationTypes] = useState<string[]>(['Co-co-author']);
 const [granularity, setGranularity] = useState<SpreadlineGranularity>('yearly');
@@ -774,70 +737,50 @@ const [pageIndex, setPageIndex] = useState(0);
 const [blocksFilter, setBlocksFilter] = useState(1);
 const [activeBottomTab, setActiveBottomTab] = useState<SpreadlineBottomTab>('spreadline');
 const [hopLimit, setHopLimit] = useState(2);`}
-            </pre>
-          </Collapsible>
+          </CodeBlock>
+        </Collapsible>
 
-          <Collapsible title="Utility Transform Functions">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-2 pr-4 text-left">Function</th>
-                    <th className="py-2 pr-4 text-left">Input</th>
-                    <th className="py-2 text-left">Output</th>
-                  </tr>
-                </thead>
-                <tbody className="text-muted-foreground">
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-mono text-xs">transformSpreadlineToGraph()</td>
-                    <td className="py-2 pr-4">Raw response</td>
-                    <td className="py-2">Nodes + links across ALL times</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-mono text-xs">transformSpreadlineToGraphByTime()</td>
-                    <td className="py-2 pr-4">Response + time</td>
-                    <td className="py-2">Nodes + links for ONE time block</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-mono text-xs">transformSpreadlineToGraphByTimes()</td>
-                    <td className="py-2 pr-4">Response + time range</td>
-                    <td className="py-2">Nodes + links for MULTIPLE blocks</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-mono text-xs">transformSpreadlineToTimeline()</td>
-                    <td className="py-2 pr-4">Raw response</td>
-                    <td className="py-2">TimelineEntity[] for timeline chart</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-mono text-xs">deduplicateLinks()</td>
-                    <td className="py-2 pr-4">Topology + node IDs</td>
-                    <td className="py-2">Aggregated links (deduped)</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 pr-4 font-mono text-xs">bfsDistances()</td>
-                    <td className="py-2 pr-4">Start ID + links</td>
-                    <td className="py-2">Map of ID to shortest distance</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </Collapsible>
-        </section>
+        <Collapsible title="Utility Transform Functions">
+          <p className="text-muted-foreground mb-3">
+            These pure functions convert the API response into formats needed by each visualization:
+          </p>
+          <DataTable
+            headers={['Function', 'Input', 'Output']}
+            rows={[
+              ['transformSpreadlineToGraph()', 'Raw response', 'Nodes + links across ALL times'],
+              ['transformSpreadlineToGraphByTime()', 'Response + time', 'Nodes + links for ONE time block'],
+              ['transformSpreadlineToGraphByTimes()', 'Response + time range', 'Nodes + links for MULTIPLE blocks'],
+              ['transformSpreadlineToTimeline()', 'Raw response', 'TimelineEntity[] for timeline chart'],
+              ['deduplicateLinks()', 'Topology + node IDs', 'Aggregated links (deduped)'],
+              ['bfsDistances()', 'Start ID + links', 'Map of ID to shortest distance']
+            ]}
+          />
+        </Collapsible>
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 7: SpreadLine Layout Engine                      */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="layout-engine" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">7. SpreadLine Layout Engine</h2>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 7: SpreadLine Layout Engine                           */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="layout-engine"
+        number={7}
+        title="SpreadLine Layout Engine"
+        color="rose"
+        subtitle="A 5-phase pipeline that computes where storylines should be drawn"
+      >
+        <p className="text-muted-foreground">
+          The layout engine lives in <IC>src/lib/spreadline/</IC> and is a TypeScript port of a Python academic library. It computes
+          vertical positions for storylines.
+        </p>
 
-          <div className="bg-card mb-6 rounded-lg p-6">
-            <p className="text-muted-foreground mb-4">
-              The layout engine lives in <code className="bg-muted rounded px-1">src/lib/spreadline/</code> and is a TypeScript port of a
-              Python academic library. It computes vertical positions for storylines in the chart.
-            </p>
+        <Analogy>
+          Imagine organizing spaghetti noodles on a plate so they don&apos;t tangle. Phase 1 decides the top-to-bottom order. Phase 2
+          straightens noodles horizontally. Phase 3 squeezes out gaps. Phase 4 nudges overlapping noodles apart. Phase 5 draws the final
+          curves.
+        </Analogy>
 
-            <MermaidDiagram
-              chart={`
+        <MermaidDiagram
+          chart={`
 graph LR
     subgraph "5-Phase Pipeline"
         direction LR
@@ -849,59 +792,38 @@ graph LR
         CX --> R["rendering()<br/>Generate SVG paths"]
     end
     R --> RES["SpreadLineResult<br/>storylines, blocks,<br/>timeLabels, paths"]
-              `}
-              caption="The SpreadLine layout pipeline: data flows through 5 optimization phases before rendering to SVG paths"
-            />
-          </div>
+          `}
+          caption="The SpreadLine layout pipeline: data flows through 5 optimization phases before rendering to SVG paths"
+        />
 
-          <Collapsible title="Phase Details" defaultOpen>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-2 pr-4 text-left">Phase</th>
-                    <th className="py-2 pr-4 text-left">File</th>
-                    <th className="py-2 text-left">What It Does</th>
-                  </tr>
-                </thead>
-                <tbody className="text-muted-foreground">
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-semibold">1. Ordering</td>
-                    <td className="py-2 pr-4 font-mono">order.ts</td>
-                    <td className="py-2">
-                      Determines vertical order at each time block to minimize edge crossings. Uses a barycenter heuristic.
-                    </td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-semibold">2. Aligning</td>
-                    <td className="py-2 pr-4 font-mono">align.ts</td>
-                    <td className="py-2">
-                      Snaps entities to consistent Y positions across adjacent blocks so lines are as horizontal as possible.
-                    </td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-semibold">3. Compacting</td>
-                    <td className="py-2 pr-4 font-mono">compact.ts</td>
-                    <td className="py-2">Removes unnecessary vertical whitespace, squeezing the chart to minimal height.</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2 pr-4 font-semibold">4. Contextualizing</td>
-                    <td className="py-2 pr-4 font-mono">contextualize.ts</td>
-                    <td className="py-2">Runs a D3 force simulation for final position refinement and collision detection.</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 pr-4 font-semibold">5. Rendering</td>
-                    <td className="py-2 pr-4 font-mono">render.ts</td>
-                    <td className="py-2">Converts final positions into SVG paths (bezier curves), labels, marks, and blocks.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </Collapsible>
+        <Collapsible title="Phase Details" defaultOpen>
+          <DataTable
+            headers={['Phase', 'File', 'What It Does']}
+            rows={[
+              [
+                '1. Ordering',
+                'order.ts',
+                'Determines vertical order at each time block to minimize edge crossings. Uses a barycenter heuristic.'
+              ],
+              [
+                '2. Aligning',
+                'align.ts',
+                'Snaps entities to consistent Y positions across adjacent blocks so lines are as horizontal as possible.'
+              ],
+              ['3. Compacting', 'compact.ts', 'Removes unnecessary vertical whitespace, squeezing the chart to minimal height.'],
+              [
+                '4. Contextualizing',
+                'contextualize.ts',
+                'Runs a D3 force simulation for final position refinement and collision detection.'
+              ],
+              ['5. Rendering', 'render.ts', 'Converts final positions into SVG paths (bezier curves), labels, marks, and blocks.']
+            ]}
+          />
+        </Collapsible>
 
-          <Collapsible title="Usage Code Example">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`import { SpreadLine } from '@/lib/spreadline';
+        <Collapsible title="Usage Code Example">
+          <CodeBlock filename="How to use the SpreadLine class">
+            {`import { SpreadLine } from '@/lib/spreadline';
 
 const spreadline = new SpreadLine();
 
@@ -923,12 +845,12 @@ spreadline.center(
 // Phase 2-5: Run optimization + render
 const result = spreadline.fit(width, height);
 // result: SpreadLineResult with storylines, blocks, timeLabels, etc.`}
-            </pre>
-          </Collapsible>
+          </CodeBlock>
+        </Collapsible>
 
-          <Collapsible title="Output: SpreadLineResult">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`interface SpreadLineResult {
+        <Collapsible title="Output: SpreadLineResult">
+          <CodeBlock language="TypeScript">
+            {`interface SpreadLineResult {
   bandWidth: number;       // Width of each time column
   blockWidth: number;      // Total chart width
   ego: string;             // Ego entity name
@@ -946,18 +868,28 @@ interface StorylineResult {
   color: string;         // Line color
   lifespan: number;      // Active time block count
 }`}
-            </pre>
-          </Collapsible>
-        </section>
+          </CodeBlock>
+        </Collapsible>
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 8: D3 Visualization Layer                        */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="d3-visualization" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">8. D3 Visualization Layer</h2>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 8: D3 Visualization Layer                             */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="d3-visualization"
+        number={8}
+        title="D3 Visualization Layer"
+        color="emerald"
+        subtitle="How React and D3 work together without fighting each other"
+      >
+        <Analogy>
+          React and D3 both want to control the DOM &mdash; like two cooks grabbing the same spoon. The solution: React owns the
+          &quot;kitchen&quot; (lifecycle, when to cook), and D3 owns the &quot;stove&quot; (SVG rendering, animations). React decides WHEN
+          to render; D3 decides HOW to render.
+        </Analogy>
 
-          <MermaidDiagram
-            chart={`
+        <MermaidDiagram
+          chart={`
 graph TB
     subgraph "React World"
         RC["SpreadLineChart<br/>(React forwardRef)"]
@@ -976,18 +908,18 @@ graph TB
         FILTER -->|"calls directly"| VIZ
         PIN -->|"calls directly"| VIZ
     end
-            `}
-            caption="The critical React/D3 separation: React manages lifecycle, D3 manages ALL rendering and interaction"
-          />
+          `}
+          caption="React manages lifecycle, D3 manages ALL rendering and interaction"
+        />
 
-          <Callout type="important" title="Critical Rendering Separation">
-            React re-renders ONLY when data, config, or resetKey changes. D3 handles ALL other updates: filtering, pinning, hover, zoom/pan,
-            highlight bar drag, block collapse/expand. This ensures smooth D3 animations without React interference.
-          </Callout>
+        <Callout type="important" title="Critical Rendering Separation">
+          React re-renders ONLY when data, config, or resetKey changes. D3 handles ALL other updates: filtering, pinning, hover, zoom/pan,
+          highlight bar drag, block collapse/expand. This ensures smooth D3 animations without React interference.
+        </Callout>
 
-          <Collapsible title="SpreadLineChart Props API" defaultOpen>
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`interface SpreadLineChartProps {
+        <Collapsible title="SpreadLineChart Props API" defaultOpen>
+          <CodeBlock language="TypeScript">
+            {`interface SpreadLineChartProps {
   data: SpreadLineData;                   // Layout result
   config?: Partial<SpreadLineConfig>;     // Visual overrides
   onFilterChange?: (names: string[]) => void;
@@ -1011,13 +943,15 @@ interface SpreadLineChartHandle {
   toggleLineVisibility: (color: string) => void;
   toggleLabels: () => void;
 }`}
-            </pre>
-          </Collapsible>
+          </CodeBlock>
+        </Collapsible>
 
-          <Collapsible title="Force-Directed Graph Setup">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`// D3 force simulation for the top panel graph
-const simulation = d3.forceSimulation(nodes)
+        <Collapsible title="Force-Directed Graph Setup">
+          <p className="text-muted-foreground mb-3">
+            The top panel uses D3&apos;s force simulation to arrange nodes in a physics-based layout:
+          </p>
+          <CodeBlock filename="spreadline-graph.component.tsx (simplified)">
+            {`const simulation = d3.forceSimulation(nodes)
   .force('link', d3.forceLink(links).id(d => d.id)
     .distance(d => d.hopDistance === 1 ? 100 : 200))
   .force('charge', d3.forceManyBody().strength(-300))
@@ -1032,85 +966,74 @@ const simulation = d3.forceSimulation(nodes)
 // - Hop-2+ nodes: float farther out
 // - Link thickness/color scales with relationship weight
 // - Time changes trigger smooth D3 transitions (600ms)`}
-            </pre>
-          </Collapsible>
-        </section>
+          </CodeBlock>
+        </Collapsible>
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 9: Configuration & Constants                     */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="configuration" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">9. Configuration &amp; Constants</h2>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 9: Configuration & Constants                          */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="configuration"
+        number={9}
+        title="Configuration & Constants"
+        color="orange"
+        subtitle="All tunable values are centralized in one file"
+      >
+        <p className="text-muted-foreground">
+          All tunable values live in <IC>src/features/spreadlines/const.ts</IC>. This is the single source of truth for defaults, colors,
+          and dimensions.
+        </p>
 
-          <p className="text-muted-foreground mb-4">
-            All tunable values are centralized in <code className="bg-muted rounded px-1">src/features/spreadlines/const.ts</code>.
-          </p>
-
-          <Tabs
-            tabs={[
-              {
-                label: 'Defaults',
-                content: (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-2 pr-4 text-left">Constant</th>
-                          <th className="py-2 pr-4 text-left">Value</th>
-                          <th className="py-2 text-left">Purpose</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-muted-foreground">
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">SPREADLINE_DEFAULT_EGO_ID</td>
-                          <td className="py-2 pr-4">&quot;p1199&quot;</td>
-                          <td className="py-2">Jeffrey Heer (demo ego)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">SPREADLINE_DEFAULT_YEAR_RANGE</td>
-                          <td className="py-2 pr-4">[2002, 2022]</td>
-                          <td className="py-2">Default time range</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">SPREADLINE_DEFAULT_HOP_LIMIT</td>
-                          <td className="py-2 pr-4">2</td>
-                          <td className="py-2">Default BFS depth</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">SPREADLINE_MAX_HOP_LIMIT</td>
-                          <td className="py-2 pr-4">5</td>
-                          <td className="py-2">Maximum BFS depth</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 pr-4 font-mono text-xs">SPREADLINE_PAGE_SIZE</td>
-                          <td className="py-2 pr-4">20</td>
-                          <td className="py-2">Blocks per API page</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              },
-              {
-                label: 'Colors',
-                content: (
-                  <div>
-                    <div className="mb-4 grid gap-4 md:grid-cols-2">
-                      {[
-                        { name: 'INTERNAL', color: '#FA9902', desc: 'Same affiliation as ego' },
-                        { name: 'EXTERNAL', color: '#166b6b', desc: 'Different affiliation' },
-                        { name: 'SELECTED', color: 'hsl(270, 65%, 55%)', desc: 'Pinned/selected entities' }
-                      ].map(c => (
-                        <div key={c.name} className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
-                          <div className="h-8 w-8 flex-shrink-0 rounded-md border" style={{ backgroundColor: c.color }} />
-                          <div>
-                            <div className="font-mono text-xs">{c.name}</div>
-                            <div className="text-muted-foreground text-sm">{c.desc}</div>
-                          </div>
+        <Tabs
+          tabs={[
+            {
+              label: 'Defaults',
+              content: (
+                <DataTable
+                  headers={['Constant', 'Value', 'Purpose']}
+                  rows={[
+                    ['SPREADLINE_DEFAULT_EGO_ID', '"p1199"', 'Demo ego entity'],
+                    ['SPREADLINE_DEFAULT_YEAR_RANGE', '[2002, 2022]', 'Default time range'],
+                    ['SPREADLINE_DEFAULT_HOP_LIMIT', '2', 'Default BFS depth'],
+                    ['SPREADLINE_MAX_HOP_LIMIT', '5', 'Maximum BFS depth'],
+                    ['SPREADLINE_PAGE_SIZE', '20', 'Blocks per API page']
+                  ]}
+                />
+              )
+            },
+            {
+              label: 'Colors',
+              content: (
+                <div>
+                  <Grid>
+                    {[
+                      {
+                        name: 'INTERNAL',
+                        color: '#FA9902',
+                        desc: 'Same affiliation as ego'
+                      },
+                      {
+                        name: 'EXTERNAL',
+                        color: '#166b6b',
+                        desc: 'Different affiliation'
+                      },
+                      {
+                        name: 'SELECTED',
+                        color: 'hsl(270, 65%, 55%)',
+                        desc: 'Pinned/selected entities'
+                      }
+                    ].map(c => (
+                      <div key={c.name} className="flex items-center gap-3 rounded-lg border p-3">
+                        <div className="h-8 w-8 flex-shrink-0 rounded-md border" style={{ backgroundColor: c.color }} />
+                        <div>
+                          <div className="font-mono text-xs">{c.name}</div>
+                          <div className="text-muted-foreground text-sm">{c.desc}</div>
                         </div>
-                      ))}
-                    </div>
-                    <h4 className="mb-2 font-semibold">Frequency Heatmap Colors (low to high)</h4>
+                      </div>
+                    ))}
+                  </Grid>
+                  <SubSection title="Frequency Heatmap Colors (low to high)">
                     <div className="flex gap-1">
                       {['#ffffff', '#fcdaca', '#e599a6', '#c94b77', '#740980'].map(c => (
                         <div key={c} className="h-8 flex-1 rounded border" style={{ backgroundColor: c }} title={c} />
@@ -1120,64 +1043,41 @@ const simulation = d3.forceSimulation(nodes)
                       <span>Low activity</span>
                       <span>High activity</span>
                     </div>
-                  </div>
-                )
-              },
-              {
-                label: 'Dimensions',
-                content: (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-2 pr-4 text-left">Constant</th>
-                          <th className="py-2 pr-4 text-left">Value</th>
-                          <th className="py-2 text-left">Usage</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-muted-foreground">
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">SPREADLINE_MIN_WIDTH_PER_TIMESTAMP</td>
-                          <td className="py-2 pr-4">200px</td>
-                          <td className="py-2">Minimum column width</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">SPREADLINE_CHART_HEIGHT</td>
-                          <td className="py-2 pr-4">1000px</td>
-                          <td className="py-2">Layout height</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">GRAPH_HOP1_LINK_DISTANCE</td>
-                          <td className="py-2 pr-4">100px</td>
-                          <td className="py-2">Hop-1 link distance</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 pr-4 font-mono text-xs">GRAPH_TIME_TRANSITION_MS</td>
-                          <td className="py-2 pr-4">600ms</td>
-                          <td className="py-2">Animation duration</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 pr-4 font-mono text-xs">NETWORK_TIMELINE_ROW_HEIGHT</td>
-                          <td className="py-2 pr-4">32px</td>
-                          <td className="py-2">Timeline row height</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              }
-            ]}
-          />
-        </section>
+                  </SubSection>
+                </div>
+              )
+            },
+            {
+              label: 'Dimensions',
+              content: (
+                <DataTable
+                  headers={['Constant', 'Value', 'Usage']}
+                  rows={[
+                    ['SPREADLINE_MIN_WIDTH_PER_TIMESTAMP', '200px', 'Minimum column width'],
+                    ['SPREADLINE_CHART_HEIGHT', '1000px', 'Layout height'],
+                    ['GRAPH_HOP1_LINK_DISTANCE', '100px', 'Hop-1 link distance'],
+                    ['GRAPH_TIME_TRANSITION_MS', '600ms', 'Animation duration'],
+                    ['NETWORK_TIMELINE_ROW_HEIGHT', '32px', 'Timeline row height']
+                  ]}
+                />
+              )
+            }
+          ]}
+        />
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 10: Directory Structure                          */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="directory-structure" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">10. Directory Structure</h2>
-
-          <MermaidDiagram
-            chart={`
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 10: Directory Structure                               */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="directory-structure"
+        number={10}
+        title="Directory Structure"
+        color="teal"
+        subtitle="Three directories, each with a clear responsibility"
+      >
+        <MermaidDiagram
+          chart={`
 graph TB
     subgraph "3 Main Directories"
         F["src/features/spreadlines/<br/>Feature code<br/>(components, hooks, server, utils)"]
@@ -1187,13 +1087,19 @@ graph TB
     F --> |"imports"| L
     F --> |"imports"| V
     V --> |"imports"| L
-            `}
-            caption="The three main directories and their dependency relationships"
-          />
+          `}
+          caption="The three main directories and their dependency relationships"
+        />
 
-          <Collapsible title="Full File Tree" defaultOpen>
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`# Feature code
+        <Analogy>
+          Think of it like a restaurant chain: <strong>features/spreadlines</strong> is the specific restaurant (menu, staff, kitchen),{' '}
+          <strong>lib/spreadline</strong> is the recipe book (reusable across restaurants), and <strong>lib/spreadline-viz</strong> is the
+          plating guide (how to present the dish).
+        </Analogy>
+
+        <Collapsible title="Full File Tree" defaultOpen>
+          <CodeBlock>
+            {`# Feature code
 src/features/spreadlines/
 ├── components/
 │   ├── spreadline-tab.component.tsx            # Main container + state
@@ -1244,17 +1150,21 @@ src/lib/spreadline-viz/
 data/spreadline/
 ├── vis-author2/          # Yearly
 └── vis-author2-monthly/  # Monthly`}
-            </pre>
-          </Collapsible>
-        </section>
+          </CodeBlock>
+        </Collapsible>
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 11: Data Flow                                    */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="data-flow" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">11. Data Flow</h2>
-
-          <h3 className="mb-4 text-lg font-semibold">End-to-End Request Flow</h3>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 11: Data Flow                                         */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="data-flow"
+        number={11}
+        title="Data Flow"
+        color="violet"
+        subtitle="End-to-end journey of data from user action to rendered pixels"
+      >
+        <SubSection title="End-to-End Request Flow">
           <MermaidDiagram
             chart={`
 sequenceDiagram
@@ -1288,10 +1198,14 @@ sequenceDiagram
     TAB->>TAB: new SpreadLine().load().center().fit()
     TAB->>TAB: Render Force Graph + Spreadline Chart
             `}
-            caption="Complete sequence diagram from user action to rendered visualization"
+            caption="Complete sequence from user action to rendered visualization"
           />
+        </SubSection>
 
-          <h3 className="mt-8 mb-4 text-lg font-semibold">User Interaction Flow</h3>
+        <SubSection title="User Interaction Flow">
+          <p className="text-muted-foreground mb-4">
+            Most interactions stay client-side. Only filter changes and page navigation trigger new API calls.
+          </p>
           <MermaidDiagram
             chart={`
 graph LR
@@ -1318,18 +1232,23 @@ graph LR
     A5 --> B5
     A6 --> B6
             `}
-            caption="Map of user interactions to system responses. Most stay client-side; only filter/page changes trigger API calls."
+            caption="Map of user interactions to system responses"
           />
-        </section>
+        </SubSection>
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 12: Migration Guide                              */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="migration-guide" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">12. Migration Guide (Step-by-Step)</h2>
-
-          <MermaidDiagram
-            chart={`
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 12: Migration Guide                                   */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="migration-guide"
+        number={12}
+        title="Migration Guide"
+        color="sky"
+        subtitle="Step-by-step instructions to move SpreadLine into your project"
+      >
+        <MermaidDiagram
+          chart={`
 graph TB
     subgraph "Migration Steps"
         direction TB
@@ -1347,18 +1266,18 @@ graph TB
         S12 --> S13["13. Build & Verify"]
         S13 --> S14["14. Optional: Replace CSV with DB"]
     end
-            `}
-            caption="The 14 migration steps in order. Each step builds on the previous."
-          />
+          `}
+          caption="The 14 migration steps in order. Each step builds on the previous."
+        />
 
-          <Callout type="info" title="Prerequisites">
-            Your target project must have: Next.js 14+ with App Router, TypeScript, React 18+, Tailwind CSS, and Shadcn/ui components
-            (ResizablePanel, Button, Select, Slider, Tabs, Tooltip).
-          </Callout>
+        <Callout type="info" title="Prerequisites">
+          Your target project must have: Next.js 14+ with App Router, TypeScript, React 18+, Tailwind CSS, and Shadcn/ui components
+          (ResizablePanel, Button, Select, Slider, Tabs, Tooltip).
+        </Callout>
 
-          <Step number={1} title="Install Dependencies">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`# Core visualization
+        <Step number={1} title="Install Dependencies">
+          <CodeBlock>
+            {`# Core visualization
 npm install d3 @types/d3
 
 # CSV parsing (server-side)
@@ -1372,60 +1291,46 @@ npm install zod
 
 # Shadcn components
 npx shadcn@latest add resizable button select slider tabs tooltip`}
-            </pre>
-          </Step>
+          </CodeBlock>
+        </Step>
 
-          <Step number={2} title="Copy Layout Engine (standalone library)">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`cp -r src/lib/spreadline/ <your-project>/src/lib/spreadline/`}
-            </pre>
-            <p>
-              This is self-contained. No external dependencies beyond D3. Run{' '}
-              <code className="bg-muted rounded px-1">spreadline.test.ts</code> to verify.
-            </p>
-          </Step>
+        <Step number={2} title="Copy Layout Engine (standalone library)">
+          <CodeBlock>{`cp -r src/lib/spreadline/ <your-project>/src/lib/spreadline/`}</CodeBlock>
+          <p>
+            This is self-contained. No external dependencies beyond D3. Run <IC>spreadline.test.ts</IC> to verify.
+          </p>
+        </Step>
 
-          <Step number={3} title="Copy D3 Visualization Layer">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`cp -r src/lib/spreadline-viz/ <your-project>/src/lib/spreadline-viz/`}
-            </pre>
-            <p>
-              Imports constants from <code className="bg-muted rounded px-1">features/spreadlines/const.ts</code> &mdash; you&apos;ll need
-              to update paths or copy those constants.
-            </p>
-          </Step>
+        <Step number={3} title="Copy D3 Visualization Layer">
+          <CodeBlock>{`cp -r src/lib/spreadline-viz/ <your-project>/src/lib/spreadline-viz/`}</CodeBlock>
+          <p>
+            Imports constants from <IC>features/spreadlines/const.ts</IC> &mdash; you&apos;ll need to update paths or copy those constants.
+          </p>
+        </Step>
 
-          <Step number={4} title="Copy Data Models">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`cp src/models/relation-event.model.ts <your-project>/src/models/`}
-            </pre>
-            <p>
-              The key types (TopologyEntry, EntityInfo, SpreadlineRawDataResponse) are defined inline in service/router files, not in
-              separate model files.
-            </p>
-          </Step>
+        <Step number={4} title="Copy Data Models">
+          <CodeBlock>{`cp src/models/relation-event.model.ts <your-project>/src/models/`}</CodeBlock>
+          <p>
+            The key types (TopologyEntry, EntityInfo, SpreadlineRawDataResponse) are defined inline in service/router files, not in separate
+            model files.
+          </p>
+        </Step>
 
-          <Step number={5} title="Copy the Feature Directory">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`cp -r src/features/spreadlines/ <your-project>/src/features/spreadlines/`}
-            </pre>
-            <p>
-              Includes server/, hooks/, components/, utils/, and const.ts. Update import paths to match your project&apos;s{' '}
-              <code className="bg-muted rounded px-1">@/</code> alias.
-            </p>
-          </Step>
+        <Step number={5} title="Copy the Feature Directory">
+          <CodeBlock>{`cp -r src/features/spreadlines/ <your-project>/src/features/spreadlines/`}</CodeBlock>
+          <p>
+            Includes server/, hooks/, components/, utils/, and const.ts. Update import paths to match your project&apos;s <IC>@/</IC> alias.
+          </p>
+        </Step>
 
-          <Step number={6} title="Copy CSV Data Files">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`cp -r data/spreadline/ <your-project>/data/spreadline/`}
-            </pre>
-            <p>This copies the demo dataset. If using your own data, create CSVs in the same format (Section 3a).</p>
-          </Step>
+        <Step number={6} title="Copy CSV Data Files">
+          <CodeBlock>{`cp -r data/spreadline/ <your-project>/data/spreadline/`}</CodeBlock>
+          <p>This copies the demo dataset. If using your own data, create CSVs in the same format (Section 3).</p>
+        </Step>
 
-          <Step number={7} title="Set Up the API Layer">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`// In your main router file (if using ORPC):
-import { spreadlineRouter } from '@/features/spreadlines/server/routers';
+        <Step number={7} title="Set Up the API Layer">
+          <CodeBlock filename="Your main router file (if using ORPC)">
+            {`import { spreadlineRouter } from '@/features/spreadlines/server/routers';
 export const router = {
   // ...your routers...
   spreadline: spreadlineRouter
@@ -1435,24 +1340,24 @@ export const router = {
 // 1. Create equivalent endpoints for getRawData and getRelationEvents
 // 2. Use the same Zod schemas from routers.ts
 // 3. Update hooks to call your framework`}
-            </pre>
-          </Step>
+          </CodeBlock>
+        </Step>
 
-          <Step number={8} title="Update Import Paths">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`# Key imports to search and fix:
+        <Step number={8} title="Update Import Paths">
+          <CodeBlock>
+            {`# Key imports to search and fix:
 @/lib/orpc/orpc            → Your API client path
 @/lib/orpc                 → Your ORPC procedure definitions
 @/components/ui/*          → Your Shadcn component paths
 @/features/relationship-evidence/const → Just has MAX_RELATION_EVENTS (a number)
                                          Define locally to remove cross-feature dep`}
-            </pre>
-          </Step>
+          </CodeBlock>
+        </Step>
 
-          <Step number={9} title="Create a Host Page">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`// src/app/spreadline/page.tsx
-import SpreadlineTabComponent from '@/features/spreadlines/components/spreadline-tab.component';
+        <Step number={9} title="Create a Host Page">
+          <CodeBlock filename="src/app/spreadline/page.tsx">
+            {`import SpreadlineTabComponent from
+  '@/features/spreadlines/components/spreadline-tab.component';
 
 export default function SpreadlinePage() {
   return (
@@ -1461,139 +1366,138 @@ export default function SpreadlinePage() {
     </div>
   );
 }`}
-            </pre>
-          </Step>
+          </CodeBlock>
+        </Step>
 
-          <Step number={10} title="Handle Store Dependency">
-            <p>
-              <code className="bg-muted rounded px-1">SpreadlineTabComponent</code> imports{' '}
-              <code className="bg-muted rounded px-1">useOpenFilesActions</code> (Zustand store for tab titles). Either remove the import +
-              useEffect that calls <code className="bg-muted rounded px-1">updateOpenFileTitle</code> (cosmetic only), or create a no-op
-              stub hook.
-            </p>
-          </Step>
+        <Step number={10} title="Handle Store Dependency">
+          <p>
+            <IC>SpreadlineTabComponent</IC> imports <IC>useOpenFilesActions</IC> (Zustand store for tab titles). Either remove the import +
+            useEffect that calls <IC>updateOpenFileTitle</IC> (cosmetic only), or create a no-op stub hook.
+          </p>
+        </Step>
 
-          <Step number={11} title="Adapt to Your Own Data">
-            <ol className="list-inside list-decimal space-y-1">
-              <li>Prepare three CSV files matching Section 3a format</li>
-              <li>
-                Place in <code className="bg-muted rounded px-1">data/spreadline/your-dataset/</code>
-              </li>
-              <li>
-                Update <code className="bg-muted rounded px-1">DATASET_DIRS</code> in service
-              </li>
-              <li>
-                Update <code className="bg-muted rounded px-1">SPREADLINE_DEFAULT_EGO_ID</code> in const.ts
-              </li>
-              <li>
-                Update <code className="bg-muted rounded px-1">SPREADLINE_DEFAULT_YEAR_RANGE</code>
-              </li>
-              <li>
-                Update <code className="bg-muted rounded px-1">SPREADLINE_RELATION_TYPE_OPTIONS</code>
-              </li>
-              <li>
-                Replace <code className="bg-muted rounded px-1">remapJHAffiliation()</code> with your own normalization
-              </li>
-            </ol>
-          </Step>
+        <Step number={11} title="Adapt to Your Own Data">
+          <ol className="text-muted-foreground list-inside list-decimal space-y-1 text-sm">
+            <li>Prepare three CSV files matching Section 3 format</li>
+            <li>
+              Place in <IC>data/spreadline/your-dataset/</IC>
+            </li>
+            <li>
+              Update <IC>DATASET_DIRS</IC> in service
+            </li>
+            <li>
+              Update <IC>SPREADLINE_DEFAULT_EGO_ID</IC> in const.ts
+            </li>
+            <li>
+              Update <IC>SPREADLINE_DEFAULT_YEAR_RANGE</IC>
+            </li>
+            <li>
+              Update <IC>SPREADLINE_RELATION_TYPE_OPTIONS</IC>
+            </li>
+            <li>
+              Replace <IC>remapJHAffiliation()</IC> with your own normalization
+            </li>
+          </ol>
+        </Step>
 
-          <Step number={12} title="Run Tests">
-            <pre className="bg-muted overflow-x-auto rounded-lg p-4 text-sm">
-              {`npm test -- --testPathPattern="spreadline"
+        <Step number={12} title="Run Tests">
+          <CodeBlock>
+            {`npm test -- --testPathPattern="spreadline"
 # Should run 7 test files, all passing`}
-            </pre>
-          </Step>
+          </CodeBlock>
+        </Step>
 
-          <Step number={13} title="Build and Verify">
-            <pre className="bg-muted mb-2 overflow-x-auto rounded-lg p-4 text-sm">
-              {`npm run build   # Catch TypeScript errors
+        <Step number={13} title="Build and Verify">
+          <CodeBlock>
+            {`npm run build   # Catch TypeScript errors
 npm run dev      # Navigate to your spreadline page`}
-            </pre>
-            <p>
-              Verify: graph shows nodes/links, chart shows storylines, scrubber works, clicking pins entities, filters work, pagination
-              loads new pages.
-            </p>
-          </Step>
+          </CodeBlock>
+          <p>
+            Verify: graph shows nodes/links, chart shows storylines, scrubber works, clicking pins entities, filters work, pagination loads
+            new pages.
+          </p>
+        </Step>
 
-          <Step number={14} title="Optional: Replace CSV with Database">
-            <p>
-              Replace the three <code className="bg-muted rounded px-1">loadCSV()</code> calls in{' '}
-              <code className="bg-muted rounded px-1">spreadline-data.service.ts</code> with database queries. The rest of the function
-              (network construction, pagination) stays exactly the same. Data must return the same shape as{' '}
-              <code className="bg-muted rounded px-1">RelationRow</code>, <code className="bg-muted rounded px-1">EntityRow</code>,{' '}
-              <code className="bg-muted rounded px-1">RelationshipRow</code>.
-            </p>
-          </Step>
-        </section>
+        <Step number={14} title="Optional: Replace CSV with Database">
+          <p>
+            Replace the three <IC>loadCSV()</IC> calls in <IC>spreadline-data.service.ts</IC> with database queries. The rest of the
+            function (network construction, pagination) stays exactly the same. Data must return the same shape as <IC>RelationRow</IC>,{' '}
+            <IC>EntityRow</IC>, <IC>RelationshipRow</IC>.
+          </p>
+        </Step>
+      </Section>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* SECTION 13: FAQ                                          */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <section id="faq" className="mb-16">
-          <h2 className="border-primary mb-6 border-b pb-2 text-2xl font-bold">13. FAQ</h2>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SECTION 13: FAQ                                                */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <Section
+        id="faq"
+        number={13}
+        title="Frequently Asked Questions"
+        color="fuchsia"
+        subtitle="Common questions from developers working with SpreadLine"
+      >
+        {[
+          [
+            'Why does the layout engine exist as a separate library from the D3 visualization?',
+            'Separation of concerns. The layout engine computes WHERE things go (coordinates, paths). The viz layer handles HOW to render and interact (D3 SVG, hover, zoom). You could swap D3 for Canvas or WebGL without touching the layout engine.'
+          ],
+          [
+            'Why is pagination server-side instead of client-side?',
+            "With 20 years of monthly data, you'd have 240+ time blocks. BFS network construction for all blocks is expensive. Server-side pagination means we only compute and transfer one page at a time (default: 20 blocks)."
+          ],
+          [
+            'What is remapJHAffiliation() for?',
+            'It\'s specific to the demo dataset. Raw affiliation strings vary (e.g., "UC Berkeley" vs "University of California, Berkeley"). It normalizes them so internal/external classification works correctly. Replace with your own normalization or remove if your data is clean.'
+          ],
+          [
+            'Can I change the number of hops?',
+            'Yes. hopLimit ranges from 1 to 5. Higher hops = more entities but exponentially more computation and visual complexity. Default of 2 is a good balance.'
+          ],
+          [
+            'What happens when splitByAffiliation is false?',
+            'All entities are treated as "internal" (same color). External group slots are emptied and merged into internal ones. Useful when your data doesn\'t have meaningful affiliation info.'
+          ],
+          [
+            'Why Ctrl+wheel for zoom instead of just wheel?',
+            'To prevent accidental zooming when scrolling the page. The chart lives in a scrollable container. Ctrl+wheel makes zoom intentional.'
+          ],
+          [
+            'How does CSV caching work?',
+            'Simple in-memory Map keyed by file path. Once loaded, data stays cached for the Node.js process lifetime. clearCSVCache() exists for testing. In serverless (Vercel), cache resets on cold starts.'
+          ],
+          [
+            "What is import 'server-only' and why is it everywhere?",
+            'A Next.js convention. If any client component imports a server file, the build fails. Prevents accidental exposure of server code (file system, database) to the browser.'
+          ],
+          [
+            'Can I use a different dataset format?',
+            'Yes. The layout engine and viz layer work with SpreadlineRawDataResponse, not CSV. As long as your data service produces that shape, everything else works. Load from a database, API, or any source.'
+          ],
+          [
+            "What's the performance like?",
+            'BFS is the bottleneck (server-side). Demo dataset (~1000 relations, ~200 entities): <200ms API response. Layout engine: 50-100ms for 20 blocks. D3 rendering: nearly instant. For 10k+ entities, reduce hop limit or pre-compute.'
+          ],
+          [
+            'What does the "minimize" config do in the layout engine?',
+            "3 options: 'space' minimizes vertical space, 'line' minimizes line lengths, 'wiggles' (default) minimizes unnecessary line movement. 'wiggles' generally produces the most readable charts."
+          ],
+          [
+            'What are the minimum files for a bare-bones SpreadLine?',
+            'Just: src/lib/spreadline/ (layout engine), src/lib/spreadline-viz/ (D3 rendering), src/features/spreadlines/const.ts (constants), and your data in SpreadlineRawDataResponse format.'
+          ]
+        ].map(([q, a], i) => (
+          <Collapsible key={i} title={q}>
+            <p className="text-muted-foreground">{a}</p>
+          </Collapsible>
+        ))}
+      </Section>
 
-          {[
-            [
-              'Why does the layout engine exist as a separate library from the D3 visualization?',
-              'Separation of concerns. The layout engine computes WHERE things go (coordinates, paths). The viz layer handles HOW to render and interact (D3 SVG, hover, zoom). You could swap D3 for Canvas or WebGL without touching the layout engine.'
-            ],
-            [
-              'Why is pagination server-side instead of client-side?',
-              "With 20 years of monthly data, you'd have 240+ time blocks. BFS network construction for all blocks is expensive. Server-side pagination means we only compute and transfer one page at a time (default: 20 blocks)."
-            ],
-            [
-              'What is remapJHAffiliation() for?',
-              'It\'s specific to the Jeffrey Heer demo dataset. Raw affiliation strings vary (e.g., "UC Berkeley" vs "University of California, Berkeley"). It normalizes them so internal/external classification works correctly. Replace with your own normalization or remove if your data is clean.'
-            ],
-            [
-              'Can I change the number of hops?',
-              'Yes. hopLimit ranges from 1 to 5. Higher hops = more entities but exponentially more computation and visual complexity. Default of 2 is a good balance.'
-            ],
-            [
-              'What happens when splitByAffiliation is false?',
-              'All entities are treated as "internal" (same color). External group slots are emptied and merged into internal ones. Useful when your data doesn\'t have meaningful affiliation info.'
-            ],
-            [
-              'Why Ctrl+wheel for zoom instead of just wheel?',
-              'To prevent accidental zooming when scrolling the page. The chart lives in a scrollable container. Ctrl+wheel makes zoom intentional.'
-            ],
-            [
-              'How does CSV caching work?',
-              'Simple in-memory Map keyed by file path. Once loaded, data stays cached for the Node.js process lifetime. clearCSVCache() exists for testing. In serverless (Vercel), cache resets on cold starts.'
-            ],
-            [
-              "What is import 'server-only' and why is it everywhere?",
-              'A Next.js convention. If any client component imports a server file, the build fails. Prevents accidental exposure of server code (file system, database) to the browser.'
-            ],
-            [
-              'Can I use a different dataset format?',
-              'Yes. The layout engine and viz layer work with SpreadlineRawDataResponse, not CSV. As long as your data service produces that shape, everything else works. Load from a database, API, or any source.'
-            ],
-            [
-              "What's the performance like?",
-              'BFS is the bottleneck (server-side). Demo dataset (~1000 relations, ~200 entities): <200ms API response. Layout engine: 50-100ms for 20 blocks. D3 rendering: nearly instant. For 10k+ entities, reduce hop limit or pre-compute.'
-            ],
-            [
-              'What does the "minimize" config do in the layout engine?',
-              "3 options: 'space' minimizes vertical space, 'line' minimizes line lengths, 'wiggles' (default) minimizes unnecessary line movement. 'wiggles' generally produces the most readable charts."
-            ],
-            [
-              'What are the minimum files for a bare-bones SpreadLine?',
-              'Just: src/lib/spreadline/ (layout engine), src/lib/spreadline-viz/ (D3 rendering), src/features/spreadlines/const.ts (constants), and your data in SpreadlineRawDataResponse format.'
-            ]
-          ].map(([q, a], i) => (
-            <Collapsible key={i} title={q}>
-              <p className="text-muted-foreground">{a}</p>
-            </Collapsible>
-          ))}
-        </section>
-
-        {/* ── Footer ─────────────────────────────────────────────── */}
-        <footer className="border-t pt-8 text-center">
-          <p className="text-muted-foreground text-sm">SpreadLine Technical Design Document &mdash; Generated from codebase analysis</p>
-          <p className="text-muted-foreground mt-1 text-xs">Last updated: 2026-03-05</p>
-        </footer>
-      </div>
-    </div>
+      {/* ── Footer ──────────────────────────────────────────────────── */}
+      <footer className="mt-8 border-t pt-8 text-center">
+        <p className="text-muted-foreground text-sm">SpreadLine Technical Design Document &mdash; Generated from codebase analysis</p>
+        <p className="text-muted-foreground mt-1 text-xs">Last updated: 2026-03-05</p>
+      </footer>
+    </LayoutShell>
   );
 }
