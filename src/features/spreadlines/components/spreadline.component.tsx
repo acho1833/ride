@@ -31,7 +31,7 @@ export interface SpreadlineRawData {
   egoId: string;
   egoName: string;
   dataset: string;
-  entities: Record<string, { name: string; category: 'internal' | 'external'; citations: Record<string, number> }>;
+  entities: Record<string, { name: string; category: 'internal' | 'external'; relationships: Record<string, number> }>;
   topology: { sourceId: string; targetId: string; time: string; weight: number }[];
   groups: Record<string, string[][]>;
   timeBlocks: string[];
@@ -145,10 +145,10 @@ const SpreadlineComponent = ({
         }));
         spreadline.load(lineColorData, { entity: 'entity', color: 'color' }, 'line');
 
-        // Convert entities citations to node context array
+        // Convert entities relationships to node context array
         const nodeContextData: { entity: string; time: string; context: number }[] = [];
         for (const [id, entity] of Object.entries(rawData.entities)) {
-          for (const [time, count] of Object.entries(entity.citations)) {
+          for (const [time, count] of Object.entries(entity.relationships)) {
             nodeContextData.push({ entity: nameOf(id), time, context: count });
           }
         }

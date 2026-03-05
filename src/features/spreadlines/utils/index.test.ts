@@ -36,16 +36,16 @@ describe('transformSpreadlineToGraph', () => {
     expect(egoA1!.years).toEqual(expect.arrayContaining(['2020', '2021']));
   });
 
-  it('computes totalCitations per node', () => {
+  it('computes totalRelationships per node', () => {
     const { nodes } = transformSpreadlineToGraph(makeRawData());
     const a1 = nodes.find(n => n.id === 'a1');
-    expect(a1!.totalCitations).toBe(3);
+    expect(a1!.totalRelationships).toBe(3);
   });
 
-  it('sets ego totalCitations to 0', () => {
+  it('sets ego totalRelationships to 0', () => {
     const { nodes } = transformSpreadlineToGraph(makeRawData());
     const ego = nodes.find(n => n.isEgo);
-    expect(ego!.totalCitations).toBe(0);
+    expect(ego!.totalRelationships).toBe(0);
   });
 });
 
@@ -82,8 +82,8 @@ const makeRawDataWithCitations = () => ({
   egoId: 'ego',
   egoName: 'Ego Author',
   entities: {
-    a1: { name: 'Author A', category: 'internal', citations: { '2020': 100, '2021': 200 } },
-    a2: { name: 'Author B', category: 'external', citations: { '2020': 50 } }
+    a1: { name: 'Author A', category: 'internal', relationships: { '2020': 100, '2021': 200 } },
+    a2: { name: 'Author B', category: 'external', relationships: { '2020': 50 } }
   },
   topology: [
     { sourceId: 'ego', targetId: 'a1', time: '2020', weight: 1 },
@@ -113,13 +113,13 @@ describe('transformSpreadlineToTimeline', () => {
     expect(nonEgo[0].totalActivity).toBeGreaterThanOrEqual(nonEgo[1].totalActivity);
   });
 
-  it('computes timeBlocks with citation counts per entity', () => {
+  it('computes timeBlocks with relationship counts per entity', () => {
     const result = transformSpreadlineToTimeline(makeRawDataWithCitations());
     const a1 = result.find(e => e.name === 'Author A')!;
     expect(a1.timeBlocks).toEqual(
       expect.arrayContaining([
-        { time: '2020', citationCount: 100 },
-        { time: '2021', citationCount: 200 }
+        { time: '2020', relationshipCount: 100 },
+        { time: '2021', relationshipCount: 200 }
       ])
     );
   });

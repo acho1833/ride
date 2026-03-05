@@ -19,7 +19,7 @@ const topologyEntrySchema = z.object({
 const entityInfoSchema = z.object({
   name: z.string(),
   category: z.enum(['internal', 'external']),
-  citations: z.record(z.string(), z.number())
+  relationships: z.record(z.string(), z.number())
 });
 
 const spreadlineRawDataResponseSchema = z.object({

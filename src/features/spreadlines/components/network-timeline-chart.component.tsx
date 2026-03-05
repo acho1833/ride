@@ -4,7 +4,7 @@
  * Network Timeline Chart Component
  *
  * Renders horizontal dot-and-line timelines per entity, sorted by activity count.
- * Dots are colored by citation frequency using a heatmap threshold scale.
+ * Dots are colored by relationship frequency using a heatmap threshold scale.
  * Shares all state (filters, pins, pagination) with the sibling Spreadline tab.
  *
  * Features:
@@ -38,8 +38,8 @@ import type { TimelineEntity } from '@/features/spreadlines/utils';
 import { setDragCursor, clearDragCursor } from '@/features/spreadlines/utils/drag-cursor';
 import SpreadlineToolbarComponent from '@/features/spreadlines/components/spreadline-toolbar.component';
 
-/** D3 threshold scale: citation count -> heatmap fill color */
-const citationColorScale = d3.scaleThreshold<number, string>().domain(SPREADLINE_FREQUENCY_THRESHOLDS).range(SPREADLINE_FREQUENCY_COLORS);
+/** D3 threshold scale: relationship count -> heatmap fill color */
+const relationshipColorScale = d3.scaleThreshold<number, string>().domain(SPREADLINE_FREQUENCY_THRESHOLDS).range(SPREADLINE_FREQUENCY_COLORS);
 
 interface Props {
   rawData: SpreadlineRawData | null;
@@ -411,7 +411,7 @@ const NetworkTimelineChartComponent = ({
             .attr('y1', cy)
             .attr('x2', x2)
             .attr('y2', cy)
-            .attr('stroke', citationColorScale(curr.citationCount))
+            .attr('stroke', relationshipColorScale(curr.relationshipCount))
             .attr('stroke-width', NETWORK_TIMELINE_LINE_WIDTH)
             .attr('stroke-linecap', 'round');
         }
@@ -420,7 +420,7 @@ const NetworkTimelineChartComponent = ({
       // Dots at each active time block
       for (const tb of entity.timeBlocks) {
         const cx = (xScale(tb.time) ?? 0) + xScale.bandwidth() / 2;
-        const color = citationColorScale(tb.citationCount);
+        const color = relationshipColorScale(tb.relationshipCount);
         row
           .append('circle')
           .attr('cx', cx)

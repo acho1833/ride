@@ -12,8 +12,8 @@ export interface SpreadlineGraphNode extends SimulationNodeDatum {
   name: string;
   isEgo: boolean;
   collaborationCount: number;
-  /** Sum of citation weights across all links involving this node */
-  totalCitations: number;
+  /** Sum of relationship weights across all links involving this node */
+  totalRelationships: number;
   /** Hop distance from ego: 0 = ego, 1 = direct, 2+ = indirect */
   hopDistance?: number;
   /** Entity category: internal (same affiliation) or external */
@@ -72,16 +72,16 @@ export function deduplicateLinks(
   }));
 }
 
-/** Compute total citations per node from aggregated links */
-function computeNodeCitations(links: SpreadlineGraphLink[]): Map<string, number> {
-  const citations = new Map<string, number>();
+/** Compute total relationships per node from aggregated links */
+function computeNodeRelationships(links: SpreadlineGraphLink[]): Map<string, number> {
+  const relationships = new Map<string, number>();
   for (const link of links) {
     const s = typeof link.source === 'string' ? link.source : link.source.id;
     const t = typeof link.target === 'string' ? link.target : link.target.id;
-    citations.set(s, (citations.get(s) ?? 0) + link.weight);
-    citations.set(t, (citations.get(t) ?? 0) + link.weight);
+    relationships.set(s, (relationships.get(s) ?? 0) + link.weight);
+    relationships.set(t, (relationships.get(t) ?? 0) + link.weight);
   }
-  return citations;
+  return relationships;
 }
 
 /**
@@ -109,7 +109,7 @@ export function transformSpreadlineToGraph(rawData: {
     name: rawData.egoName,
     isEgo: true,
     collaborationCount: 0,
-    totalCitations: 0
+    totalRelationships: 0
   };
 
   const entityNodes: SpreadlineGraphNode[] = Object.entries(rawData.entities).map(([id, entity]) => ({
@@ -117,17 +117,17 @@ export function transformSpreadlineToGraph(rawData: {
     name: entity.name,
     isEgo: false,
     collaborationCount: collabCounts.get(id) ?? 0,
-    totalCitations: 0
+    totalRelationships: 0
   }));
 
   const nodes = [egoNode, ...entityNodes];
   const nodeIds = new Set(nodes.map(n => n.id));
   const links = deduplicateLinks(rawData.topology, nodeIds);
-  const nodeCitations = computeNodeCitations(links);
+  const nodeRelationships = computeNodeRelationships(links);
 
-  // Apply totalCitations to nodes (ego stays 0)
+  // Apply totalRelationships to nodes (ego stays 0)
   for (const node of entityNodes) {
-    node.totalCitations = nodeCitations.get(node.id) ?? 0;
+    node.totalRelationships = nodeRelationships.get(node.id) ?? 0;
   }
 
   return { nodes, links };
@@ -203,7 +203,7 @@ export function transformSpreadlineToGraphByTime(
     name: rawData.egoName,
     isEgo: true,
     collaborationCount: 0,
-    totalCitations: 0,
+    totalRelationships: 0,
     hopDistance: 0,
     category: 'ego'
   });
@@ -220,7 +220,7 @@ export function transformSpreadlineToGraphByTime(
       name: entity.name,
       isEgo: false,
       collaborationCount: collabCounts.get(id) ?? 0,
-      totalCitations: 0,
+      totalRelationships: 0,
       hopDistance: info.hop,
       category: info.category
     });
@@ -229,9 +229,9 @@ export function transformSpreadlineToGraphByTime(
   // 5. Build links (deduplicated within this time block, with aggregation)
   const nodeIds = new Set(nodes.map(n => n.id));
   const links = deduplicateLinks(timeTopology, nodeIds);
-  const nodeCitations = computeNodeCitations(links);
+  const nodeRelationships = computeNodeRelationships(links);
   for (const node of nodes) {
-    node.totalCitations = node.isEgo ? 0 : (nodeCitations.get(node.id) ?? 0);
+    node.totalRelationships = node.isEgo ? 0 : (nodeRelationships.get(node.id) ?? 0);
   }
 
   return { nodes, links };
@@ -298,7 +298,7 @@ export function transformSpreadlineToGraphByTimes(
     name: rawData.egoName,
     isEgo: true,
     collaborationCount: 0,
-    totalCitations: 0,
+    totalRelationships: 0,
     hopDistance: 0,
     category: 'ego'
   });
@@ -316,7 +316,7 @@ export function transformSpreadlineToGraphByTimes(
       name: entity.name,
       isEgo: false,
       collaborationCount: collabCounts.get(id) ?? 0,
-      totalCitations: 0,
+      totalRelationships: 0,
       hopDistance: info.hop,
       category: info.category
     });
@@ -325,9 +325,9 @@ export function transformSpreadlineToGraphByTimes(
   // 5. Build links (deduplicated across all times in range, with aggregation)
   const nodeIds = new Set(nodes.map(n => n.id));
   const links = deduplicateLinks(rangeTopology, nodeIds);
-  const nodeCitations = computeNodeCitations(links);
+  const nodeRelationships = computeNodeRelationships(links);
   for (const node of nodes) {
-    node.totalCitations = node.isEgo ? 0 : (nodeCitations.get(node.id) ?? 0);
+    node.totalRelationships = node.isEgo ? 0 : (nodeRelationships.get(node.id) ?? 0);
   }
 
   return { nodes, links };
@@ -371,7 +371,7 @@ export interface TimelineEntity {
   lifespan: number;
   timeBlocks: Array<{
     time: string;
-    citationCount: number;
+    relationshipCount: number;
   }>;
 }
 
@@ -379,12 +379,12 @@ export interface TimelineEntity {
  * Transform spreadline raw data into timeline entities.
  *
  * Each entity gets a row with time blocks where it has relations,
- * plus citation counts per block. Sorted by total activity (ego first).
+ * plus relationship counts per block. Sorted by total activity (ego first).
  */
 export function transformSpreadlineToTimeline(rawData: {
   egoId: string;
   egoName: string;
-  entities: Record<string, { name: string; citations: Record<string, number> }>;
+  entities: Record<string, { name: string; relationships: Record<string, number> }>;
   topology: { sourceId: string; targetId: string; time: string; weight: number }[];
 }): TimelineEntity[] {
   // 1. Collect active time blocks per entity from topology
@@ -409,7 +409,7 @@ export function transformSpreadlineToTimeline(rawData: {
     lifespan: egoTimes.size,
     timeBlocks: Array.from(egoTimes)
       .sort()
-      .map(time => ({ time, citationCount: 0 }))
+      .map(time => ({ time, relationshipCount: 0 }))
   });
 
   // Non-ego entities
@@ -419,7 +419,7 @@ export function transformSpreadlineToTimeline(rawData: {
       .sort()
       .map(time => ({
         time,
-        citationCount: entity.citations[time] ?? 0
+        relationshipCount: entity.relationships[time] ?? 0
       }));
 
     results.push({

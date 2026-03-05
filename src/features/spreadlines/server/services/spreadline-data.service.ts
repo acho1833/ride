@@ -5,7 +5,7 @@ import { ORPCError } from '@orpc/server';
 import { loadCSV, type RelationRow } from './csv.utils';
 import { constructAuthorNetwork, INTERNAL, EXTERNAL, type EntityRow } from './author-network.utils';
 
-interface CitationRow {
+interface RelationshipRow {
   paperID: string;
   year: number;
   entityId: string;
@@ -26,7 +26,7 @@ export interface TopologyEntry {
 export interface EntityInfo {
   name: string;
   category: LineCategoryValue;
-  citations: Record<string, number>;
+  relationships: Record<string, number>;
 }
 
 export interface SpreadlineRawDataResponse {
@@ -75,13 +75,13 @@ export async function getSpreadlineRawData(params: {
 
   let relations: RelationRow[];
   let allEntities: EntityRow[];
-  let citations: CitationRow[];
+  let relationships: RelationshipRow[];
 
   try {
-    [relations, allEntities, citations] = await Promise.all([
+    [relations, allEntities, relationships] = await Promise.all([
       loadCSV<RelationRow>(path.join(basePath, 'relations.csv')),
       loadCSV<EntityRow>(path.join(basePath, 'entities.csv')),
-      loadCSV<CitationRow>(path.join(basePath, 'citations.csv'))
+      loadCSV<RelationshipRow>(path.join(basePath, 'citations.csv'))
     ]);
   } catch (error) {
     throw new ORPCError('INTERNAL_SERVER_ERROR', {
@@ -132,16 +132,16 @@ export async function getSpreadlineRawData(params: {
     }
   }
 
-  // Build citations per entity
+  // Build relationships per entity
   const papers = [...new Set(network.map(r => r.id))];
-  const citationsByEntity: Record<string, Record<string, number>> = {};
+  const relationshipsByEntity: Record<string, Record<string, number>> = {};
   for (const paper of papers) {
-    const group = citations.filter(c => c.paperID === paper);
+    const group = relationships.filter(c => c.paperID === paper);
     for (const row of group) {
       const eid = row.entityId;
       const time = String(row.year);
-      if (!citationsByEntity[eid]) citationsByEntity[eid] = {};
-      citationsByEntity[eid][time] = (citationsByEntity[eid][time] || 0) + row.relationshipcount;
+      if (!relationshipsByEntity[eid]) relationshipsByEntity[eid] = {};
+      relationshipsByEntity[eid][time] = (relationshipsByEntity[eid][time] || 0) + row.relationshipcount;
     }
   }
 
@@ -158,7 +158,7 @@ export async function getSpreadlineRawData(params: {
     entities[eid] = {
       name: idToName[eid] || eid,
       category: categoryMap[eid] || EXTERNAL,
-      citations: citationsByEntity[eid] || {}
+      relationships: relationshipsByEntity[eid] || {}
     };
   }
 
@@ -218,11 +218,11 @@ export async function getSpreadlineRawData(params: {
   const pagedEntities: Record<string, EntityInfo> = {};
   for (const [eid, info] of Object.entries(entities)) {
     if (!activeEntityIds.has(eid)) continue;
-    const filteredCitations: Record<string, number> = {};
-    for (const [time, count] of Object.entries(info.citations)) {
-      if (pageTimeSet.has(time)) filteredCitations[time] = count;
+    const filteredRelationships: Record<string, number> = {};
+    for (const [time, count] of Object.entries(info.relationships)) {
+      if (pageTimeSet.has(time)) filteredRelationships[time] = count;
     }
-    pagedEntities[eid] = { ...info, citations: filteredCitations };
+    pagedEntities[eid] = { ...info, relationships: filteredRelationships };
   }
 
   const pagedGroups: Record<string, string[][]> = {};

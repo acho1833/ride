@@ -29,7 +29,7 @@ describe('spreadline-data.service', () => {
       expect(typeof result.groups).toBe('object');
     });
 
-    it('returns entities map with name, category, and citations', async () => {
+    it('returns entities map with name, category, and relationships', async () => {
       const result = await getSpreadlineRawData({
         egoId: 'p1199',
         relationTypes: ['Co-co-author'],
@@ -43,7 +43,7 @@ describe('spreadline-data.service', () => {
         expect(typeof entity.name).toBe('string');
         expect(entity.name.length).toBeGreaterThan(0);
         expect(['internal', 'external']).toContain(entity.category);
-        expect(typeof entity.citations).toBe('object');
+        expect(typeof entity.relationships).toBe('object');
       }
     });
 
@@ -93,7 +93,7 @@ describe('spreadline-data.service', () => {
       }
     });
 
-    it('citation keys in entities are valid year strings', async () => {
+    it('relationship keys in entities are valid year strings', async () => {
       const result = await getSpreadlineRawData({
         egoId: 'p1199',
         relationTypes: ['Co-co-author'],
@@ -101,7 +101,7 @@ describe('spreadline-data.service', () => {
       });
 
       for (const entity of Object.values(result.entities)) {
-        for (const [time, count] of Object.entries(entity.citations)) {
+        for (const [time, count] of Object.entries(entity.relationships)) {
           expect(time).toMatch(/^\d{4}(-\d{2})?$/);
           expect(typeof count).toBe('number');
         }

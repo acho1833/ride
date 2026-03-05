@@ -142,7 +142,7 @@ export const GRAPH_TIME_TRANSITION_MS = 600;
 /** Graph link thresholds (lower than heatmap to match typical graph weights) */
 export const GRAPH_LINK_THRESHOLDS = [2, 4, 6, 10];
 
-/** Fixed link stroke widths per citation-count band (doubled for visibility) */
+/** Fixed link stroke widths per relationship-count band (doubled for visibility) */
 export const GRAPH_LINK_WIDTH_BANDS = [2, 4, 6, 8, 12];
 
 /** Link colors for graph (visible on dark background) */

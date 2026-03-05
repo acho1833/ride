@@ -6,7 +6,7 @@ export interface RelationEvent {
   sourceId: string;
   targetId: string;
   type: string;
-  citationCount: number;
+  relationshipCount: number;
 }
 
 export const relationEventSchema = z.object({
@@ -15,5 +15,5 @@ export const relationEventSchema = z.object({
   sourceId: z.string(),
   targetId: z.string(),
   type: z.string(),
-  citationCount: z.number()
+  relationshipCount: z.number()
 });

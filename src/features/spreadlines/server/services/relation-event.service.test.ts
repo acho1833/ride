@@ -22,7 +22,7 @@ describe('relation-event.service', () => {
       expect(typeof event.id).toBe('string');
       expect(typeof event.year).toBe('string');
       expect(typeof event.type).toBe('string');
-      expect(typeof event.citationCount).toBe('number');
+      expect(typeof event.relationshipCount).toBe('number');
     }
   });
 
