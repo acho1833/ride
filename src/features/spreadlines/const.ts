@@ -121,14 +121,8 @@ export const SCRUBBER_DEFAULT_SPEED_MS = 1000;
 /** Force link distance: ego ↔ hop-1 nodes */
 export const GRAPH_HOP1_LINK_DISTANCE = 100;
 
-/** Force link distance: hop-1 ↔ hop-2 nodes */
-export const GRAPH_HOP2_LINK_DISTANCE = 200;
-
 /** Radial force target radius for hop-1 nodes */
 export const GRAPH_HOP1_RADIAL_RADIUS = 120;
-
-/** Radial force target radius for hop-2 nodes */
-export const GRAPH_HOP2_RADIAL_RADIUS = 240;
 
 /** Strength of the radial force nudge (0-1) */
 export const GRAPH_RADIAL_STRENGTH = 0.3;
