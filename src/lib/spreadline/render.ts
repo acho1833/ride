@@ -97,9 +97,9 @@ function computeButtonAndBars(posX: number, topPosY: number, bottomPosY: number,
 /**
  * Compute block outline shape
  * Now outputs separate paths for each collapsible section:
- * - topHop: { topArc, line, bottomArc } for top 2-hop section
+ * - topHops: sections above main (outer hops, farthest first)
  * - main: { left, right } for main section (1-hop + ego)
- * - bottomHop: { topArc, line, bottomArc } for bottom 2-hop section
+ * - bottomHops: sections below main (outer hops, farthest first)
  */
 function computeBlock(points: PointResult[], hops: number[][], blockWidth: number, portion: number = 0.35): [Record<string, any>, number] {
   const radius = blockWidth / 2;
