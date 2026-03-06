@@ -18,7 +18,7 @@ const topologyEntrySchema = z.object({
 
 const entityInfoSchema = z.object({
   name: z.string(),
-  category: z.enum(['internal', 'external']),
+  category: z.record(z.string(), z.enum(['internal', 'external'])),
   relationships: z.record(z.string(), z.number())
 });
 

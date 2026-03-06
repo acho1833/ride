@@ -31,7 +31,7 @@ export interface SpreadlineRawData {
   egoId: string;
   egoName: string;
   dataset: string;
-  entities: Record<string, { name: string; category: 'internal' | 'external'; relationships: Record<string, number> }>;
+  entities: Record<string, { name: string; category: Record<string, 'internal' | 'external'>; relationships: Record<string, number> }>;
   topology: { sourceId: string; targetId: string; time: string; weight: number }[];
   groups: Record<string, string[][]>;
   timeBlocks: string[];
@@ -139,10 +139,15 @@ const SpreadlineComponent = ({
         spreadline.load(topoData, { source: 'source', target: 'target', time: 'time', weight: 'weight' }, 'topology');
 
         // Convert entities map to line color array
-        const lineColorData = Object.entries(rawData.entities).map(([id, entity]) => ({
-          entity: nameOf(id),
-          color: SPREADLINE_CATEGORY_COLORS[entity.category] ?? SPREADLINE_CATEGORY_COLORS.external
-        }));
+        const lineColorData = Object.entries(rawData.entities).map(([id, entity]) => {
+          const categories = Object.values(entity.category);
+          const internalCount = categories.filter(c => c === 'internal').length;
+          const majorityCategory = internalCount >= categories.length - internalCount ? 'internal' : 'external';
+          return {
+            entity: nameOf(id),
+            color: SPREADLINE_CATEGORY_COLORS[majorityCategory] ?? SPREADLINE_CATEGORY_COLORS.external
+          };
+        });
         spreadline.load(lineColorData, { entity: 'entity', color: 'color' }, 'line');
 
         // Convert entities relationships to node context array

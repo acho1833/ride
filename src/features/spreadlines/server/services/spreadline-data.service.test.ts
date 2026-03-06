@@ -42,7 +42,10 @@ describe('spreadline-data.service', () => {
         expect(id).toMatch(/^p\d{4}$/);
         expect(typeof entity.name).toBe('string');
         expect(entity.name.length).toBeGreaterThan(0);
-        expect(['internal', 'external']).toContain(entity.category);
+        expect(typeof entity.category).toBe('object');
+        for (const val of Object.values(entity.category)) {
+          expect(['internal', 'external']).toContain(val);
+        }
         expect(typeof entity.relationships).toBe('object');
       }
     });

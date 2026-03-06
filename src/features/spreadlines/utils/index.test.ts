@@ -11,8 +11,8 @@ const makeRawData = () => ({
   egoId: 'ego',
   egoName: 'Ego Entity',
   entities: {
-    a1: { name: 'Entity A', category: 'internal' },
-    a2: { name: 'Entity B', category: 'external' }
+    a1: { name: 'Entity A', category: { '2020': 'internal', '2021': 'internal' } },
+    a2: { name: 'Entity B', category: { '2020': 'external', '2021': 'external' } }
   },
   topology: [
     { sourceId: 'ego', targetId: 'a1', time: '2020', weight: 1 },
@@ -82,8 +82,8 @@ const makeRawDataWithCitations = () => ({
   egoId: 'ego',
   egoName: 'Ego Entity',
   entities: {
-    a1: { name: 'Entity A', category: 'internal', relationships: { '2020': 100, '2021': 200 } },
-    a2: { name: 'Entity B', category: 'external', relationships: { '2020': 50 } }
+    a1: { name: 'Entity A', category: { '2020': 'internal', '2021': 'internal' }, relationships: { '2020': 100, '2021': 200 } },
+    a2: { name: 'Entity B', category: { '2020': 'external', '2021': 'external' }, relationships: { '2020': 50 } }
   },
   topology: [
     { sourceId: 'ego', targetId: 'a1', time: '2020', weight: 1 },

@@ -25,7 +25,7 @@ export interface TopologyEntry {
 
 export interface EntityInfo {
   name: string;
-  category: LineCategoryValue;
+  category: Record<string, LineCategoryValue>;
   relationships: Record<string, number>;
 }
 
@@ -114,9 +114,11 @@ export async function getSpreadlineRawData(params: {
 
   // When splitByAffiliation is disabled, merge external entities into internal groups
   if (!splitByAffiliation) {
-    // Set all categories to internal
+    // Set all categories to internal (per block)
     for (const eid of Object.keys(categoryMap)) {
-      categoryMap[eid] = INTERNAL;
+      for (const time of Object.keys(categoryMap[eid])) {
+        categoryMap[eid][time] = INTERNAL;
+      }
     }
     // Move external groups into internal: ext-K -> int-K (mirror across ego index)
     const egoIdx = hopLimit;
@@ -157,7 +159,7 @@ export async function getSpreadlineRawData(params: {
     if (eid === egoId) continue;
     entities[eid] = {
       name: idToName[eid] || eid,
-      category: categoryMap[eid] || EXTERNAL,
+      category: categoryMap[eid] || {},
       relationships: relationshipsByEntity[eid] || {}
     };
   }

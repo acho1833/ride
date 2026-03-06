@@ -166,7 +166,7 @@ export function transformSpreadlineToGraphByTime(
   rawData: {
     egoId: string;
     egoName: string;
-    entities: Record<string, { name: string; category: string }>;
+    entities: Record<string, { name: string; category: Record<string, string> }>;
     topology: { sourceId: string; targetId: string; time: string; weight: number }[];
     groups: Record<string, string[][]>;
   },
@@ -247,7 +247,7 @@ export function transformSpreadlineToGraphByTimes(
   rawData: {
     egoId: string;
     egoName: string;
-    entities: Record<string, { name: string; category: string }>;
+    entities: Record<string, { name: string; category: Record<string, string> }>;
     topology: { sourceId: string; targetId: string; time: string; weight: number }[];
     groups: Record<string, string[][]>;
   },

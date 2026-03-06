@@ -310,7 +310,8 @@ export class SpreadLine {
       // Get groups for this timestamp
       const timestampLabel = this._all_timestamps[tIdx];
       let groups = this._groups[timestampLabel] || [];
-      groups = groups.map(g => [...g]);
+      const nameSet = new Set(names);
+      groups = groups.map(g => g.filter(name => nameSet.has(name)));
 
       let constraints: SessionConstraints;
       let order: string[][];
@@ -331,7 +332,7 @@ export class SpreadLine {
         [constraints, order] = findWithinConstraints(entries, this.ego, this._line_color);
       }
 
-      const entities = order.flat();
+      const entities = order.flat().filter(name => names.indexOf(name) !== -1);
       const entitiesIDs = entities.map(name => names.indexOf(name));
       const entityNodes = entitiesIDs.map((id, idx) => new Node(names[id], sessionID, idx, -1, id));
       const indices = entries.map((_, idx) => idx);

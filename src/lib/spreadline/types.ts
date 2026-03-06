@@ -327,7 +327,10 @@ export class Session {
   replaceNode(nodes: Node[], sweepRange: [number, number]): void {
     const [startIdx, endIdx] = sweepRange;
     for (let idx = startIdx; idx < endIdx; idx++) {
-      this.entities[idx] = nodes[idx - startIdx];
+      const node = nodes[idx - startIdx];
+      if (node !== undefined) {
+        this.entities[idx] = node;
+      }
     }
   }
 
