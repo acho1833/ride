@@ -157,31 +157,7 @@ export function constructEntityNetwork(
 
   // N-hop ego network with BFS distances
   const { relations: egoRelations, hopDistances } = constructEgoNetworks(relations, egoId, hopLimit);
-  let network = egoRelations;
-
-  // For 1-2 hop networks, keep only papers involving ego (original behavior).
-  // For higher hops, the BFS already scopes relations correctly—hop-3+ papers
-  // connect non-ego entities and must be preserved.
-  if (hopLimit <= 2) {
-    const byPaper: Record<string, RelationRow[]> = {};
-    network.forEach(row => {
-      if (!byPaper[row.id]) byPaper[row.id] = [];
-      byPaper[row.id].push(row);
-    });
-
-    const validRows: RelationRow[] = [];
-    for (const group of Object.values(byPaper)) {
-      const nodes = new Set<string>();
-      group.forEach(row => {
-        nodes.add(row.sourceId);
-        nodes.add(row.targetId);
-      });
-      if (nodes.has(egoId)) {
-        validRows.push(...group);
-      }
-    }
-    network = validRows;
-  }
+  const network = egoRelations;
 
   // Helper: affiliations for entity in a year (O(1) lookup)
   const getAffiliations = (entityId: string, year: string): string[] => {
