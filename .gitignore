@@ -68,3 +68,5 @@ bun.lock
 src/lib/mock-data/mock.db
 src/lib/mock-data/mock.db-wal
 src/lib/mock-data/mock.db-shm
+
+docs
