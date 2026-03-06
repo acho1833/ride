@@ -136,11 +136,16 @@ export async function getSpreadlineRawData(params: {
     }
   }
 
-  // Build relationships per entity
-  const papers = [...new Set(network.map(r => r.id))];
+  // Build relationships per entity (pre-index citations by paperID for O(1) lookup)
+  const citationsByPaper = new Map<string, RelationshipRow[]>();
+  for (const c of relationships) {
+    if (!citationsByPaper.has(c.paperID)) citationsByPaper.set(c.paperID, []);
+    citationsByPaper.get(c.paperID)!.push(c);
+  }
+  const papers = new Set(network.map(r => r.id));
   const relationshipsByEntity: Record<string, Record<string, number>> = {};
   for (const paper of papers) {
-    const group = relationships.filter(c => c.paperID === paper);
+    const group = citationsByPaper.get(paper) || [];
     for (const row of group) {
       const eid = row.entityId;
       const time = String(row.year);

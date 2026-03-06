@@ -55,6 +55,18 @@ export function constructEgoNetworks(
   });
 
   for (const [time, entries] of Object.entries(byTime)) {
+    // Pre-build adjacency maps for O(1) neighbor lookups
+    const bySource = new Map<string, { row: RelationRow; idx: number }[]>();
+    const byTarget = new Map<string, { row: RelationRow; idx: number }[]>();
+    for (const entry of entries) {
+      const sId = entry.row.sourceId;
+      const tId = entry.row.targetId;
+      if (!bySource.has(sId)) bySource.set(sId, []);
+      bySource.get(sId)!.push(entry);
+      if (!byTarget.has(tId)) byTarget.set(tId, []);
+      byTarget.get(tId)!.push(entry);
+    }
+
     const distMap = new Map<string, number>();
     distMap.set(egoId, 0);
     let waitlist = new Set<string>([egoId]);
@@ -65,15 +77,21 @@ export function constructEgoNetworks(
       const nextWaitlist: string[] = [];
 
       for (const each of waitlist) {
-        const sources = entries.filter(e => e.row.targetId === each);
-        const targets = entries.filter(e => e.row.sourceId === each);
+        const sources = byTarget.get(each) || [];
+        const targets = bySource.get(each) || [];
 
-        const candidates: string[] = [...sources.map(e => e.row.sourceId), ...targets.map(e => e.row.targetId)];
-
-        sources.forEach(e => indices.add(e.idx));
-        targets.forEach(e => indices.add(e.idx));
-
-        for (const c of candidates) {
+        for (const e of sources) {
+          indices.add(e.idx);
+          const c = e.row.sourceId;
+          if (!visited.has(c)) {
+            distMap.set(c, hop);
+            visited.add(c);
+            nextWaitlist.push(c);
+          }
+        }
+        for (const e of targets) {
+          indices.add(e.idx);
+          const c = e.row.targetId;
           if (!visited.has(c)) {
             distMap.set(c, hop);
             visited.add(c);
@@ -111,23 +129,31 @@ export function constructEntityNetwork(
   groups: Record<string, string[][]>;
   network: RelationRow[];
 } {
-  // Ensure year strings
-  relations = relations.map(r => ({ ...r, year: String(r.year) }));
-  allEntities = allEntities.map(e => ({ ...e, year: String(e.year) }));
+  // Coerce year to string in-place (avoids cloning entire arrays)
+  for (const r of relations) r.year = String(r.year);
+  for (const e of allEntities) e.year = String(e.year);
+
+  // Pre-build affiliation lookup: "entityId|year" -> remapped affiliations
+  const affiliationLookup = new Map<string, string[]>();
+  for (const e of allEntities) {
+    const key = `${e.id}|${e.year}`;
+    if (!affiliationLookup.has(key)) affiliationLookup.set(key, []);
+    const remapped = remapJHAffiliation(e.affiliation);
+    const list = affiliationLookup.get(key)!;
+    if (!list.includes(remapped)) list.push(remapped);
+  }
 
   // Ego affiliations by year
-  const egoEntries = allEntities.filter(e => e.id === egoId);
   const egoStatus: Record<string, string> = {};
-  for (const entry of egoEntries) {
-    const remapped = remapJHAffiliation(entry.affiliation);
-    if (!egoStatus[entry.year]) {
-      egoStatus[entry.year] = remapped;
+  for (const e of allEntities) {
+    if (e.id === egoId && !egoStatus[e.year]) {
+      egoStatus[e.year] = remapJHAffiliation(e.affiliation);
     }
   }
-  const years = Object.keys(egoStatus);
+  const yearsSet = new Set(Object.keys(egoStatus));
 
   // Filter relations to years where ego exists
-  relations = relations.filter(r => years.includes(r.year));
+  relations = relations.filter(r => yearsSet.has(r.year));
 
   // N-hop ego network with BFS distances
   const { relations: egoRelations, hopDistances } = constructEgoNetworks(relations, egoId, hopLimit);
@@ -157,10 +183,9 @@ export function constructEntityNetwork(
     network = validRows;
   }
 
-  // Helper: affiliations for entity in a year
+  // Helper: affiliations for entity in a year (O(1) lookup)
   const getAffiliations = (entityId: string, year: string): string[] => {
-    const entries = allEntities.filter(e => e.id === entityId && e.year === year);
-    return [...new Set(entries.map(e => remapJHAffiliation(e.affiliation)))];
+    return affiliationLookup.get(`${entityId}|${year}`) || [];
   };
 
   const groupSize = 2 * hopLimit + 1;
@@ -177,7 +202,7 @@ export function constructEntityNetwork(
   });
 
   // Assign entities to groups using BFS hop distances
-  for (const year of years) {
+  for (const year of yearsSet) {
     if (!groupAssign[year]) {
       const groups: Set<string>[] = Array.from({ length: groupSize }, () => new Set());
       groups[egoIdx].add(egoId);
