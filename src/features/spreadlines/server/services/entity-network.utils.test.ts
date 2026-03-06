@@ -116,6 +116,14 @@ describe('constructEntityNetwork', () => {
     expect(allGroupEntities).not.toContain('h3');
   });
 
+  it('returns per-block category in categoryMap', () => {
+    // Use hopLimit=3 so h2 is included in the network (hopLimit<=2 filters non-ego papers)
+    const result = constructEntityNetwork('ego', relations, allEntities, 3);
+    // categoryMap should be Record<entityId, Record<time, category>>
+    expect(result.categoryMap['h1']).toEqual({ '2020': 'internal' });
+    expect(result.categoryMap['h2']).toEqual({ '2020': 'external' });
+  });
+
   it('with hopLimit=3, includes hop-3 entity in topology AND groups', () => {
     const result = constructEntityNetwork('ego', relations, allEntities, 3);
 

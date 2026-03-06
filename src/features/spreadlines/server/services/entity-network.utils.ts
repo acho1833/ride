@@ -107,7 +107,7 @@ export function constructEntityNetwork(
   hopLimit: number = SPREADLINE_DEFAULT_HOP_LIMIT
 ): {
   topology: TopologyEntry[];
-  categoryMap: Record<string, LineCategoryValue>;
+  categoryMap: Record<string, Record<string, LineCategoryValue>>;
   groups: Record<string, string[][]>;
   network: RelationRow[];
 } {
@@ -272,15 +272,12 @@ export function constructEntityNetwork(
     finalGroups[year] = newGroups;
   }
 
-  // Build category map (entity ID -> category)
-  const categoryMap: Record<string, LineCategoryValue> = {};
-  for (const eid of networkEntityIds) {
-    for (const year of years) {
-      const category = colorAssign[year]?.[eid];
-      if (category) {
-        categoryMap[eid] = category;
-        break;
-      }
+  // Build category map (entity ID -> time -> category)
+  const categoryMap: Record<string, Record<string, LineCategoryValue>> = {};
+  for (const [year, assignments] of Object.entries(colorAssign)) {
+    for (const [eid, category] of Object.entries(assignments)) {
+      if (!categoryMap[eid]) categoryMap[eid] = {};
+      categoryMap[eid][year] = category;
     }
   }
 
