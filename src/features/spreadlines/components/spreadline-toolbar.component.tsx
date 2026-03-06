@@ -1,6 +1,6 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { X, ArrowDownUp, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
@@ -10,7 +10,8 @@ import {
   SPREADLINE_FREQUENCY_COLORS,
   SPREADLINE_FREQUENCY_THRESHOLDS,
   SPREADLINE_HOP_LIMIT_OPTIONS,
-  type SpreadlineGranularity
+  type SpreadlineGranularity,
+  type SpreadlineSortOrder
 } from '@/features/spreadlines/const';
 
 interface Props {
@@ -33,6 +34,9 @@ interface Props {
   /** Hop limit */
   hopLimit?: number;
   onHopLimitChange?: (value: number) => void;
+  /** Sort order */
+  sortOrder: SpreadlineSortOrder;
+  onSortOrderChange: (value: SpreadlineSortOrder) => void;
   /** Pinned entity clear */
   pinnedCount: number;
   onClearPins: () => void;
@@ -51,6 +55,8 @@ const SpreadlineToolbarComponent = ({
   onGranularityChange,
   hopLimit,
   onHopLimitChange,
+  sortOrder,
+  onSortOrderChange,
   pinnedCount,
   onClearPins
 }: Props) => {
@@ -101,6 +107,17 @@ const SpreadlineToolbarComponent = ({
         <span className="text-foreground w-4 font-medium">{blocksFilter}</span>
         <label className="text-muted-foreground">Blocks</label>
       </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 gap-1 px-2 text-xs"
+        onClick={() => onSortOrderChange(sortOrder === 'desc' ? 'asc' : 'desc')}
+        title={sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
+      >
+        {sortOrder === 'desc' ? <ArrowDownUp className="h-3 w-3" /> : <ArrowUpDown className="h-3 w-3" />}
+        {sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
+      </Button>
 
       <Select value={relationTypes[0]} onValueChange={val => onRelationTypesChange([val])}>
         <SelectTrigger className="ml-auto h-7 w-auto gap-1 text-xs">

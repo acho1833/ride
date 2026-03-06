@@ -297,7 +297,7 @@ class Renderer {
   fit(screenSize: { width: number; height: number }, liner: SpreadLine): void {
     const { width, height } = screenSize;
 
-    this.fitTime(width, liner._all_timestamps, liner._config.bandStretch);
+    this.fitTime(width, liner._all_timestamps, liner._config.bandStretch, liner._config.descending);
     this.fitEntities(liner.span, height, liner._tables.presence, liner._tables.height, liner.effective_timestamps);
 
     this.prepareTimeLabels(liner._all_timestamps);
@@ -312,7 +312,7 @@ class Renderer {
   /**
    * Compute horizontal positioning (d3.scaleBand() emulation)
    */
-  private fitTime(width: number, domain: string[], bandStretch: [string, string][]): void {
+  private fitTime(width: number, domain: string[], bandStretch: [string, string][], descending: boolean): void {
     const domainSize = domain.length;
     const toBeStretched: number[] = [];
 
@@ -342,7 +342,7 @@ class Renderer {
     }
 
     // Reverse positions so newest time appears on the left (descending order)
-    bandStart.reverse();
+    if (descending) bandStart.reverse();
 
     const bands: [number, number][] = bandStart.map(s => [s, s + bandwidth]);
 

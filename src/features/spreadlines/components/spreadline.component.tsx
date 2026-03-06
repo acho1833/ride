@@ -21,7 +21,8 @@ import {
   SPREADLINE_SQUEEZE_SAME_CATEGORY,
   SPREADLINE_MINIMIZE,
   SPREADLINE_TIME_CONFIG,
-  type SpreadlineGranularity
+  type SpreadlineGranularity,
+  type SpreadlineSortOrder
 } from '@/features/spreadlines/const';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -58,6 +59,8 @@ interface Props {
   onFilteredEntityNamesChange?: (names: string[]) => void;
   hopLimit: number;
   onHopLimitChange: (value: number) => void;
+  sortOrder: SpreadlineSortOrder;
+  onSortOrderChange: (value: SpreadlineSortOrder) => void;
 }
 
 const SpreadlineComponent = ({
@@ -80,7 +83,9 @@ const SpreadlineComponent = ({
   onBlocksFilterChange,
   onFilteredEntityNamesChange,
   hopLimit,
-  onHopLimitChange
+  onHopLimitChange,
+  sortOrder,
+  onSortOrderChange
 }: Props) => {
   const [computedData, setComputedData] = useState<SpreadLineData | null>(null);
   const [computing, setComputing] = useState(false);
@@ -179,13 +184,14 @@ const SpreadlineComponent = ({
         }
 
         const timeConfig = SPREADLINE_TIME_CONFIG[granularity];
-        // timeBlocks are descending; timeExtents needs [oldest, newest]
-        const timeExtents: [string, string] | undefined =
-          rawData.timeBlocks.length >= 2 ? [rawData.timeBlocks[rawData.timeBlocks.length - 1], rawData.timeBlocks[0]] : undefined;
+        // timeExtents needs [oldest, newest] regardless of sort order
+        const sorted = [...rawData.timeBlocks].sort();
+        const timeExtents: [string, string] | undefined = sorted.length >= 2 ? [sorted[0], sorted[sorted.length - 1]] : undefined;
         spreadline.center(egoName, timeExtents, timeConfig.delta, timeConfig.format, namedGroups);
         spreadline.configure({
           squeezeSameCategory: SPREADLINE_SQUEEZE_SAME_CATEGORY,
-          minimize: SPREADLINE_MINIMIZE
+          minimize: SPREADLINE_MINIMIZE,
+          descending: sortOrder === 'desc'
         });
 
         // Fixed width: consistent across all pages so viewBox stays identical
@@ -202,7 +208,7 @@ const SpreadlineComponent = ({
     }
 
     computeLayout();
-  }, [rawData, granularity, hopLimit]);
+  }, [rawData, granularity, hopLimit, sortOrder]);
 
   const maxLifespan = computedData ? Math.max(...computedData.storylines.map(s => s.lifespan)) : 50;
 
@@ -357,6 +363,8 @@ const SpreadlineComponent = ({
         onGranularityChange={onGranularityChange}
         hopLimit={hopLimit}
         onHopLimitChange={onHopLimitChange}
+        sortOrder={sortOrder}
+        onSortOrderChange={onSortOrderChange}
         pinnedCount={pinnedEntityNames.length}
         onClearPins={() => chartRef.current?.clearPins()}
       />

@@ -384,6 +384,7 @@ export interface RenderConfig {
   bandStretch: [string, string][];
   squeezeSameCategory: boolean;
   minimize: 'space' | 'line' | 'wiggles';
+  descending: boolean;
 }
 
 export interface SpreadLineResult {

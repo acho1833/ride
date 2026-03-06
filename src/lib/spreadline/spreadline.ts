@@ -86,7 +86,8 @@ export class SpreadLine {
   _config: RenderConfig = {
     bandStretch: [],
     squeezeSameCategory: false,
-    minimize: 'space'
+    minimize: 'space',
+    descending: false
   };
 
   _render: SpreadLineResult | null = null;

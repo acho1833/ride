@@ -23,8 +23,10 @@ import {
   SPREADLINE_DEFAULT_SPLIT_BY_AFFILIATION,
   SPREADLINE_DEFAULT_HOP_LIMIT,
   SPREADLINE_PAGE_SIZE,
+  SPREADLINE_DEFAULT_SORT_ORDER,
   type SpreadlineGranularity,
-  type SpreadlineBottomTab
+  type SpreadlineBottomTab,
+  type SpreadlineSortOrder
 } from '@/features/spreadlines/const';
 import SpreadlineGraphComponent from './spreadline-graph.component';
 import SpreadlineComponent from './spreadline.component';
@@ -41,6 +43,7 @@ interface SpreadlineTabCache {
   blocksFilter: number;
   activeBottomTab: SpreadlineBottomTab;
   hopLimit: number;
+  sortOrder: SpreadlineSortOrder;
 }
 
 /** Module-level cache: preserves tab state across unmount/remount (e.g. split-and-move) */
@@ -72,6 +75,7 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
   const [filteredEntityNames, setFilteredEntityNames] = useState<string[] | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<SpreadlineBottomTab>(cached?.activeBottomTab ?? 'spreadline');
   const [hopLimit, setHopLimit] = useState(cached?.hopLimit ?? SPREADLINE_DEFAULT_HOP_LIMIT);
+  const [sortOrder, setSortOrder] = useState<SpreadlineSortOrder>(cached?.sortOrder ?? SPREADLINE_DEFAULT_SORT_ORDER);
 
   // Sync state to cache so it survives unmount/remount
   useEffect(() => {
@@ -84,7 +88,8 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
       pageIndex,
       blocksFilter,
       activeBottomTab,
-      hopLimit
+      hopLimit,
+      sortOrder
     });
   }, [
     fileId,
@@ -96,7 +101,8 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
     pageIndex,
     blocksFilter,
     activeBottomTab,
-    hopLimit
+    hopLimit,
+    sortOrder
   ]);
 
   const { data: rawData } = useSpreadlineRawDataQuery({
@@ -107,7 +113,8 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
     splitByAffiliation,
     pageIndex,
     pageSize: SPREADLINE_PAGE_SIZE,
-    hopLimit
+    hopLimit,
+    sortOrder
   });
 
   const timeBlocks = rawData?.timeBlocks ?? [];
@@ -161,8 +168,9 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
       // so the year range filter works with monthly event data
       const toMonthlyMin = (t: string) => (t && !t.includes('-') ? `${t}-01` : t);
       const toMonthlyMax = (t: string) => (t && !t.includes('-') ? `${t}-12` : t);
-      const timeStart = selectedTimes.length > 0 ? toMonthlyMax(selectedTimes[0]) : '';
-      const timeEnd = selectedTimes.length > 0 ? toMonthlyMin(selectedTimes[selectedTimes.length - 1]) : '';
+      const sortedTimes = selectedTimes.length > 0 ? [...selectedTimes].sort() : [];
+      const timeStart = sortedTimes.length > 0 ? toMonthlyMin(sortedTimes[0]) : '';
+      const timeEnd = sortedTimes.length > 0 ? toMonthlyMax(sortedTimes[sortedTimes.length - 1]) : '';
       openNewFile({
         id: `re-${sortedIds[0]}-${sortedIds[1]}`,
         name: `${getLastName(sourceName)} ↔ ${getLastName(targetName)}.re`,
@@ -214,6 +222,8 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
                   onFilteredEntityNamesChange={setFilteredEntityNames}
                   hopLimit={hopLimit}
                   onHopLimitChange={setHopLimit}
+                  sortOrder={sortOrder}
+                  onSortOrderChange={setSortOrder}
                 />
               ) : (
                 <NetworkTimelineChartComponent
@@ -235,6 +245,8 @@ const SpreadlineTabComponent = ({ fileId }: Props) => {
                   onBlocksFilterChange={setBlocksFilter}
                   onFilteredEntityNamesChange={setFilteredEntityNames}
                   onEntityPin={setPinnedEntityNames}
+                  sortOrder={sortOrder}
+                  onSortOrderChange={setSortOrder}
                 />
               )}
             </div>

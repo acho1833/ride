@@ -459,12 +459,14 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
     const barX = Math.min(firstLabel.posX, lastLabel.posX) - bandWidth / 2;
     const barWidth = Math.abs(lastLabel.posX - firstLabel.posX) + bandWidth;
 
-    // Track current label indices during drag (ensure ascending order for drag constraints)
+    // Track current label indices during drag.
+    // Use posX to determine visual left/right (works for both asc and desc order).
     let currentStartIdx = data.timeLabels.findIndex(t => t.label === highlightTimes[0]);
     let currentEndIdx = data.timeLabels.findIndex(t => t.label === highlightTimes[highlightTimes.length - 1]);
     if (currentStartIdx === -1) currentStartIdx = 0;
     if (currentEndIdx === -1) currentEndIdx = data.timeLabels.length - 1;
-    if (currentStartIdx > currentEndIdx) {
+    // Ensure startIdx is the visually-left label and endIdx is visually-right
+    if (data.timeLabels[currentStartIdx].posX > data.timeLabels[currentEndIdx].posX) {
       [currentStartIdx, currentEndIdx] = [currentEndIdx, currentStartIdx];
     }
 
@@ -547,7 +549,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       onHighlightRangeChangeRef.current?.(data.timeLabels[currentStartIdx].label, data.timeLabels[currentEndIdx].label);
     };
 
-    // D3 drag for left handle (controls endIdx — higher index = leftmost due to reversed positions)
+    // D3 drag for left handle (controls visually-leftmost index)
     const leftDrag = d3
       .drag<SVGRectElement, unknown>()
       .container(function () {
@@ -561,8 +563,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       })
       .on('drag', event => {
         const idx = findNearestLabelIdx(event.x);
-        if (idx >= currentStartIdx) {
-          currentEndIdx = idx;
+        if (data.timeLabels[idx].posX <= data.timeLabels[currentEndIdx].posX) {
+          currentStartIdx = idx;
           updateVisuals();
           fireRangeChange();
         }
@@ -573,7 +575,7 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
         fireRangeChange();
       });
 
-    // D3 drag for right handle (controls startIdx — lower index = rightmost due to reversed positions)
+    // D3 drag for right handle (controls visually-rightmost index)
     const rightDrag = d3
       .drag<SVGRectElement, unknown>()
       .container(function () {
@@ -587,8 +589,8 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       })
       .on('drag', event => {
         const idx = findNearestLabelIdx(event.x);
-        if (idx <= currentEndIdx) {
-          currentStartIdx = idx;
+        if (data.timeLabels[idx].posX >= data.timeLabels[currentStartIdx].posX) {
+          currentEndIdx = idx;
           updateVisuals();
           fireRangeChange();
         }
@@ -620,16 +622,19 @@ const SpreadLineChart = forwardRef<SpreadLineChartHandle, SpreadLineChartProps>(
       .on('drag', event => {
         const idx = findNearestLabelIdx(event.x);
         const delta = idx - panStartIdx;
-        const rangeSize = panOrigEnd - panOrigStart;
         let newStart = panOrigStart + delta;
         let newEnd = panOrigEnd + delta;
-        if (newStart < 0) {
-          newStart = 0;
-          newEnd = rangeSize;
+        // Clamp so neither index goes out of bounds (works for both asc and desc)
+        const lo = Math.min(newStart, newEnd);
+        const hi = Math.max(newStart, newEnd);
+        if (lo < 0) {
+          newStart -= lo;
+          newEnd -= lo;
         }
-        if (newEnd >= data.timeLabels.length) {
-          newEnd = data.timeLabels.length - 1;
-          newStart = newEnd - rangeSize;
+        if (hi >= data.timeLabels.length) {
+          const shift = hi - (data.timeLabels.length - 1);
+          newStart -= shift;
+          newEnd -= shift;
         }
         currentStartIdx = newStart;
         currentEndIdx = newEnd;

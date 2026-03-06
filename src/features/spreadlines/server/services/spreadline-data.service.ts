@@ -59,6 +59,7 @@ export async function getSpreadlineRawData(params: {
   pageIndex?: number;
   pageSize?: number;
   hopLimit?: number;
+  sortOrder?: 'asc' | 'desc';
 }): Promise<SpreadlineRawDataResponse> {
   const {
     egoId,
@@ -68,7 +69,8 @@ export async function getSpreadlineRawData(params: {
     splitByAffiliation = true,
     pageIndex = 0,
     pageSize = 20,
-    hopLimit = 2
+    hopLimit = 2,
+    sortOrder = 'desc'
   } = params;
   const dataDir = DATASET_DIRS[granularity] ?? DATASET_DIRS.yearly;
   const basePath = path.join(process.cwd(), dataDir);
@@ -164,8 +166,10 @@ export async function getSpreadlineRawData(params: {
     };
   }
 
-  // Extract unique time blocks sorted descending (newest first)
-  const allTimeBlocks = [...new Set(topology.map(t => t.time))].sort((a, b) => b.localeCompare(a));
+  // Extract unique time blocks sorted by requested order
+  const allTimeBlocks = [...new Set(topology.map(t => t.time))].sort((a, b) =>
+    sortOrder === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+  );
   const totalPages = Math.max(1, Math.ceil(allTimeBlocks.length / pageSize));
   const clampedPage = Math.max(0, Math.min(pageIndex, totalPages - 1));
   const start = clampedPage * pageSize;
@@ -173,16 +177,19 @@ export async function getSpreadlineRawData(params: {
   const pageTimeBlocks = allTimeBlocks.slice(start, end);
 
   // Pad to pageSize so every page lays out the same number of columns.
-  // Generate earlier time labels beyond the last real block.
+  // Generate time labels beyond the last real block (forward for asc, backward for desc).
   if (pageTimeBlocks.length < pageSize && pageTimeBlocks.length > 0) {
     const lastLabel = pageTimeBlocks[pageTimeBlocks.length - 1];
     const existing = new Set(pageTimeBlocks);
+    const step = sortOrder === 'asc' ? 1 : -1;
     if (granularity === 'monthly') {
-      // Format: "YYYY-MM"
       let [y, m] = lastLabel.split('-').map(Number);
       while (pageTimeBlocks.length < pageSize) {
-        m -= 1;
-        if (m < 1) {
+        m += step;
+        if (m > 12) {
+          m = 1;
+          y += 1;
+        } else if (m < 1) {
           m = 12;
           y -= 1;
         }
@@ -193,10 +200,9 @@ export async function getSpreadlineRawData(params: {
         }
       }
     } else {
-      // Format: "YYYY"
       let y = Number(lastLabel);
       while (pageTimeBlocks.length < pageSize) {
-        y -= 1;
+        y += step;
         const label = String(y);
         if (!existing.has(label)) {
           pageTimeBlocks.push(label);

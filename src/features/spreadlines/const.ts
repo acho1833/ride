@@ -47,6 +47,12 @@ export const SPREADLINE_TIME_FORMAT = '%Y';
 /** Granularity type for time axis */
 export type SpreadlineGranularity = 'yearly' | 'monthly';
 
+/** Sort order for time blocks */
+export type SpreadlineSortOrder = 'asc' | 'desc';
+
+/** Default sort order (newest first) */
+export const SPREADLINE_DEFAULT_SORT_ORDER: SpreadlineSortOrder = 'desc';
+
 /** Available granularity options for the dropdown */
 export const SPREADLINE_GRANULARITY_OPTIONS: { label: string; value: SpreadlineGranularity }[] = [
   { label: 'Yearly', value: 'yearly' },

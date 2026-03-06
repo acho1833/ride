@@ -50,7 +50,8 @@ export const spreadlineRouter = appProcedure.router({
         splitByAffiliation: z.boolean().default(true),
         pageIndex: z.number().default(0),
         pageSize: z.number().default(20),
-        hopLimit: z.number().min(1).max(5).default(2)
+        hopLimit: z.number().min(1).max(5).default(2),
+        sortOrder: z.enum(['asc', 'desc']).default('desc')
       })
     )
     .output(spreadlineRawDataResponseSchema)

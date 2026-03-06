@@ -30,7 +30,8 @@ import {
   SPREADLINE_HIGHLIGHT_HANDLE_WIDTH,
   SPREADLINE_HIGHLIGHT_HANDLE_COLOR,
   SPREADLINE_HIGHLIGHT_HANDLE_HOVER_COLOR,
-  type SpreadlineGranularity
+  type SpreadlineGranularity,
+  type SpreadlineSortOrder
 } from '@/features/spreadlines/const';
 import type { SpreadlineRawData } from '@/features/spreadlines/components/spreadline.component';
 import { transformSpreadlineToTimeline } from '@/features/spreadlines/utils';
@@ -63,6 +64,8 @@ interface Props {
   onBlocksFilterChange: (value: number) => void;
   onFilteredEntityNamesChange?: (names: string[]) => void;
   onEntityPin?: (names: string[]) => void;
+  sortOrder: SpreadlineSortOrder;
+  onSortOrderChange: (value: SpreadlineSortOrder) => void;
 }
 
 /** Drag state for highlight overlay handles */
@@ -90,7 +93,9 @@ const NetworkTimelineChartComponent = ({
   blocksFilter,
   onBlocksFilterChange,
   onFilteredEntityNamesChange,
-  onEntityPin
+  onEntityPin,
+  sortOrder,
+  onSortOrderChange
 }: Props) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -270,7 +275,7 @@ const NetworkTimelineChartComponent = ({
     const timeBlockIndex = new Map<string, number>();
     timeBlocks.forEach((tb, i) => timeBlockIndex.set(tb, i));
 
-    // X scale: time blocks (used as-is — descending from API, newest on left)
+    // X scale: time blocks (rendered left-to-right in API order)
     const xScale = d3.scaleBand().domain(timeBlocks).range([0, chartWidth]).padding(0.1);
 
     // Y scale: entity names in filtered order
@@ -474,6 +479,8 @@ const NetworkTimelineChartComponent = ({
         onRelationTypesChange={onRelationTypesChange}
         granularity={granularity}
         onGranularityChange={onGranularityChange}
+        sortOrder={sortOrder}
+        onSortOrderChange={onSortOrderChange}
         pinnedCount={pinnedEntityNames.length}
         onClearPins={() => onEntityPin?.([])}
       />
